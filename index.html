@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="css/reset.css">
     <link rel="stylesheet" href="css/general.css">
     <link rel="stylesheet" href="css/home.css">
+    <link rel="stylesheet" type="text/css" href="//cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.css" />
 </head>
 
 <body>
@@ -52,7 +53,7 @@
     <main class="container">
         <section id="projects">
             <h2>Projects <i class="fa-regular fa-folder-open"></i></h2>
-            <div class="projects">
+            <div class="projects slick--projects">
 
                 <a class="project" href="projects/broth-brawlers.html">
                     <div class="project__preview">
@@ -135,6 +136,7 @@
                 </a>
 
             </div>
+            <div class="slick-arrows"></div>
         </section>
 
         <section id="about">
@@ -208,5 +210,43 @@
 </body>
 
 <script src="https://kit.fontawesome.com/7ab46062e1.js" crossorigin="anonymous"></script>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"
+    integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+<script type="text/javascript" src="//code.jquery.com/jquery-1.11.0.min.js"></script>
+<script type="text/javascript" src="//code.jquery.com/jquery-migrate-1.2.1.min.js"></script>
+<script type="text/javascript" src="//cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.min.js"></script>
+
+<script type="text/javascript">
+    $(document).ready(function () {
+
+        const projectSettings = {
+            arrows: true,
+            infinite: true,
+            slidesToShow: 1,
+            mobileFirst: true,
+            slidesToScroll: 1,
+            draggable: true,
+            centerMode: true,
+            prevArrow: '<div class="button slick-prev"><span></span></div>',
+            nextArrow: '<div class="button slick-next"><span></span></div>',
+            appendArrows: $('.slick-arrows'),
+            responsive: [
+                {
+                    breakpoint: 768,
+                    settings: "unslick"
+                }
+            ]
+        };
+
+        const projectSlider = $('.slick--projects').slick(projectSettings);
+
+        $(window).on('resize', function () {
+            if ($(window).width() < 768 && !projectSlider.hasClass('slick-initialized')) {
+                $('.slick--projects').slick(projectSettings);
+            }
+        });
+
+    });
+</script>
 
 </html>

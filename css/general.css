@@ -57,6 +57,7 @@ strong {
     padding: 0 clamp(20px, 6vw, 140px);
     max-width: 1440px;
     margin-inline: auto;
+    overflow-x: hidden;
 }
 
 .tag {
@@ -158,6 +159,33 @@ strong {
 }
 .button:hover::before {
     opacity: 1;
+}
+.button.slick-arrow {
+    width: fit-content;
+}
+.button.slick-arrow span {
+    padding: 0;
+}
+.button.slick-arrow span {
+    height: 42px;
+    width: 42px;
+    border-radius: 5px;
+    display: grid;
+    place-items: center;
+}
+.button.slick-arrow span::after {
+    display: block;
+    margin: 0;
+}
+.button.slick-prev span::after {
+    transform: rotate(180deg);
+}
+.slick-arrows {
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    justify-content: center;
+    margin-block-start: 2rem;
 }
 
 
