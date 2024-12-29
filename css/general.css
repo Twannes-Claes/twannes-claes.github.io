@@ -140,6 +140,7 @@ strong {
     position: relative;
     display: inline-block;
     transition: .3s ease transform;
+    white-space: nowrap;
 }
 .button a i, .button span i {
     margin-inline-end: 8px;
@@ -188,6 +189,14 @@ strong {
     margin-block-start: 2rem;
 }
 
+ul {
+    list-style: disc;
+    list-style-position: inside;
+}
+
+li::marker {
+    color: var(--c-purple);
+}
 
 nav {
     position: sticky;
@@ -199,6 +208,7 @@ nav {
 nav ul {
     display: flex;
     flex-direction: row;
+    list-style: none;
     justify-content: flex-end;
     gap: clamp(32px, 2vw + 16px, 60px);
     border-block-end: 1px var(--c-white) solid;
@@ -218,3 +228,5 @@ nav ul li a::after {
 nav ul li a:hover::after {
     width: 100%;
 }
+
+

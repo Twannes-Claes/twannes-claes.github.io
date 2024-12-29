@@ -1,0 +1,121 @@
+.back {
+    display: flex;
+    flex-direction: row-reverse;
+    align-items: center;
+    font-size: 1rem;
+    margin-block: clamp(4rem, 2.5vw + 2.5rem, 6.25rem);
+}
+.back::after {
+    transform: rotate(180deg);
+    display: inline-block;
+}
+.back:hover::after {
+    margin-inline: 0 0.5rem;
+}
+
+.project {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-block: clamp(4rem, 2.5vw + 2.5rem, 6.25rem);
+}
+@media (max-width: 768px) {
+    .project {
+        grid-template-columns: 100%;
+        gap: 3rem;
+    }
+}
+
+
+.project__content {
+    margin-inline-end: 5%;
+    height: fit-content;
+}
+@media (max-width: 768px) {
+    .project__content {
+        margin-inline-end: 0;
+    }
+}
+.project__title {
+    font-size: clamp(1.8rem, 3vw + 1rem, 4rem);
+    margin-block-end: 1rem;
+}
+.project__tags {
+    margin-block-end: 3.5rem;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.project__desc {
+    margin-block-end: 3.5rem;
+}
+.project__links {
+    margin-block-start: 3.5rem;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 24px;
+}
+
+.project__images {
+    margin-inline-start: 12%;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    position: relative;
+    height: fit-content;
+}
+@media (max-width: 768px) {
+    .project__images {
+        margin-inline-start: 0;
+    }
+}
+
+.project__images::before {
+    content: '';
+    background-color: var(--c-purple);
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: -1;
+    transform: rotate(-2deg);
+}
+
+.project__images img {
+    width: 100%;
+    border-radius: 5px;
+}
+
+.project__img:has(i) {
+    overflow: hidden;
+    position: relative;
+    transition: .3s ease all;
+}
+.project__img:has(i) img {
+    filter: blur(8px);
+    scale: 1.05;
+}
+.project__img:has(i)::before {
+    content: '';
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    background-color: var(--c-purple);
+    opacity: 0.2;
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
+.project__img i {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    font-size: 2rem;
+    transition: .3s ease all;
+    transform: translate(-50%, -50%);
+}
+.project__img:has(i):hover i {
+    font-size: 2.5rem;
+}
