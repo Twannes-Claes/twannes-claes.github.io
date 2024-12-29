@@ -1,0 +1,237 @@
+.header {
+    display: grid;
+    gap: 2rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: center;
+}
+@media (max-width: 992px) {
+    .header {
+        grid-template-columns: 100%;
+        gap: 4rem;
+    }
+}
+
+.header__content {
+    grid-column: 1 / span 2;
+    padding-inline-end: 20%;
+}
+@media (max-width: 992px) {
+    .header__content {
+        padding: 0;
+        grid-column: 1 / 2;
+    }
+}
+
+.header__content h1 {
+    font-size: clamp(2rem, 3vw + 1.5rem, 5rem);
+    margin-block-end: 1rem;
+}
+
+.header__content p {
+    margin-block-end: 1.5rem;
+}
+
+.header__img {
+    background-color: var(--c-purple);
+    aspect-ratio: 1 / 1;
+    max-height: 20rem;
+}
+
+.header__img img {
+    width: 100%;
+    height: 100%;
+    border-radius: 5px;
+    object-fit: cover;
+    border: 1px solid var(--c-white);
+    transform: rotate(-5deg);
+}
+@media (max-width: 1200px) {
+    .header .tag {
+        margin-block-end: 0.5rem;
+    }
+}
+
+
+.header,
+#about,
+#projects,
+#contact {
+    scroll-margin-block-start: clamp(6rem, 5vw + 5rem, 12.5rem);
+    margin-block: clamp(8rem, 5vw + 5rem, 12.5rem);
+}
+.header {
+    margin-block-start: clamp(4rem, 2.5vw + 2.5rem, 6.25rem);
+}
+#contact {
+    margin-block-end: clamp(4rem, 2.5vw + 2.5rem, 6.25rem);
+}
+
+
+
+.projects {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 32px;
+    position: relative;
+}
+
+.projects::before {
+    content: '';
+    background-color: var(--c-purple);
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: -1;
+    transform: rotate(-2deg);
+}
+
+@media (max-width: 992px) {
+    .projects {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+@media (max-width: 768px) {
+    .projects {
+        grid-template-columns: 100%;
+    }
+}
+
+.project {
+    border-radius: 5px;
+    border: 1px solid var(--c-white);
+    padding: 24px;
+    background-color: var(--c-black);
+}
+
+.project__preview {
+    position: relative;
+    z-index: 0;
+}
+
+.project__img {
+    overflow: hidden;
+}
+
+.project__img img {
+    width: 100%;
+    aspect-ratio: 330/260;
+    object-fit: cover;
+    object-position: center;
+    transition: all .3s ease;
+}
+
+.project:hover .project__img img {
+    filter: blur(8px);
+    transform: scale(1.05);
+}
+
+.project__tags {
+    position: absolute;
+    top: 0;
+    left: 0;
+    padding: 12px;
+    z-index: 1;
+}
+
+.project__button {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    transition: .3s ease all;
+}
+
+.project:hover .project__button {
+    opacity: 1;
+}
+
+.project:hover .button span {
+    transform: rotate(-3deg);
+}
+
+.project:nth-of-type(odd):hover .button span {
+    transform: rotate(3deg);
+}
+
+.project:hover .button::before {
+    opacity: 1;
+}
+
+.project__title {
+    font-size: 20px;
+    margin-block-start: 12px;
+}
+
+
+.about {
+    display: grid;
+    gap: 2rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 1200px) {
+    .about {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+@media (max-width: 992px) {
+    .about {
+        grid-template-columns: 100%;
+        gap: 4rem;
+    }
+}
+
+.about__desc {
+    grid-column: 1 / span 2;
+    padding-inline-end: 20%;
+}
+@media (max-width: 1200px) {
+    .about__desc {
+        grid-column: 1 / 2;
+    }
+}
+@media (max-width: 992px) {
+    .about__desc {
+        padding: 0;
+    }
+}
+
+.about__skills {
+    padding: 24px;
+    border: 1px solid var(--c-white);
+    border-radius: 5px;
+    position: relative;
+    background-color: var(--c-black);
+}
+
+.about__skills::after {
+    content: '';
+    background-color: var(--c-purple);
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform: rotate(4deg);
+    z-index: -1;
+}
+
+.about__skill {
+    margin-block-end: 0.5rem;
+}
+
+.contact {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    column-gap: clamp(20px, 2vw + 10px, 70px);
+    flex-direction: row;
+}
+.break {
+    flex-basis: 100%;
+}
+.contact .button {
+    margin-block-end: clamp(20px, 2vw + 10px, 70px);
+}
