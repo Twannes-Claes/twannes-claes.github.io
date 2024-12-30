@@ -159,7 +159,7 @@
 }
 
 .project:hover .project__img img {
-    filter: blur(8px);
+    filter: blur(6px);
     transform: scale(1.05);
 }
 .project:hover .project__img::before {
