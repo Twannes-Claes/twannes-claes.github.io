@@ -1,0 +1,10 @@
+# Ignore the .vs folder
+.vs/
+
+# Optional: Ignore other common files and folders
+*.log
+*.tmp
+*.bak
+*.swp
+*.DS_Store
+*.Thumbs.db
