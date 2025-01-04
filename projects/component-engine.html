@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Component Engine | Twannes Claes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Onest:wght@100..900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="../css/reset.css">
+    <link rel="stylesheet" href="../css/general.css">
+    <link rel="stylesheet" href="../css/project.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.css" />
+</head>
+
+<body>
+
+    <nav class="container">
+        <ul>
+            <li>
+                <a href="/#projects">Projects</a>
+            </li>
+            <li>
+                <a href="/#about">About me</a>
+            </li>
+            <li>
+                <a href="/#contact">Contact & Links</a>
+            </li>
+        </ul>
+    </nav>
+
+    <main class="container">
+        <a class="back link" href="/#projects">
+            Back to overview
+        </a>
+
+        <div class="project">
+            <div class="project__content">
+                <h1 class="project__title">2D Component Engine</h1>
+                <div class="project__tags">
+                    <div class="tag">C++</div>
+                    <div class="tag">SDL</div>
+                    <div class="tag">SteamSDK</div>
+                    <div class="tag">Imgui</div>
+                </div>
+                <div class="project__desc">
+                    This project was my first attempt at making a game engine from scratch. Doing this project, I learned a lot about programming patterns, engine features and various other programming techniques.
+                </div>
+                <ul>
+                    <strong>Features:</strong>
+                    <li>GameObjects and Components</li>
+                    <li>Observers and Event Queue</li>
+                    <li>Lobby loading</li>
+                    <li>Multithreaded Audio System</li>
+                    <li>Sprite + text rendering</li>
+                    <li>Gamepad & Keyboard input</li>
+                    <li>Scene management</li>
+                    <li>Resource management</li>
+                    <li>Steam achievements</li>
+                    <br>
+                    <strong>Patterns used:</strong>
+                    <li>Game Loop</li>
+                    <li>Update method</li>
+                    <li>Dirty flag</li>
+                    <li>Observer</li>
+                    <li>Event Queue</li>
+                    <li>Command</li>
+                    <li>Singleton</li>
+                    <li>Service Locator</li>
+                </ul>         
+                <div class="project__links">
+                    <div class="button">
+                        <a href="https://github.com/Twannes-Claes/2D-Component-Engine" target="_blank"><i class="fa-brands fa-github"></i>Visit my repository</a>
+                    </div>
+            </div>
+        </div>
+            <!-- <div class="project__images">
+                <a href="../assets/pepper-robot.png" data-fancybox="gallery" class="project__img">
+                    <img src="../assets/pepper-robot.png" />
+                </a>
+                <a href="../assets/pepper-robot-1.png" data-fancybox="gallery" class="project__img">
+                    <img src="../assets/pepper-robot-1.png"/>
+                </a>
+            </div> -->
+        </div>
+    </main>
+
+</body>
+
+<script src="https://kit.fontawesome.com/7ab46062e1.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.umd.js"></script>
+
+
+<script type="text/javascript">
+    Fancybox.bind("[data-fancybox]", {
+    });
+</script>
+
+</html>

@@ -45,7 +45,10 @@
     flex-direction: row;
     flex-wrap: wrap;
     gap: 0.5rem;
+    position: relative;
+    width: fit-content;
 }
+
 .project__desc {
     margin-block-end: 3.5rem;
 }
@@ -94,7 +97,7 @@
     transition: .3s ease all;
 }
 .project__img:has(i) img {
-    filter: blur(8px);
+    filter: blur(1px);
     scale: 1.05;
 }
 .project__img:has(i)::before {

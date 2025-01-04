@@ -193,6 +193,7 @@ strong {
 ul {
     list-style: disc;
     list-style-position: inside;
+    line-height: 1.75;
 }
 
 li::marker {
