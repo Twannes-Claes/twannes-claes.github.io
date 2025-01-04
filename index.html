@@ -37,11 +37,13 @@
             <div class="header__content">
                 <div class="tag tag--big">Game Developer</div>
                 <h1>Twannes Claes</h1>
-                <p>Lorem ipsum dolor sit amet consectetur. Nibh dignissim mauris iaculis molestie posuere. Lorem id id
-                    vitae odio.
-                    Tincidunt ut diam egestas id a sed. Blandit facilisi a lorem aliquam velit.Tincidunt ut diam egestas
-                    id a sed. Blandit
-                    facilisi a lorem aliquam velit.</p>
+                <p>
+                    <strong>Hi there, and welcome to my portfolio!</strong>
+                    <br>
+                    This is a collection of the projects I'm most proud of, showcasing my journey in game development.
+                    <br>
+                    You'll find both personal and collaborative works here, some created during my studies at Digital Arts and Entertainment, and others crafted during my free time. I hope you enjoy exploring my work as much as I enjoyed creating it!
+                </p>
                 <a class="link" href="#projects">View my projects</a>
             </div>
             <div class="header__img">
@@ -203,17 +205,19 @@
             <h2>About me <i class="fa-regular fa-user"></i></h2>
             <div class="about">
                 <div class="about__desc">
-                    Lorem ipsum dolor sit amet consectetur. Nibh dignissim mauris iaculis molestie posuere. Lorem id id
-                    vitae odio.
-                    Tincidunt ut diam egestas id a sed. Blandit facilisi a lorem aliquam velit.Tincidunt ut diam egestas
-                    id a sed. Blandit
-                    facilisi a lorem aliquam velit. Lorem ipsum dolor sit amet consectetur. Nibh dignissim mauris
-                    iaculis molestie posuere.
-                    <br>
-                    <br>
-                    Lorem id id vitae odio. Tincidunt ut diam egestas id a sed. Blandit facilisi a lorem aliquam
-                    velit.Tincidunt ut diam
-                    egestas id a sed. Blandit facilisi a lorem aliquam velit.
+                    <p>
+                        Hi, I'm Twannes Claes, a 21-year old Game Development graduate from Digital Arts and Entertainment, class of 2024.
+                        <br>
+                        <br>
+                        I am currently seeking exciting opportunities in the game industry, so if you like my work, don't hesitate to reach out!
+                        <br>
+                        <br>
+                        I am passionate about crafting and improving my skills, whether it's trough programming, drawing, cooking, or something else to spark my creativity.
+                        <br> 
+                        Above all, I love programming. There's nothing more exciting to me than bringing ideas to life trough code, turning simple thoughts into something real and interactive that other people can enjoy.
+                        <br>
+                        This passion has also made me a big fan of indie games. I admire how they focus on creativity and unique ideas, and the succes they earned.
+                    </p>
                 </div>
                 <div class="about__skills">
                     <div class="about__skill">
@@ -273,9 +277,10 @@
 <script type="text/javascript" src="//cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.min.js"></script>
 
 <script type="text/javascript">
-    $(document).ready(function () {
-
-        const projectSettings = {
+    $(document).ready(function () 
+    {
+        const projectSettings = 
+        {
             arrows: true,
             infinite: true,
             slidesToShow: 1,
@@ -293,15 +298,16 @@
                 }
             ]
         };
-
-        const projectSlider = $('.slick--projects').slick(projectSettings);
-
-        $(window).on('resize', function () {
-            if ($(window).width() < 768 && !projectSlider.hasClass('slick-initialized')) {
+        
+         const projectSlider = $('.slick--projects').slick(projectSettings);
+        
+        $(window).on('resize', function () 
+        {
+            if ($(window).width() < 768 && !projectSlider.hasClass('slick-initialized')) 
+            {
                 $('.slick--projects').slick(projectSettings);
             }
         });
-
     });
 </script>
 
