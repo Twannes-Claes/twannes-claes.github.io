@@ -2086,13 +2086,13 @@ var tempI64;
 // === Body ===
 
 var ASM_CONSTS = {
-  5019312: function() {return Module.webglContextAttributes.premultipliedAlpha;},  
- 5019373: function() {return Module.webglContextAttributes.preserveDrawingBuffer;},  
- 5019437: function() {return Module.webglContextAttributes.powerPreference;},  
- 5019495: function() {Module['emscripten_get_now_backup'] = performance.now;},  
- 5019550: function($0) {performance.now = function() { return $0; };},  
+  5019360: function() {return Module.webglContextAttributes.premultipliedAlpha;},  
+ 5019421: function() {return Module.webglContextAttributes.preserveDrawingBuffer;},  
+ 5019485: function() {return Module.webglContextAttributes.powerPreference;},  
+ 5019543: function() {Module['emscripten_get_now_backup'] = performance.now;},  
  5019598: function($0) {performance.now = function() { return $0; };},  
- 5019646: function() {performance.now = Module['emscripten_get_now_backup'];}
+ 5019646: function($0) {performance.now = function() { return $0; };},  
+ 5019694: function() {performance.now = Module['emscripten_get_now_backup'];}
 };
 
 
@@ -4893,6 +4893,21 @@ var ASM_CONSTS = {
   
           requestOptions.timeout = timeout;
   	}
+
+  function _SaveFileJS(fileNamePtr, jsonPtr) {
+          var fileName = UTF8ToString(fileNamePtr);
+          var json = UTF8ToString(jsonPtr);
+  
+          var blob = new Blob([json], { type: 'application/json' });
+          var url = URL.createObjectURL(blob);
+  
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = fileName;
+          a.click();
+  
+          URL.revokeObjectURL(url);
+      }
 
   function ___assert_fail(condition, filename, line, func) {
       abort('Assertion failed: ' + UTF8ToString(condition) + ', at: ' + [filename ? UTF8ToString(filename) : 'unknown filename', line, func ? UTF8ToString(func) : 'unknown function']);
@@ -16164,6 +16179,7 @@ var asmLibraryArg = {
   "JS_WebRequest_SetRedirectLimit": _JS_WebRequest_SetRedirectLimit,
   "JS_WebRequest_SetRequestHeader": _JS_WebRequest_SetRequestHeader,
   "JS_WebRequest_SetTimeout": _JS_WebRequest_SetTimeout,
+  "SaveFileJS": _SaveFileJS,
   "__assert_fail": ___assert_fail,
   "__cxa_allocate_exception": ___cxa_allocate_exception,
   "__cxa_begin_catch": ___cxa_begin_catch,
