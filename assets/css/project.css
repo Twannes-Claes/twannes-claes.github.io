@@ -1,14 +1,3 @@
-.nav--project {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    border-block-end: 1px solid var(--c-fg);
-}
-.nav--project ul {
-    border-block-end: none;
-}
 .button--back a, .button--back span {
     display: grid;
     place-items: center;
@@ -98,15 +87,20 @@
     transform: rotate(-2deg);
 }
 
+.project__images .project__img {
+    display: block;
+    overflow: hidden;
+    position: relative;
+    border-radius: 5px;
+    border: 2px solid var(--c-border);
+}
+
 .project__images img {
     width: 100%;
-    border-radius: 5px;
-    border: 2px solid var(--c-fg);
+    display: block;
 }
 
 .project__img:has(i) {
-    overflow: hidden;
-    position: relative;
     transition: .3s ease all;
 }
 .project__img:has(i) img {

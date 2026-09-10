@@ -1,23 +1,25 @@
-<nav class="container{% if include.back %} nav--project{% endif %}">
-    {% if include.back %}
-    <div class="button button--back">
-        <a href="{{ include.prefix }}#projects" aria-label="Back to overview"><i class="fa-solid fa-house"></i></a>
+<nav class="container">
+    <div class="nav__row">
+        {% if include.back %}
+        <div class="button button--back">
+            <a href="{{ include.prefix }}#projects" aria-label="Back to overview"><i class="fa-solid fa-house"></i></a>
+        </div>
+        {% endif %}
+        <ul>
+            <li>
+                <a href="{{ include.prefix }}#projects"><i class="fa-regular fa-folder-open"></i><span>Projects</span></a>
+            </li>
+            <li>
+                <a href="{{ include.prefix }}#about"><i class="fa-regular fa-user"></i><span>About me</span></a>
+            </li>
+            <li>
+                <a href="{{ include.prefix }}#contact"><i class="fa-regular fa-envelope"></i><span>Contact & Links</span></a>
+            </li>
+            <li>
+                <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle light and dark theme">
+                    <i class="fa-solid fa-moon"></i>
+                </button>
+            </li>
+        </ul>
     </div>
-    {% endif %}
-    <ul>
-        <li>
-            <a href="{{ include.prefix }}#projects"><i class="fa-regular fa-folder-open"></i><span>Projects</span></a>
-        </li>
-        <li>
-            <a href="{{ include.prefix }}#about"><i class="fa-regular fa-user"></i><span>About me</span></a>
-        </li>
-        <li>
-            <a href="{{ include.prefix }}#contact"><i class="fa-regular fa-envelope"></i><span>Contact & Links</span></a>
-        </li>
-        <li>
-            <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle light and dark theme">
-                <i class="fa-solid fa-moon"></i>
-            </button>
-        </li>
-    </ul>
 </nav>
