@@ -1,3 +1,6 @@
 title: Twannes Claes | Portfolio
 author: Twannes Claes
 description: Check out my portfolio!
+
+exclude:
+  - archive

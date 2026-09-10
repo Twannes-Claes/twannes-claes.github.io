@@ -31,13 +31,13 @@
     <nav class="container">
         <ul>
             <li>
-                <a href="#projects">Projects</a>
+                <a href="#projects"><i class="fa-regular fa-folder-open"></i>Projects</a>
             </li>
             <li>
-                <a href="#about">About me</a>
+                <a href="#about"><i class="fa-regular fa-user"></i>About me</a>
             </li>
             <li>
-                <a href="#contact">Contact & Links</a>
+                <a href="#contact"><i class="fa-regular fa-envelope"></i>Contact & Links</a>
             </li>
             <li>
                 <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle light and dark theme">
@@ -55,14 +55,18 @@
                 <p>
                     <strong>Hi there, and welcome to my portfolio!</strong>
                     <br>
+                    <br>
                     This is a collection of the projects I'm most proud of, showcasing my journey through game development and software engineering.
+                    <br>
                     <br>
                     You'll find both personal and collaborative works here, some created during my studies at Digital Arts and Entertainment, others from my professional work, and the rest crafted during my free time. I hope you enjoy exploring my work as much as I enjoyed creating it!
                 </p>
-                <a class="link" href="#projects">View my projects</a>
+                <div class="button">
+                    <a href="#projects"><i class="fa-regular fa-folder-open"></i>View my projects</a>
+                </div>
             </div>
             <div class="header__img">
-                <img src="assets/home-picture.jpg" alt="">
+                <img src="/assets/site/home-picture.jpg" alt="">
             </div>
         </div>
     </header>
@@ -70,117 +74,55 @@
     <main class="container">
         <section id="projects">
             <h2>Projects <i class="fa-regular fa-folder-open"></i></h2>
+            <h3 class="projects__group-title">Professional Work</h3>
             <div class="projects slick--projects">
 
                 <a class="project" href="projects/vintecc.html">
                     <div class="project__preview">
                         <div class="project__img">
-                            <img src="assets/vintecc-placeholder.svg" alt="">
+                            <img src="/assets/projects/vintecc/cover.svg" alt="">
                         </div>
                         <div class="project__tags">
+                            <span class="tag">Work</span>
                             <span class="tag">Unity</span>
                             <span class="tag">C#</span>
                             <span class="tag">DOD/ECS</span>
-                            <span class="tag">Docker</span>
-                        </div>
-                        <div class="project__button button">
-                            <span href=""><i class="fa-solid fa-circle-info"></i>More info</span>
+                            <span class="tag">CI/CD</span>
                         </div>
                     </div>
-                    <h3 class="project__title">Vintecc - Digital Twin Engineer</h3>
+                    <div class="project__footer">
+                        <h3 class="project__title">Vintecc - Digital Twin Engineer</h3>
+                        <div class="project__button button">
+                            <span><i class="fa-solid fa-arrow-right"></i></span>
+                        </div>
+                    </div>
                 </a>
 
-                <a class="project" href="projects/adapta-solva.html">
+                <a class="project" href="projects/replaceable.html">
                     <div class="project__preview">
                         <div class="project__img">
-                            <img src="assets/adapta-solva.png" alt="">
+                            <img src="/assets/projects/replaceable/header.jpg" alt="">
                         </div>
                         <div class="project__tags">
+                            <span class="tag">Work</span>
                             <span class="tag">Unity</span>
                             <span class="tag">C#</span>
-                            <span class="tag">Perforce</span>
-                            <span class="tag">Team</span>
-                        </div>
-                        <div class="project__button button">
-                            <span href=""><i class="fa-solid fa-circle-info"></i>More info</span>
+                            <span class="tag">DOTS</span>
+                            <span class="tag">CI/CD</span>
                         </div>
                     </div>
-                    <h3 class="project__title">Adapta Solva</h3>
-                </a>
-
-                <a class="project" href="projects/physics-engine.html">
-                    <div class="project__preview">
-                        <div class="project__img">
-                            <img src="assets/physics-engine.png" alt="">
-                        </div>
-                        <div class="project__tags">
-                            <span class="tag">C++</span>
-                            <span class="tag">SDL</span>
-                        </div>
+                    <div class="project__footer">
+                        <h3 class="project__title">The Pack - Replaceable</h3>
                         <div class="project__button button">
-                            <span href=""><i class="fa-solid fa-circle-info"></i>More info</span>
+                            <span><i class="fa-solid fa-arrow-right"></i></span>
                         </div>
                     </div>
-                    <h3 class="project__title">2D Physics Engine</h3>
-                </a>
-
-                <a class="project" href="projects/dots-research-game.html">
-                    <div class="project__preview">
-                        <div class="project__img">
-                            <img src="assets/dots-research.png" alt="">
-                        </div>
-                        <div class="project__tags">
-                            <span class="tag">Unity</span>
-                            <span class="tag">C#</span>
-                            <span class="tag">DOP</span>
-                            <span class="tag">NETCODE</span>
-                        </div>
-                        <div class="project__button button">
-                            <span href=""><i class="fa-solid fa-circle-info"></i>More info</span>
-                        </div>
-                    </div>
-                    <h3 class="project__title">DOTS Research/Game</h3>
-                </a>
-
-                <a class="project" href="projects/broth-brawlers.html">
-                    <div class="project__preview">
-                        <div class="project__img">
-                            <img src="assets/broth-brawlers.png" alt="">
-                        </div>
-                        <div class="project__tags">
-                            <span class="tag">Unity</span>
-                            <span class="tag">C#</span>
-                            <span class="tag">Perforce</span>
-                            <span class="tag">Team</span>
-                        </div>
-                        <div class="project__button button">
-                            <span href=""><i class="fa-solid fa-circle-info"></i>More info</span>
-                        </div>
-                    </div>
-                    <h3 class="project__title">Broth Brawlers</h3>
-                </a>
-
-                <a class="project" href="projects/ai-planes.html">
-                    <div class="project__preview">
-                        <div class="project__img">
-                            <img src="assets/ai-planes.png" alt="">
-                        </div>
-                        <div class="project__tags">
-                            <span class="tag">Unity</span>
-                            <span class="tag">C#</span>
-                            <span class="tag">ML-AGENTS</span>
-                        </div>
-                        <div class="project__button button">
-                            <span href=""><i class="fa-solid fa-circle-info"></i>More info</span>
-                        </div>
-                    </div>
-                    <h3 class="project__title">AI Airplanes</h3>
                 </a>
 
                 <a class="project" href="projects/pepper-robot.html">
                     <div class="project__preview">
                         <div class="project__img">
-                            <img src="assets/pepper-robot.png" alt="">
+                            <img src="/assets/projects/pepper-robot/card.png" alt="">
                         </div>
                         <div class="project__tags">
                             <span class="tag">C++</span>
@@ -188,17 +130,121 @@
                             <span class="tag">Mqtt</span>
                             <span class="tag">Vue</span>
                         </div>
+                    </div>
+                    <div class="project__footer">
+                        <h3 class="project__title">Vacation Job - Pepper Robot</h3>
                         <div class="project__button button">
-                            <span href=""><i class="fa-solid fa-circle-info"></i>More info</span>
+                            <span><i class="fa-solid fa-arrow-right"></i></span>
                         </div>
                     </div>
-                    <h3 class="project__title">Pepper Robot</h3>
+                </a>
+
+            </div>
+
+            <h3 class="projects__group-title">Game Dev</h3>
+            <div class="projects slick--projects">
+
+                <a class="project" href="projects/adapta-solva.html">
+                    <div class="project__preview">
+                        <div class="project__img">
+                            <img src="/assets/projects/adapta-solva/card.png" alt="">
+                        </div>
+                        <div class="project__tags">
+                            <span class="tag">Unity</span>
+                            <span class="tag">C#</span>
+                            <span class="tag">Perforce</span>
+                            <span class="tag">Team</span>
+                        </div>
+                    </div>
+                    <div class="project__footer">
+                        <h3 class="project__title">Adapta Solva</h3>
+                        <div class="project__button button">
+                            <span><i class="fa-solid fa-arrow-right"></i></span>
+                        </div>
+                    </div>
+                </a>
+
+                <a class="project" href="projects/physics-engine.html">
+                    <div class="project__preview">
+                        <div class="project__img">
+                            <img src="/assets/projects/physics-engine/card.png" alt="">
+                        </div>
+                        <div class="project__tags">
+                            <span class="tag">C++</span>
+                            <span class="tag">SDL</span>
+                        </div>
+                    </div>
+                    <div class="project__footer">
+                        <h3 class="project__title">2D Physics Engine</h3>
+                        <div class="project__button button">
+                            <span><i class="fa-solid fa-arrow-right"></i></span>
+                        </div>
+                    </div>
+                </a>
+
+                <a class="project" href="projects/dots-research-game.html">
+                    <div class="project__preview">
+                        <div class="project__img">
+                            <img src="/assets/projects/dots-research/card.png" alt="">
+                        </div>
+                        <div class="project__tags">
+                            <span class="tag">Unity</span>
+                            <span class="tag">C#</span>
+                            <span class="tag">DOP</span>
+                            <span class="tag">NETCODE</span>
+                        </div>
+                    </div>
+                    <div class="project__footer">
+                        <h3 class="project__title">DOTS/ECS Research</h3>
+                        <div class="project__button button">
+                            <span><i class="fa-solid fa-arrow-right"></i></span>
+                        </div>
+                    </div>
+                </a>
+
+                <a class="project" href="projects/broth-brawlers.html">
+                    <div class="project__preview">
+                        <div class="project__img">
+                            <img src="/assets/projects/broth-brawlers/card.png" alt="">
+                        </div>
+                        <div class="project__tags">
+                            <span class="tag">Unity</span>
+                            <span class="tag">C#</span>
+                            <span class="tag">Perforce</span>
+                            <span class="tag">Team</span>
+                        </div>
+                    </div>
+                    <div class="project__footer">
+                        <h3 class="project__title">Broth Brawlers</h3>
+                        <div class="project__button button">
+                            <span><i class="fa-solid fa-arrow-right"></i></span>
+                        </div>
+                    </div>
+                </a>
+
+                <a class="project" href="projects/ai-planes.html">
+                    <div class="project__preview">
+                        <div class="project__img">
+                            <img src="/assets/projects/ai-planes/card.png" alt="">
+                        </div>
+                        <div class="project__tags">
+                            <span class="tag">Unity</span>
+                            <span class="tag">C#</span>
+                            <span class="tag">ML-AGENTS</span>
+                        </div>
+                    </div>
+                    <div class="project__footer">
+                        <h3 class="project__title">AI Airplanes</h3>
+                        <div class="project__button button">
+                            <span><i class="fa-solid fa-arrow-right"></i></span>
+                        </div>
+                    </div>
                 </a>
 
                 <a class="project" href="projects/component-engine.html">
                     <div class="project__preview">
                         <div class="project__img">
-                            <img src="assets/dots-research.png" alt="">
+                            <img src="/assets/projects/component-engine/cover.svg" alt="">
                         </div>
                         <div class="project__tags">
                             <span class="tag">C++</span>
@@ -206,28 +252,13 @@
                             <span class="tag">SteamSDK</span>
                             <span class="tag">ImGui</span>
                         </div>
+                    </div>
+                    <div class="project__footer">
+                        <h3 class="project__title">2D Component Engine</h3>
                         <div class="project__button button">
-                            <span href=""><i class="fa-solid fa-circle-info"></i>More info</span>
+                            <span><i class="fa-solid fa-arrow-right"></i></span>
                         </div>
                     </div>
-                    <h3 class="project__title">2D Component Engine</h3>
-                </a>
-
-                <a class="project" href="projects/city-crawlers.html">
-                    <div class="project__preview">
-                        <div class="project__img">
-                            <img src="assets/city-crawlers.png" alt="">
-                        </div>
-                        <div class="project__tags">
-                            <span class="tag">Unity</span>
-                            <span class="tag">C#</span>
-                            <span class="tag">Game Jam</span>
-                        </div>
-                        <div class="project__button button">
-                            <span href=""><i class="fa-solid fa-circle-info"></i>More info</span>
-                        </div>
-                    </div>
-                    <h3 class="project__title">City Crawlers</h3>
                 </a>
 
             </div>
@@ -300,7 +331,7 @@
                     <a href="mailto:twannes.claes@outlook.com" target="_blank"><i class="fa-solid fa-envelope"></i>E-mail me</a>
                 </div>
                 <div class="button">
-                    <a href="assets/CV_TwannesClaes.pdf"  target="_blank"><i class="fa-solid fa-file-lines"></i>Check out my CV</a>
+                    <a href="/assets/documents/CV_TwannesClaes.pdf"  target="_blank"><i class="fa-solid fa-file-lines"></i>Check out my CV</a>
                 </div>
                 <div class="break"></div>
                 <div class="button">
@@ -360,5 +391,6 @@
 </script>
 
 <script src="js/theme-toggle.js"></script>
+<script src="js/button-tilt.js"></script>
 
 </html>

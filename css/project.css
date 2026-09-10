@@ -1,16 +1,27 @@
-.back {
+.nav--project {
     display: flex;
-    flex-direction: row-reverse;
+    flex-wrap: wrap;
     align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border-block-end: 1px solid var(--c-fg);
+}
+.nav--project ul {
+    border-block-end: none;
+}
+.button--back a, .button--back span {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+}
+.button--back a i, .button--back span i {
+    margin: 0;
     font-size: 1rem;
-    margin-block: clamp(4rem, 2.5vw + 2.5rem, 6.25rem);
 }
-.back::after {
-    transform: rotate(180deg);
-    display: inline-block;
-}
-.back:hover::after {
-    margin-inline: 0 0.5rem;
+.button--back::before {
+    inset: -2px;
 }
 
 .project {
@@ -36,6 +47,7 @@
     }
 }
 .project__title {
+    font-family: var(--main-font);
     font-size: clamp(1.5rem, 2vw + 1rem, 2.75rem);
     margin-block-end: 1rem;
 }
@@ -89,6 +101,7 @@
 .project__images img {
     width: 100%;
     border-radius: 5px;
+    border: 2px solid var(--c-fg);
 }
 
 .project__img:has(i) {

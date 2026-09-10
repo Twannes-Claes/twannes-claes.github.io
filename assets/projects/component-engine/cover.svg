@@ -1,0 +1,59 @@
+<svg viewBox="0 0 660 520" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <pattern id="grid" width="55" height="55" patternUnits="userSpaceOnUse">
+            <path d="M 55 0 L 0 0 0 55" fill="none" stroke="#FCF8EC" stroke-opacity="0.06" stroke-width="1"/>
+        </pattern>
+        <radialGradient id="glow" cx="50%" cy="42%" r="60%">
+            <stop offset="0%" stop-color="#683C9B" stop-opacity="0.28"/>
+            <stop offset="100%" stop-color="#683C9B" stop-opacity="0"/>
+        </radialGradient>
+    </defs>
+
+    <rect width="660" height="520" fill="#1E1D1F"/>
+    <rect width="660" height="520" fill="url(#grid)"/>
+    <rect width="660" height="520" fill="url(#glow)"/>
+
+    <g stroke="#683C9B" stroke-width="1.5" opacity="0.5">
+        <line x1="140" y1="110" x2="302.5" y2="147.37"/>
+        <line x1="520" y1="110" x2="357.5" y2="147.37"/>
+        <line x1="140" y1="290" x2="302.5" y2="242.63"/>
+        <line x1="520" y1="290" x2="357.5" y2="242.63"/>
+    </g>
+    <g fill="#683C9B">
+        <circle cx="140" cy="110" r="5"/>
+        <circle cx="520" cy="110" r="5"/>
+        <circle cx="140" cy="290" r="5"/>
+        <circle cx="520" cy="290" r="5"/>
+    </g>
+
+    <g stroke="#683C9B" stroke-width="2" opacity="0.6" fill="none" stroke-linejoin="round">
+        <polygon points="385,195 357.5,242.63 302.5,242.63 275,195 302.5,147.37 357.5,147.37"/>
+        <polygon points="352,195 341,214.05 319,214.05 308,195 319,175.95 341,175.95"/>
+    </g>
+    <g stroke="#683C9B" stroke-width="2" opacity="0.6">
+        <line x1="385" y1="195" x2="404" y2="195"/>
+        <line x1="357.5" y1="242.63" x2="367" y2="259.5"/>
+        <line x1="302.5" y1="242.63" x2="293" y2="259.5"/>
+        <line x1="275" y1="195" x2="256" y2="195"/>
+        <line x1="302.5" y1="147.37" x2="293" y2="130.5"/>
+        <line x1="357.5" y1="147.37" x2="367" y2="130.5"/>
+    </g>
+
+    <g fill="none" stroke="#683C9B" stroke-width="1.5" opacity="0.3">
+        <circle cx="90" cy="200" r="12"/>
+        <circle cx="580" cy="230" r="9"/>
+        <circle cx="565" cy="90" r="16"/>
+    </g>
+
+    <g stroke="#683C9B" stroke-width="2" opacity="0.5" fill="none">
+        <path d="M 24 48 L 24 24 L 48 24"/>
+        <path d="M 612 24 L 636 24 L 636 48"/>
+        <path d="M 636 472 L 636 496 L 612 496"/>
+        <path d="M 48 496 L 24 496 L 24 472"/>
+    </g>
+
+    <line x1="200" y1="378" x2="460" y2="378" stroke="#683C9B" stroke-opacity="0.4" stroke-width="1"/>
+
+    <text x="330" y="410" text-anchor="middle" font-family="Consolas, 'JetBrains Mono', monospace" font-size="32" letter-spacing="2" fill="#FCF8EC" font-weight="600">2D COMPONENT ENGINE</text>
+    <text x="330" y="440" text-anchor="middle" font-family="Consolas, 'JetBrains Mono', monospace" font-size="15" letter-spacing="2" fill="#FCF8EC" fill-opacity="0.6">C++ GAME ENGINE</text>
+</svg>
