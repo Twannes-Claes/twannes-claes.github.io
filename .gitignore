@@ -1,6 +1,11 @@
 # Ignore the .vs folder
 .vs/
 
+# Jekyll build output
+_site/
+.jekyll-cache/
+.jekyll-metadata
+
 # Optional: Ignore other common files and folders
 *.log
 *.tmp

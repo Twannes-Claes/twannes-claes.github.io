@@ -1,13 +1,15 @@
+---
+---
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Twannes Claes | Portfolio</title>
+    <title>{{ site.title }}</title>
 
-    <meta property="og:title" content="Twannes Claes | Portfolio">
-    <meta property="og:description" content="Check out my portfolio!">
+    <meta property="og:title" content="{{ site.title }}">
+    <meta property="og:description" content="{{ site.description }}">
     <meta property="og:image" content="https://i.imgur.com/32B7dGM.png">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://twannes-claes.github.io/">
@@ -21,6 +23,7 @@
     <link rel="stylesheet" href="css/general.css">
     <link rel="stylesheet" href="css/home.css">
     <link rel="stylesheet" type="text/css" href="//cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.css" />
+    <script src="js/theme-init.js"></script>
 </head>
 
 <body>
@@ -35,6 +38,11 @@
             </li>
             <li>
                 <a href="#contact">Contact & Links</a>
+            </li>
+            <li>
+                <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle light and dark theme">
+                    <i class="fa-solid fa-moon"></i>
+                </button>
             </li>
         </ul>
     </nav>
@@ -340,15 +348,17 @@
         };
         
          const projectSlider = $('.slick--projects').slick(projectSettings);
-        
-        $(window).on('resize', function () 
+
+        $(window).on('resize', function ()
         {
-            if ($(window).width() < 768 && !projectSlider.hasClass('slick-initialized')) 
+            if ($(window).width() < 768 && !projectSlider.hasClass('slick-initialized'))
             {
                 $('.slick--projects').slick(projectSettings);
             }
         });
     });
 </script>
+
+<script src="js/theme-toggle.js"></script>
 
 </html>

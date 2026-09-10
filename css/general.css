@@ -2,8 +2,22 @@
     --c-black: #1E1D1F;
     --c-white: #FCF8EC;
     --c-purple: #683C9B;
+    --c-green: #1E5631;
+    --c-accent: var(--c-purple);
+    --c-bg: var(--c-black);
+    --c-fg: var(--c-white);
+    --c-chip-bg: var(--c-white);
+    --c-chip-fg: var(--c-black);
     --main-font: "Onest", serif;
     --mono-font: "JetBrains Mono", serif;
+}
+
+[data-theme="light"] {
+    --c-accent: var(--c-green);
+    --c-bg: var(--c-white);
+    --c-fg: var(--c-black);
+    --c-chip-bg: var(--c-black);
+    --c-chip-fg: var(--c-white);
 }
 
 html {
@@ -11,15 +25,16 @@ html {
 }
 
 body {
-    background-color: var(--c-black);
-    color: var(--c-white);
+    background-color: var(--c-bg);
+    color: var(--c-fg);
     font-family: var(--main-font);
     font-weight: 200;
     line-height: 1.5;
+    transition: background-color .3s ease, color .3s ease;
 }
 
 a {
-    color: var(--c-white);
+    color: var(--c-fg);
     text-decoration: none;
 }
 
@@ -43,7 +58,7 @@ h2::before {
     width: clamp(2rem, 2vw + 1rem, 5rem);
     height: 1px;
     margin-inline-end: clamp(0.5rem, 1vw + 0.25rem, 1rem);
-    background-color: var(--c-white);
+    background-color: var(--c-fg);
 }
 h2 i {
     margin-inline-start: auto;
@@ -62,18 +77,18 @@ strong {
 
 .tag {
     font-family: var(--mono-font);
-    color: var(--c-black);
-    background-color: var(--c-white);
+    color: var(--c-chip-fg);
+    background-color: var(--c-chip-bg);
     text-transform: uppercase;
     width: fit-content;
     border-radius: 5px;
     padding: 0.25rem 0.5rem;
     font-size: 14px;
     font-weight: 500;
-    box-shadow: 0px 0px 10px var(--c-black);
+    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.25);
 }
 .tag--big {
-    background-color: var(--c-purple);
+    background-color: var(--c-accent);
     color: var(--c-white);
     border-radius: 10px;
     padding: 0.5rem 1rem;
@@ -87,7 +102,7 @@ strong {
 }
 .tag--label {
     display: block;
-    background-color: var(--c-purple);
+    background-color: var(--c-accent);
     color: var(--c-white);
     font-size: 12px;
     letter-spacing: 0.05em;
@@ -112,15 +127,20 @@ strong {
     position: absolute;
     bottom: -2px;
     display: block;
-    border-block-end: 1px solid var(--c-white);
+    border-block-end: 1px solid var(--c-fg);
     width: 100%;
     transition: width .3s ease;
 }
 .link::after {
-    content: url(../assets/arrow.svg);
+    content: '';
+    width: 16px;
+    height: 10px;
+    background-color: currentColor;
+    mask: url(../assets/arrow.svg) no-repeat center / contain;
+    -webkit-mask: url(../assets/arrow.svg) no-repeat center / contain;
     position: relative;
     bottom: 2px;
-    transition: margin .3s ease;
+    transition: margin .3s ease, background-color .3s ease;
 }
 .link:hover::after {
     margin-inline-start: 1rem;
@@ -135,7 +155,7 @@ strong {
     height: 101%;
     display: block;
     position: absolute;
-    border: var(--c-white) 1px solid;
+    border: var(--c-fg) 1px solid;
     border-radius: 5px;
     z-index: -2;
     top: 0;
@@ -144,7 +164,7 @@ strong {
     transition: .3s ease all;
 }
 .button a, .button span {
-    background-color: var(--c-purple);
+    background-color: var(--c-accent);
     color: var(--c-white);
     font-size: clamp(1rem, 2vw + 0.5rem, 1.25rem);
     padding: 0.5rem 1rem;
@@ -209,23 +229,25 @@ ul {
 }
 
 li::marker {
-    color: var(--c-purple);
+    color: var(--c-accent);
 }
 
 nav {
     position: sticky;
     top: 0;
     z-index: 2;
-    background-color: var(--c-black);
+    background-color: var(--c-bg);
+    transition: background-color .3s ease;
 }
 
 nav ul {
     display: flex;
     flex-direction: row;
+    align-items: center;
     list-style: none;
     justify-content: flex-end;
     gap: clamp(32px, 2vw + 16px, 60px);
-    border-block-end: 1px var(--c-white) solid;
+    border-block-end: 1px var(--c-fg) solid;
     font-size: clamp(1rem, 2vw + 0.5rem, 1.25rem);
     padding-block: clamp(16px, 2vw + 8px, 24px);
     text-align: center;
@@ -234,7 +256,7 @@ nav ul {
 nav ul li a::after {
     content: '';
     display: block;
-    border-block-end: 1px solid var(--c-white);
+    border-block-end: 1px solid var(--c-fg);
     width: 0%;
     transition: width .3s ease;
 }
@@ -243,4 +265,18 @@ nav ul li a:hover::after {
     width: 100%;
 }
 
-
+.theme-toggle {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    color: var(--c-fg);
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+.theme-toggle:hover {
+    color: var(--c-accent);
+}
