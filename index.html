@@ -42,19 +42,19 @@
     <header class="container">
         <div class="header">
             <div class="header__content">
-                <div class="tag tag--big">Game Developer</div>
+                <div class="tag tag--big">Game Systems Engineer</div>
                 <h1>Twannes Claes</h1>
                 <p>
                     <strong>Hi there, and welcome to my portfolio!</strong>
                     <br>
-                    This is a collection of the projects I'm most proud of, showcasing my journey in game development.
+                    This is a collection of the projects I'm most proud of, showcasing my journey through game development and software engineering.
                     <br>
-                    You'll find both personal and collaborative works here, some created during my studies at Digital Arts and Entertainment, and others crafted during my free time. I hope you enjoy exploring my work as much as I enjoyed creating it!
+                    You'll find both personal and collaborative works here, some created during my studies at Digital Arts and Entertainment, others from my professional work, and the rest crafted during my free time. I hope you enjoy exploring my work as much as I enjoyed creating it!
                 </p>
                 <a class="link" href="#projects">View my projects</a>
             </div>
             <div class="header__img">
-                <img src="assets/picture.png" alt="">
+                <img src="assets/home-picture.jpg" alt="">
             </div>
         </div>
     </header>
@@ -63,6 +63,24 @@
         <section id="projects">
             <h2>Projects <i class="fa-regular fa-folder-open"></i></h2>
             <div class="projects slick--projects">
+
+                <a class="project" href="projects/vintecc.html">
+                    <div class="project__preview">
+                        <div class="project__img">
+                            <img src="assets/vintecc-placeholder.svg" alt="">
+                        </div>
+                        <div class="project__tags">
+                            <span class="tag">Unity</span>
+                            <span class="tag">C#</span>
+                            <span class="tag">DOD/ECS</span>
+                            <span class="tag">Docker</span>
+                        </div>
+                        <div class="project__button button">
+                            <span href=""><i class="fa-solid fa-circle-info"></i>More info</span>
+                        </div>
+                    </div>
+                    <h3 class="project__title">Vintecc - Digital Twin Engineer</h3>
+                </a>
 
                 <a class="project" href="projects/adapta-solva.html">
                     <div class="project__preview">
@@ -213,39 +231,54 @@
             <div class="about">
                 <div class="about__desc">
                     <p>
-                        Hi, I'm Twannes Claes, a 22-year old Game Development graduate from Digital Arts and Entertainment, class of 2024.
+                        <span class="tag tag--label">Who I Am</span>
+                        Hi, I'm Twannes Claes, a Digital Arts and Entertainment graduate (class of 2024) and Game Systems Engineer, with growing experience in software engineering more broadly.
+                        <span class="tag tag--label">What I'm Looking For</span>
+                        I am currently seeking exciting new opportunities, so if you like my work, don't hesitate to reach out!
+                        <span class="tag tag--label">What Drives Me</span>
+                        I am passionate about crafting and improving my skills, whether it's through programming, drawing, cooking, or something else to spark my creativity.
                         <br>
-                        <br>
-                        I am currently seeking exciting opportunities in the game industry, so if you like my work, don't hesitate to reach out!
-                        <br>
-                        <br>
-                        I am passionate about crafting and improving my skills, whether it's trough programming, drawing, cooking, or something else to spark my creativity.
-                        <br> 
-                        Above all, I love programming. There's nothing more exciting to me than bringing ideas to life trough code, turning simple thoughts into something real and interactive that other people can enjoy.
-                        <br>
-                        This passion has also made me a big fan of indie games. I admire how they focus on creativity and unique ideas, and the succes they earned.
+                        Above all, I love programming. There's nothing more exciting to me than bringing ideas to life through code, turning simple thoughts into something real and interactive that other people can enjoy. Lately that passion has grown into a deeper interest in software engineering as a whole, especially building advanced, well-structured, and scalable systems.
+                        <span class="tag tag--label">Indie Games</span>
+                        This has also made me a big fan of indie games. I love the creativity and originality small teams manage to pack into their work, often with a fraction of the resources bigger studios have.
                     </p>
                 </div>
                 <div class="about__skills">
                     <div class="about__skill">
                         <strong>Languages</strong><br>
-                        C++, C#, C, HLSL, XAML, ASP.NET, CSS, JS, HTML, CMAKE, Python
+                        C++, C#, C, CMake, SQL, Python, Matlab, HLSL, XAML, ASP.NET, CSS, JS, HTML
                     </div>
                     <div class="about__skill">
-                        <strong>Soft skills</strong><br>
-                        Communication, Collaboration, Problem Solving, Adaptability
+                        <strong>Architecture & practices</strong><br>
+                        DOD/ECS, Dependency Injection (DI), Reflection, Unit Testing, Test-Driven Development (TDD)
                     </div>
                     <div class="about__skill">
                         <strong>Engines</strong><br>
-                        Unreal Engine, Unity, DirectX11, Inhouse
+                        Unity, Unreal Engine, Godot, DirectX11, in-house
+                    </div>
+                    <div class="about__skill">
+                        <strong>DevOps & tooling</strong><br>
+                        CI/CD pipelines, Docker, build automation, editor scripting, release management
+                    </div>
+                    <div class="about__skill">
+                        <strong>Networking</strong><br>
+                        Photon (Bolt, Fusion), Unity Netcode, multiplayer programming
+                    </div>
+                    <div class="about__skill">
+                        <strong>Source control</strong><br>
+                        Github, Gitlab, Git, Fork, Perforce, Azure
                     </div>
                     <div class="about__skill">
                         <strong>API/Libraries</strong><br>
-                        PhysX, DirectX11, Photon Networking, Netcode, SDL, FMOD, ImGui, Raylib
+                        PhysX, SDL, FMOD, ImGui, Raylib
                     </div>
                     <div class="about__skill">
                         <strong>Databases</strong><br>
                         SQL, ERD diagrams
+                    </div>
+                    <div class="about__skill">
+                        <strong>Soft skills</strong><br>
+                        Communication, problem-solver, adaptable, quick learner, self-management, life-time learner, helpful
                     </div>
                 </div>
             </div>
@@ -259,7 +292,7 @@
                     <a href="mailto:twannes.claes@outlook.com" target="_blank"><i class="fa-solid fa-envelope"></i>E-mail me</a>
                 </div>
                 <div class="button">
-                    <a href="assets/TwannesClaes_CV.pdf"  target="_blank"><i class="fa-solid fa-file-lines"></i>Check out my CV</a>
+                    <a href="assets/CV_TwannesClaes.pdf"  target="_blank"><i class="fa-solid fa-file-lines"></i>Check out my CV</a>
                 </div>
                 <div class="break"></div>
                 <div class="button">

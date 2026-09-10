@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vintecc | Twannes Claes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Onest:wght@100..900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="../css/reset.css">
+    <link rel="stylesheet" href="../css/general.css">
+    <link rel="stylesheet" href="../css/project.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.css" />
+</head>
+
+<body>
+
+    <nav class="container">
+        <ul>
+            <li>
+                <a href="/#projects">Projects</a>
+            </li>
+            <li>
+                <a href="/#about">About me</a>
+            </li>
+            <li>
+                <a href="/#contact">Contact & Links</a>
+            </li>
+        </ul>
+    </nav>
+
+    <main class="container">
+        <a class="back link" href="/#projects">
+            Back to overview
+        </a>
+
+        <div class="project">
+            <div class="project__content">
+                <h1 class="project__title">Vintecc - Digital Twin Engineer</h1>
+                <div class="project__tags">
+                    <div class="tag">Unity</div>
+                    <div class="tag">C#</div>
+                    <div class="tag">DOD/ECS</div>
+                    <div class="tag">Docker</div>
+                </div>
+                <div class="project__desc">
+                    <span class="tag tag--label">The Role</span>
+                    From October 2025 to September 2026, I worked as a Digital Twin Engineer at Vintecc, building and maintaining tooling around <strong>a custom Unity-based DOD/ECS architecture with a full dependency injection system</strong>. A digital twin is essentially a virtual version of a real machine, sending and receiving the same commands as if it were hooked up to the real thing, so performance and reliability were always front and center.
+                    <span class="tag tag--label">Key Projects</span>
+                    My main focus was <strong>building and maintaining digital twins</strong>, along with several supporting services written in C#, Python, and C++. This meant working closely with industrial engineers to understand how each machine should actually behave, then translating that into the simulation, keeping it accurate, performant, and easy for the rest of the team to build on top of.
+                    <span class="tag tag--label">Other Work</span>
+                    Alongside that, I also worked on a reflection-based tool that auto-generates interfaces directly from engineers' code, cutting out a lot of manual, error-prone setup work, an interactive demo used at trade expos, and <strong>a full-stack client application that's now used in production</strong>.
+                    <span class="tag tag--label">Day-to-Day</span>
+                    I provided ongoing support across the codebase: bug fixes, refactoring, editor scripting, and CI/CD pipelines built with Docker.
+                </div>
+            </div>
+
+            <div class="project__images">
+                <a href="../assets/vintecc-placeholder.svg" data-fancybox="gallery" class="project__img">
+                    <img src="../assets/vintecc-placeholder.svg" />
+                </a>
+            </div>
+        </div>
+    </main>
+
+</body>
+
+<script src="https://kit.fontawesome.com/7ab46062e1.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.umd.js"></script>
+
+
+<script type="text/javascript">
+    Fancybox.bind("[data-fancybox]", {
+    });
+</script>
+
+</html>

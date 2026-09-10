@@ -36,7 +36,7 @@
     }
 }
 .project__title {
-    font-size: clamp(1.8rem, 3vw + 1rem, 4rem);
+    font-size: clamp(1.5rem, 2vw + 1rem, 2.75rem);
     margin-block-end: 1rem;
 }
 .project__tags {

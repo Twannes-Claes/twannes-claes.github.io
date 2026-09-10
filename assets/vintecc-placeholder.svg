@@ -1,0 +1,40 @@
+<svg viewBox="0 0 660 520" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <pattern id="grid" width="55" height="55" patternUnits="userSpaceOnUse">
+            <path d="M 55 0 L 0 0 0 55" fill="none" stroke="#FCF8EC" stroke-opacity="0.06" stroke-width="1"/>
+        </pattern>
+    </defs>
+
+    <rect width="660" height="520" fill="#1E1D1F"/>
+    <rect width="660" height="520" fill="url(#grid)"/>
+
+    <g stroke="#683C9B" stroke-width="1.5" opacity="0.55">
+        <line x1="90" y1="120" x2="230" y2="80"/>
+        <line x1="230" y1="80" x2="360" y2="140"/>
+        <line x1="360" y1="140" x2="520" y2="95"/>
+        <line x1="230" y1="80" x2="250" y2="200"/>
+        <line x1="360" y1="140" x2="330" y2="260"/>
+        <line x1="520" y1="95" x2="560" y2="220"/>
+        <line x1="90" y1="120" x2="130" y2="270"/>
+        <line x1="560" y1="220" x2="470" y2="330"/>
+        <line x1="130" y1="270" x2="250" y2="330"/>
+        <line x1="250" y1="330" x2="470" y2="330"/>
+    </g>
+    <g fill="#683C9B">
+        <circle cx="90" cy="120" r="4.5"/>
+        <circle cx="230" cy="80" r="4.5"/>
+        <circle cx="360" cy="140" r="4.5"/>
+        <circle cx="520" cy="95" r="4.5"/>
+        <circle cx="250" cy="200" r="4.5"/>
+        <circle cx="330" cy="260" r="4.5"/>
+        <circle cx="560" cy="220" r="4.5"/>
+        <circle cx="130" cy="270" r="4.5"/>
+        <circle cx="470" cy="330" r="4.5"/>
+        <circle cx="250" cy="330" r="4.5"/>
+    </g>
+
+    <text x="330" y="410" text-anchor="middle" font-family="Consolas, 'JetBrains Mono', monospace" font-size="46" letter-spacing="4" fill="#FCF8EC" font-weight="600">VINTECC</text>
+    <text x="330" y="444" text-anchor="middle" font-family="Consolas, 'JetBrains Mono', monospace" font-size="15" letter-spacing="2" fill="#FCF8EC" fill-opacity="0.6">DIGITAL TWIN ENGINEER</text>
+
+    <text x="20" y="500" font-family="Consolas, 'JetBrains Mono', monospace" font-size="11" letter-spacing="1" fill="#FCF8EC" fill-opacity="0.35">placeholder, swap for a real screenshot</text>
+</svg>
