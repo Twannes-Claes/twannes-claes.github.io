@@ -1,0 +1,18 @@
+<a class="project" href="{{ include.project.url }}">
+    <div class="project__preview">
+        <div class="project__img">
+            <img src="{{ include.project.card_image }}" alt="">
+        </div>
+        <div class="project__tags">
+            {% for tag in include.project.tags %}
+            <span class="tag">{{ tag }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="project__footer">
+        <h3 class="project__title">{{ include.project.title }}</h3>
+        <div class="project__button button">
+            <span><i class="fa-solid fa-arrow-right"></i></span>
+        </div>
+    </div>
+</a>

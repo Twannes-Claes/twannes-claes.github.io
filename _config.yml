@@ -2,5 +2,14 @@ title: Twannes Claes | Portfolio
 author: Twannes Claes
 description: Check out my portfolio!
 
-exclude:
-  - archive
+collections:
+  projects:
+    output: true
+    permalink: /projects/:name.html
+
+defaults:
+  - scope:
+      path: ""
+      type: projects
+    values:
+      layout: project

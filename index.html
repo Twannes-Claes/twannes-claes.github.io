@@ -19,33 +19,16 @@
     <link
         href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Onest:wght@100..900&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="css/reset.css">
-    <link rel="stylesheet" href="css/general.css">
-    <link rel="stylesheet" href="css/home.css">
+    <link rel="stylesheet" href="assets/css/reset.css">
+    <link rel="stylesheet" href="assets/css/general.css">
+    <link rel="stylesheet" href="assets/css/home.css">
     <link rel="stylesheet" type="text/css" href="//cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.css" />
-    <script src="js/theme-init.js"></script>
+    <script src="assets/js/theme-init.js"></script>
 </head>
 
 <body>
 
-    <nav class="container">
-        <ul>
-            <li>
-                <a href="#projects"><i class="fa-regular fa-folder-open"></i>Projects</a>
-            </li>
-            <li>
-                <a href="#about"><i class="fa-regular fa-user"></i>About me</a>
-            </li>
-            <li>
-                <a href="#contact"><i class="fa-regular fa-envelope"></i>Contact & Links</a>
-            </li>
-            <li>
-                <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle light and dark theme">
-                    <i class="fa-solid fa-moon"></i>
-                </button>
-            </li>
-        </ul>
-    </nav>
+    {% include nav.html %}
 
     <header class="container">
         <div class="header">
@@ -72,197 +55,43 @@
     </header>
 
     <main class="container">
+        {% assign active_projects = site.projects | where: "active", true | sort: "order" %}
+        {% assign professional_work = active_projects | where: "category", "Professional Work" %}
+        {% assign game_dev = active_projects | where: "category", "Game Dev" %}
+        {% assign game_jams = active_projects | where: "category", "Game Jam" %}
+
         <section id="projects">
             <h2>Projects <i class="fa-regular fa-folder-open"></i></h2>
+
+            {% if professional_work.size > 0 %}
             <h3 class="projects__group-title">Professional Work</h3>
             <div class="projects slick--projects">
-
-                <a class="project" href="projects/vintecc.html">
-                    <div class="project__preview">
-                        <div class="project__img">
-                            <img src="/assets/projects/vintecc/cover.svg" alt="">
-                        </div>
-                        <div class="project__tags">
-                            <span class="tag">Work</span>
-                            <span class="tag">Unity</span>
-                            <span class="tag">C#</span>
-                            <span class="tag">DOD/ECS</span>
-                            <span class="tag">CI/CD</span>
-                        </div>
-                    </div>
-                    <div class="project__footer">
-                        <h3 class="project__title">Vintecc - Digital Twin Engineer</h3>
-                        <div class="project__button button">
-                            <span><i class="fa-solid fa-arrow-right"></i></span>
-                        </div>
-                    </div>
-                </a>
-
-                <a class="project" href="projects/replaceable.html">
-                    <div class="project__preview">
-                        <div class="project__img">
-                            <img src="/assets/projects/replaceable/header.jpg" alt="">
-                        </div>
-                        <div class="project__tags">
-                            <span class="tag">Work</span>
-                            <span class="tag">Unity</span>
-                            <span class="tag">C#</span>
-                            <span class="tag">DOTS</span>
-                            <span class="tag">CI/CD</span>
-                        </div>
-                    </div>
-                    <div class="project__footer">
-                        <h3 class="project__title">The Pack - Replaceable</h3>
-                        <div class="project__button button">
-                            <span><i class="fa-solid fa-arrow-right"></i></span>
-                        </div>
-                    </div>
-                </a>
-
-                <a class="project" href="projects/pepper-robot.html">
-                    <div class="project__preview">
-                        <div class="project__img">
-                            <img src="/assets/projects/pepper-robot/card.png" alt="">
-                        </div>
-                        <div class="project__tags">
-                            <span class="tag">C++</span>
-                            <span class="tag">Python</span>
-                            <span class="tag">Mqtt</span>
-                            <span class="tag">Vue</span>
-                        </div>
-                    </div>
-                    <div class="project__footer">
-                        <h3 class="project__title">Vacation Job - Pepper Robot</h3>
-                        <div class="project__button button">
-                            <span><i class="fa-solid fa-arrow-right"></i></span>
-                        </div>
-                    </div>
-                </a>
-
-            </div>
-
-            <h3 class="projects__group-title">Game Dev</h3>
-            <div class="projects slick--projects">
-
-                <a class="project" href="projects/adapta-solva.html">
-                    <div class="project__preview">
-                        <div class="project__img">
-                            <img src="/assets/projects/adapta-solva/card.png" alt="">
-                        </div>
-                        <div class="project__tags">
-                            <span class="tag">Unity</span>
-                            <span class="tag">C#</span>
-                            <span class="tag">Perforce</span>
-                            <span class="tag">Team</span>
-                        </div>
-                    </div>
-                    <div class="project__footer">
-                        <h3 class="project__title">Adapta Solva</h3>
-                        <div class="project__button button">
-                            <span><i class="fa-solid fa-arrow-right"></i></span>
-                        </div>
-                    </div>
-                </a>
-
-                <a class="project" href="projects/physics-engine.html">
-                    <div class="project__preview">
-                        <div class="project__img">
-                            <img src="/assets/projects/physics-engine/card.png" alt="">
-                        </div>
-                        <div class="project__tags">
-                            <span class="tag">C++</span>
-                            <span class="tag">SDL</span>
-                        </div>
-                    </div>
-                    <div class="project__footer">
-                        <h3 class="project__title">2D Physics Engine</h3>
-                        <div class="project__button button">
-                            <span><i class="fa-solid fa-arrow-right"></i></span>
-                        </div>
-                    </div>
-                </a>
-
-                <a class="project" href="projects/dots-research-game.html">
-                    <div class="project__preview">
-                        <div class="project__img">
-                            <img src="/assets/projects/dots-research/card.png" alt="">
-                        </div>
-                        <div class="project__tags">
-                            <span class="tag">Unity</span>
-                            <span class="tag">C#</span>
-                            <span class="tag">DOP</span>
-                            <span class="tag">NETCODE</span>
-                        </div>
-                    </div>
-                    <div class="project__footer">
-                        <h3 class="project__title">DOTS/ECS Research</h3>
-                        <div class="project__button button">
-                            <span><i class="fa-solid fa-arrow-right"></i></span>
-                        </div>
-                    </div>
-                </a>
-
-                <a class="project" href="projects/broth-brawlers.html">
-                    <div class="project__preview">
-                        <div class="project__img">
-                            <img src="/assets/projects/broth-brawlers/card.png" alt="">
-                        </div>
-                        <div class="project__tags">
-                            <span class="tag">Unity</span>
-                            <span class="tag">C#</span>
-                            <span class="tag">Perforce</span>
-                            <span class="tag">Team</span>
-                        </div>
-                    </div>
-                    <div class="project__footer">
-                        <h3 class="project__title">Broth Brawlers</h3>
-                        <div class="project__button button">
-                            <span><i class="fa-solid fa-arrow-right"></i></span>
-                        </div>
-                    </div>
-                </a>
-
-                <a class="project" href="projects/ai-planes.html">
-                    <div class="project__preview">
-                        <div class="project__img">
-                            <img src="/assets/projects/ai-planes/card.png" alt="">
-                        </div>
-                        <div class="project__tags">
-                            <span class="tag">Unity</span>
-                            <span class="tag">C#</span>
-                            <span class="tag">ML-AGENTS</span>
-                        </div>
-                    </div>
-                    <div class="project__footer">
-                        <h3 class="project__title">AI Airplanes</h3>
-                        <div class="project__button button">
-                            <span><i class="fa-solid fa-arrow-right"></i></span>
-                        </div>
-                    </div>
-                </a>
-
-                <a class="project" href="projects/component-engine.html">
-                    <div class="project__preview">
-                        <div class="project__img">
-                            <img src="/assets/projects/component-engine/cover.svg" alt="">
-                        </div>
-                        <div class="project__tags">
-                            <span class="tag">C++</span>
-                            <span class="tag">SDL</span>
-                            <span class="tag">SteamSDK</span>
-                            <span class="tag">ImGui</span>
-                        </div>
-                    </div>
-                    <div class="project__footer">
-                        <h3 class="project__title">2D Component Engine</h3>
-                        <div class="project__button button">
-                            <span><i class="fa-solid fa-arrow-right"></i></span>
-                        </div>
-                    </div>
-                </a>
-
+                {% for project in professional_work %}
+                {% include project-card.html project=project %}
+                {% endfor %}
             </div>
             <div class="slick-arrows"></div>
+            {% endif %}
+
+            {% if game_dev.size > 0 %}
+            <h3 class="projects__group-title">Game Dev</h3>
+            <div class="projects slick--projects">
+                {% for project in game_dev %}
+                {% include project-card.html project=project %}
+                {% endfor %}
+            </div>
+            <div class="slick-arrows"></div>
+            {% endif %}
+
+            {% if game_jams.size > 0 %}
+            <h3 class="projects__group-title">Game Jams</h3>
+            <div class="projects slick--projects">
+                {% for project in game_jams %}
+                {% include project-card.html project=project %}
+                {% endfor %}
+            </div>
+            <div class="slick-arrows"></div>
+            {% endif %}
         </section>
 
         <section id="about">
@@ -355,42 +184,9 @@
 <script type="text/javascript" src="//code.jquery.com/jquery-migrate-1.2.1.min.js"></script>
 <script type="text/javascript" src="//cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.min.js"></script>
 
-<script type="text/javascript">
-    $(document).ready(function () 
-    {
-        const projectSettings = 
-        {
-            arrows: true,
-            infinite: true,
-            slidesToShow: 1,
-            mobileFirst: true,
-            slidesToScroll: 1,
-            draggable: true,
-            centerMode: true,
-            prevArrow: '<div class="button slick-prev"><span></span></div>',
-            nextArrow: '<div class="button slick-next"><span></span></div>',
-            appendArrows: $('.slick-arrows'),
-            responsive: [
-                {
-                    breakpoint: 768,
-                    settings: "unslick"
-                }
-            ]
-        };
-        
-         const projectSlider = $('.slick--projects').slick(projectSettings);
+<script src="assets/js/projects-slider.js"></script>
 
-        $(window).on('resize', function ()
-        {
-            if ($(window).width() < 768 && !projectSlider.hasClass('slick-initialized'))
-            {
-                $('.slick--projects').slick(projectSettings);
-            }
-        });
-    });
-</script>
-
-<script src="js/theme-toggle.js"></script>
-<script src="js/button-tilt.js"></script>
+<script src="assets/js/theme-toggle.js"></script>
+<script src="assets/js/button-tilt.js"></script>
 
 </html>

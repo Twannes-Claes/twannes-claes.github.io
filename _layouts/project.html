@@ -10,40 +10,65 @@
     <link
         href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Onest:wght@100..900&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="/css/reset.css">
-    <link rel="stylesheet" href="/css/general.css">
-    <link rel="stylesheet" href="/css/project.css">
+    <link rel="stylesheet" href="/assets/css/reset.css">
+    <link rel="stylesheet" href="/assets/css/general.css">
+    <link rel="stylesheet" href="/assets/css/project.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.css" />
-    <script src="/js/theme-init.js"></script>
+    <script src="/assets/js/theme-init.js"></script>
 </head>
 
 <body>
 
-    <nav class="container nav--project">
-        <div class="button button--back">
-            <a href="/#projects" aria-label="Back to overview"><i class="fa-solid fa-house"></i></a>
-        </div>
-        <ul>
-            <li>
-                <a href="/#projects"><i class="fa-regular fa-folder-open"></i>Projects</a>
-            </li>
-            <li>
-                <a href="/#about"><i class="fa-regular fa-user"></i>About me</a>
-            </li>
-            <li>
-                <a href="/#contact"><i class="fa-regular fa-envelope"></i>Contact & Links</a>
-            </li>
-            <li>
-                <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle light and dark theme">
-                    <i class="fa-solid fa-moon"></i>
-                </button>
-            </li>
-        </ul>
-    </nav>
+    {% include nav.html back=true prefix="/" %}
 
     <main class="container">
         <div class="project">
-{{ content }}
+            <div class="project__content">
+                <h1 class="project__title">{{ page.title }}</h1>
+
+                {% if page.tags %}
+                <div class="project__tags">
+                    {% for tag in page.tags %}
+                    <div class="tag">{{ tag }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="project__desc">
+                    {% for section in page.sections %}
+                    <span class="tag tag--label">{{ section.label }}</span>
+                    {% if section.text %}{{ section.text }}{% endif %}
+                    {% if section.list %}
+                    <ul>
+                        {% for item in section.list %}
+                        <li>{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+
+                {% if page.links %}
+                <div class="project__links">
+                    {% for link in page.links %}
+                    <div class="button">
+                        <a href="{{ link.url }}" target="_blank"><i class="{{ link.icon }}"></i>{{ link.text }}</a>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+
+            {% if page.images %}
+            <div class="project__images">
+                {% for image in page.images %}
+                <a href="{{ image.href | default: image.src }}" data-fancybox="gallery" class="project__img">
+                    <img src="{{ image.src }}" />
+                    {% if image.icon %}<i class="{{ image.icon }}"></i>{% endif %}
+                </a>
+                {% endfor %}
+            </div>
+            {% endif %}
         </div>
     </main>
 
@@ -51,14 +76,9 @@
 
 <script src="https://kit.fontawesome.com/7ab46062e1.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.umd.js"></script>
+<script src="/assets/js/fancybox-init.js"></script>
 
-
-<script type="text/javascript">
-    Fancybox.bind("[data-fancybox]", {
-    });
-</script>
-
-<script src="/js/theme-toggle.js"></script>
-<script src="/js/button-tilt.js"></script>
+<script src="/assets/js/theme-toggle.js"></script>
+<script src="/assets/js/button-tilt.js"></script>
 
 </html>

@@ -247,6 +247,18 @@ nav ul li a::after {
     transition: width .3s ease;
 }
 
+@media (max-width: 560px) {
+    nav ul {
+        gap: 20px;
+    }
+    nav ul li a i {
+        font-size: 1.2rem;
+    }
+    nav ul li a span {
+        display: none;
+    }
+}
+
 nav ul li a:hover::after {
     width: 100%;
 }
