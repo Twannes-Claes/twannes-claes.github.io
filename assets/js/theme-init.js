@@ -1,7 +1,7 @@
 (function ()
 {
     var stored = localStorage.getItem('theme');
-    var systemPrefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
-    var theme = stored || (systemPrefersLight ? 'light' : 'dark');
+    var systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var theme = stored || (systemPrefersDark ? 'dark' : 'light');
     document.documentElement.setAttribute('data-theme', theme);
 })();
