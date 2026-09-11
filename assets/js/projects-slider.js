@@ -9,8 +9,8 @@ $(document).ready(function ()
         slidesToScroll: 1,
         draggable: true,
         centerMode: true,
-        prevArrow: '<div class="button slick-prev"><span></span></div>',
-        nextArrow: '<div class="button slick-next"><span></span></div>',
+        prevArrow: '<div class="button slick-prev button--sm"><span></span></div>',
+        nextArrow: '<div class="button slick-next button--sm"><span></span></div>',
         responsive: [
             {
                 breakpoint: 768,

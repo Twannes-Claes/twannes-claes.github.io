@@ -1,24 +1,29 @@
 (function ()
 {
-    function randomDeg()
+    function randomDeg(magnitude)
     {
-        return Math.random() < 0.5 ? -3 : 3;
+        return Math.random() < 0.5 ? -magnitude : magnitude;
     }
 
-    function attachTilt(trigger, target)
+    function getTarget(e)
     {
-        trigger.addEventListener('mouseenter', function ()
-        {
-            target.style.transform = 'rotate(' + randomDeg() + 'deg)';
-        });
-        trigger.addEventListener('mouseleave', function ()
-        {
-            target.style.transform = '';
-        });
+        return e.target.closest('.button a, .button span');
     }
 
-    document.querySelectorAll('.button a, .button span').forEach(function (target)
+    document.addEventListener('mouseover', function (e)
     {
-        attachTilt(target, target);
+        var target = getTarget(e);
+        if (!target || target.contains(e.relatedTarget)) return;
+
+        var isSmall = target.closest('.button--sm') !== null;
+        target.style.transform = 'rotate(' + randomDeg(isSmall ? 12 : 3) + 'deg)';
+    });
+
+    document.addEventListener('mouseout', function (e)
+    {
+        var target = getTarget(e);
+        if (!target || target.contains(e.relatedTarget)) return;
+
+        target.style.transform = '';
     });
 })();

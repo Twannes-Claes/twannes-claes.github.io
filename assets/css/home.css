@@ -294,15 +294,23 @@
 }
 
 .contact {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, max-content);
     justify-content: center;
-    column-gap: clamp(20px, 2vw + 10px, 70px);
-    flex-direction: row;
+    justify-items: center;
+    column-gap: clamp(10px, 0.8vw + 4px, 24px);
+    row-gap: clamp(10px, 0.8vw + 4px, 20px);
 }
-.break {
-    flex-basis: 100%;
+@media (min-width: 601px) {
+    .contact .button:nth-child(odd) {
+        justify-self: end;
+    }
+    .contact .button:nth-child(even) {
+        justify-self: start;
+    }
 }
-.contact .button {
-    margin-block-end: clamp(20px, 2vw + 10px, 70px);
+@media (max-width: 600px) {
+    .contact {
+        grid-template-columns: 1fr;
+    }
 }
