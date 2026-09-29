@@ -1,10 +1,11 @@
-import { faMinus, faPlus, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faMinus, faPlus, faStar, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useCallback, type CSSProperties, type PointerEvent } from 'react';
 
 import type { Skylander } from '../types';
 
 import { elementFor } from '../content/elements';
+import { ownedVariants } from '../content/variants';
 
 interface SkylanderCardProps
 {
@@ -16,6 +17,8 @@ interface SkylanderCardProps
     onRemove: (item: Skylander) => void;
     /** +1 or -1. Collection.tsx turns the last -1 into the remove dialog. */
     onChangeCount: (item: Skylander, delta: number) => void;
+    /** Opens the versions dialog in Collection.tsx. */
+    onVariants: (item: Skylander) => void;
 }
 
 /** Degrees the card leans towards the pointer at its edges. */
@@ -74,12 +77,21 @@ function untilt(event: PointerEvent<HTMLLIElement>)
     card.style.setProperty('--ry', '0deg');
 }
 
-export function SkylanderCard({ item, index, intro, onRemove, onChangeCount }: SkylanderCardProps)
+export function SkylanderCard({
+    item,
+    index,
+    intro,
+    onRemove,
+    onChangeCount,
+    onVariants,
+}: SkylanderCardProps)
 {
     const remove = useCallback(() => onRemove(item), [item, onRemove]);
     const increase = useCallback(() => onChangeCount(item, 1), [item, onChangeCount]);
     const decrease = useCallback(() => onChangeCount(item, -1), [item, onChangeCount]);
+    const versions = useCallback(() => onVariants(item), [item, onVariants]);
     const element = elementFor(item.element);
+    const special = ownedVariants(item.variants);
     const style = {
         '--el': element.color,
         '--i': index,
@@ -90,7 +102,7 @@ export function SkylanderCard({ item, index, intro, onRemove, onChangeCount }: S
 
     return (
         <li
-            className={intro ? 'sky-card sky-card--intro' : 'sky-card'}
+            className={`sky-card${intro ? ' sky-card--intro' : ''}${special.length > 0 ? ' sky-card--special' : ''}`}
             style={style}
             onPointerEnter={glint}
             onPointerMove={tilt}
@@ -106,6 +118,15 @@ export function SkylanderCard({ item, index, intro, onRemove, onChangeCount }: S
                 aria-label={`Remove ${item.name}`}
             >
                 <FontAwesomeIcon icon={faXmark} />
+            </button>
+            <button
+                type="button"
+                className="sky-card__versions"
+                onClick={versions}
+                aria-label={`Versions of ${item.name}`}
+                title="Versions"
+            >
+                <FontAwesomeIcon icon={faStar} />
             </button>
 
             <div className="sky-card__portrait">
@@ -136,6 +157,21 @@ export function SkylanderCard({ item, index, intro, onRemove, onChangeCount }: S
                     <span className="sky-card__name">{item.name}</span>
                 )}
                 {item.game && <span className="sky-card__game">{item.game}</span>}
+                {special.length > 0 && (
+                    <ul className="sky-card__tags" aria-label="Special versions">
+                        {special.map((variant) => (
+                            <li
+                                key={variant.id}
+                                className="sky-tag"
+                                style={{ '--v': variant.color } as CSSProperties}
+                            >
+                                {variant.short}
+                                {(item.variants[variant.id] ?? 0) > 1 &&
+                                    ` ×${item.variants[variant.id]}`}
+                            </li>
+                        ))}
+                    </ul>
+                )}
 
                 <div className="sky-stepper" role="group" aria-label={`Copies of ${item.name}`}>
                     <button

@@ -19,6 +19,7 @@ import {
     updateDoc,
 } from 'firebase/firestore';
 
+import type { VariantId } from '../content/variants';
 import type { Skylander, SkylanderDetails } from '../types';
 
 import { accountEmail, firebaseConfig } from './config';
@@ -70,8 +71,14 @@ export function watchCollection(
                 {
                     const data = entry.data();
 
-                    // Entries saved before counts existed have none, and mean one figure.
-                    return { ...data, id: entry.id, count: data.count ?? 1 } as Skylander;
+                    // Entries saved before counts or variants existed have neither, and mean one
+                    // plain figure.
+                    return {
+                        ...data,
+                        id: entry.id,
+                        count: data.count ?? 1,
+                        variants: data.variants ?? {},
+                    } as Skylander;
                 }),
             ),
         onError,
@@ -106,10 +113,19 @@ export async function addSkylander(item: SkylanderDetails): Promise<number>
     });
 }
 
-/** Adds or takes away copies. increment() keeps two quick clicks from overwriting each other. */
-export async function changeCount(id: string, delta: number): Promise<void>
+/**
+ * Adds or takes away copies, plain ones or of one special version. The total moves along with a
+ * variant, because plain copies are the total minus the variants. increment() keeps two quick
+ * clicks from overwriting each other.
+ */
+export async function changeCount(id: string, delta: number, variant?: VariantId): Promise<void>
 {
-    await updateDoc(doc(skylanders, id), { count: increment(delta) });
+    await updateDoc(
+        doc(skylanders, id),
+        variant
+            ? { count: increment(delta), [`variants.${variant}`]: increment(delta) }
+            : { count: increment(delta) },
+    );
 }
 
 /** Fills in details a figure was saved without, such as a game an older lookup missed. */

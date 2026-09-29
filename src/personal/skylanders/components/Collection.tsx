@@ -14,11 +14,13 @@ import { flushSync } from 'react-dom';
 import type { CatalogEntry, Db, Skylander } from '../types';
 
 import { elements } from '../content/elements';
+import { ownedVariants, plainCount, type VariantId } from '../content/variants';
 import { fetchCatalog, lookup } from '../services/wiki';
 
 import { ConfirmRemove } from './ConfirmRemove';
 import { SkylanderGrid } from './SkylanderGrid';
 import { SkylanderSearch } from './SkylanderSearch';
+import { VariantsDialog } from './VariantsDialog';
 
 /**
  * Runs a list update as a view transition, so new cards pop in, removed ones pop out and the
@@ -52,6 +54,8 @@ export function Collection({ db }: { db: Db })
     const [filter, setFilter] = useState<string | null>(null);
     /** The Skylander the remove dialog is asking about. */
     const [pending, setPending] = useState<Skylander | null>(null);
+    /** Id of the Skylander in the versions dialog, looked up in items so its counts stay live. */
+    const [versionsOf, setVersionsOf] = useState<string | null>(null);
 
     useEffect(() =>
     {
@@ -95,34 +99,33 @@ export function Collection({ db }: { db: Db })
 
     useEffect(() =>
     {
-        // Figures saved before the lookup matched every game category have none, so they get
-        // looked up again once and patched. Failures are left for the next visit to retry.
+        // Figures saved before the lookup matched every game category have none, and ones saved
+        // before versions were tracked have no list of them, so they get looked up again once
+        // and patched. Failures are left for the next visit to retry.
         for (const item of items ?? [])
         {
-            if ((item.game && item.element) || !item.url || repaired.current.has(item.id))
+            const complete = item.game && item.element && item.versions;
+
+            if (complete || !item.url || repaired.current.has(item.id))
                 continue;
 
             repaired.current.add(item.id);
             lookup(item.name)
                 .then((details) =>
-                {
-                    if (details.game !== item.game || details.element !== item.element)
-                    {
-                        return db.updateDetails(item.id, {
-                            game: details.game,
-                            element: details.element,
-                        });
-                    }
-
-                })
+                    db.updateDetails(item.id, {
+                        game: details.game || item.game,
+                        element: details.element || item.element,
+                        versions: details.versions,
+                    }),
+                )
                 .catch(() => undefined);
         }
     }, [items, db]);
 
-    const owned = useMemo(() => new Set(items?.map((item) => item.name)), [items]);
-    const suggestions = useMemo(
-        () => catalog.filter((entry) => !owned.has(entry.name)),
-        [catalog, owned],
+    /** How many of each figure we have, by name, so the search can say "owned". */
+    const owned = useMemo(
+        () => new Map(items?.map((item) => [item.name, item.count])),
+        [items],
     );
 
     /** Only the elements someone owns get a chip, with how many of each. */
@@ -236,7 +239,7 @@ export function Collection({ db }: { db: Db })
     const cancelRemove = useCallback(() => setPending(null), []);
 
     const changeCount = useCallback(
-        (item: Skylander, delta: number) =>
+        (item: Skylander, delta: number, variant?: VariantId) =>
         {
             // Taking away the last copy removes the figure, so that goes through the dialog.
             if (item.count + delta < 1)
@@ -246,10 +249,23 @@ export function Collection({ db }: { db: Db })
                 return;
             }
 
-            db.changeCount(item.id, delta).catch((error: Error) => setMessage(error.message));
+            let target = variant;
+
+            // Minus on the card takes a plain copy first. With none left, it takes the last
+            // special version instead, so the total and the versions keep adding up.
+            if (!target && delta < 0 && plainCount(item.count, item.variants) === 0)
+                target = ownedVariants(item.variants).at(-1)?.id;
+
+            db.changeCount(item.id, delta, target).catch((error: Error) =>
+                setMessage(error.message),
+            );
         },
         [db],
     );
+
+    const openVersions = useCallback((item: Skylander) => setVersionsOf(item.id), []);
+    const closeVersions = useCallback(() => setVersionsOf(null), []);
+    const versionsItem = items?.find((item) => item.id === versionsOf) ?? null;
 
     const total = useMemo(() => items?.reduce((sum, item) => sum + item.count, 0) ?? 0, [items]);
 
@@ -261,7 +277,8 @@ export function Collection({ db }: { db: Db })
                 <SkylanderSearch
                     value={name}
                     onChange={setName}
-                    catalog={suggestions}
+                    catalog={catalog}
+                    owned={owned}
                     onPick={pick}
                 />
             </form>
@@ -325,11 +342,13 @@ export function Collection({ db }: { db: Db })
                         items={shown}
                         onRemove={setPending}
                         onChangeCount={changeCount}
+                        onVariants={openVersions}
                     />
                 </>
             )}
 
             <ConfirmRemove item={pending} onConfirm={confirmRemove} onCancel={cancelRemove} />
+            <VariantsDialog item={versionsItem} onChange={changeCount} onClose={closeVersions} />
         </>
     );
 }

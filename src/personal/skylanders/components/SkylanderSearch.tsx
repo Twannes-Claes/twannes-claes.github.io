@@ -1,3 +1,5 @@
+import { faCheck } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useCallback, useEffect, useId, useMemo, useState, type KeyboardEvent } from 'react';
 
 import type { CatalogEntry } from '../types';
@@ -53,8 +55,13 @@ interface SkylanderSearchProps
 {
     value: string;
     onChange: (value: string) => void;
-    /** Figures not yet in the collection. */
+    /** Every figure on the wiki, owned ones included. */
     catalog: CatalogEntry[];
+    /**
+     * How many of each figure we have, by name. Owned figures get a badge rather than being
+     * hidden, so the search doubles as a "do we have this?" check in a shop.
+     */
+    owned: Map<string, number>;
     /** Called with a suggestion that was clicked or chosen with the keyboard. */
     onPick: (name: string) => void;
 }
@@ -63,7 +70,7 @@ interface SkylanderSearchProps
  * A combobox with pictures. It replaces a native datalist, whose dropdown the browser draws
  * itself and cannot be styled or show images.
  */
-export function SkylanderSearch({ value, onChange, catalog, onPick }: SkylanderSearchProps)
+export function SkylanderSearch({ value, onChange, catalog, owned, onPick }: SkylanderSearchProps)
 {
     const listId = useId();
     const [open, setOpen] = useState(false);
@@ -150,37 +157,48 @@ export function SkylanderSearch({ value, onChange, catalog, onPick }: SkylanderS
 
             {expanded && (
                 <ul className="sky-search__list" id={listId} role="listbox">
-                    {results.map((entry, index) => (
-                        <li
-                            key={entry.name}
-                            id={`${listId}-${index}`}
-                            role="option"
-                            aria-selected={index === target}
-                            className="sky-search__option"
-                            // mousedown rather than click, because click fires after the input
-                            // blurs and the list is already gone by then.
-                            onMouseDown={(event) =>
-                            {
-                                event.preventDefault();
-                                pick(entry.name);
-                            }}
-                            onMouseEnter={() => setActive(index)}
-                        >
-                            <span className="sky-search__thumb">
-                                {entry.thumb && (
-                                    <img
-                                        src={entry.thumb}
-                                        alt=""
-                                        loading="lazy"
-                                        referrerPolicy="no-referrer"
-                                    />
+                    {results.map((entry, index) =>
+                    {
+                        const copies = owned.get(entry.name) ?? 0;
+
+                        return (
+                            <li
+                                key={entry.name}
+                                id={`${listId}-${index}`}
+                                role="option"
+                                aria-selected={index === target}
+                                className={`sky-search__option${copies > 0 ? ' sky-search__option--owned' : ''}`}
+                                // mousedown rather than click, because click fires after the input
+                                // blurs and the list is already gone by then.
+                                onMouseDown={(event) =>
+                                {
+                                    event.preventDefault();
+                                    pick(entry.name);
+                                }}
+                                onMouseEnter={() => setActive(index)}
+                            >
+                                <span className="sky-search__thumb">
+                                    {entry.thumb && (
+                                        <img
+                                            src={entry.thumb}
+                                            alt=""
+                                            loading="lazy"
+                                            referrerPolicy="no-referrer"
+                                        />
+                                    )}
+                                </span>
+                                <span className="sky-search__name">
+                                    <Highlight name={entry.name} query={value} />
+                                </span>
+                                {copies > 0 && (
+                                    <span className="sky-search__owned">
+                                        <FontAwesomeIcon icon={faCheck} />
+                                        {copies > 1 ? `Owned ×${copies}` : 'Owned'}
+                                    </span>
                                 )}
-                            </span>
-                            <span className="sky-search__name">
-                                <Highlight name={entry.name} query={value} />
-                            </span>
-                        </li>
-                    ))}
+                            </li>
+                        );
+                    })}
                 </ul>
             )}
         </div>

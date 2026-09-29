@@ -1,3 +1,4 @@
+import type { VariantCounts, VariantId } from '../content/variants';
 import type { Skylander, SkylanderDetails } from '../types';
 
 import { lookup } from './wiki';
@@ -8,19 +9,22 @@ import { lookup } from './wiki';
  * can be tried out without the password. Reloading starts over from the samples.
  */
 
-/** A mix of elements, games and name lengths, with one duplicate for the second coin. */
-const samples: [name: string, count: number][] = [
-    ['Spyro', 1],
-    ['Chop Chop', 1],
-    ['Dino-Rang', 3],
-    ['Trigger Happy', 2],
-    ['Stealth Elf', 1],
-    ['Eruptor', 1],
-    ['Gill Grunt', 1],
-    ['Hex', 1],
-    ['Tree Rex', 1],
-    ['Jet-Vac', 1],
-    ['Knight Light', 1],
+/**
+ * A mix of elements, games and name lengths, with duplicates for the second coin and a few
+ * special versions for the variant tags and frame.
+ */
+const samples: [name: string, count: number, variants: VariantCounts][] = [
+    ['Spyro', 2, { dark: 1 }],
+    ['Chop Chop', 1, {}],
+    ['Dino-Rang', 3, { eonsElite: 1 }],
+    ['Trigger Happy', 2, {}],
+    ['Stealth Elf', 1, { legendary: 1 }],
+    ['Eruptor', 1, {}],
+    ['Gill Grunt', 1, {}],
+    ['Hex', 1, {}],
+    ['Tree Rex', 1, {}],
+    ['Jet-Vac', 1, {}],
+    ['Knight Light', 1, {}],
 ];
 
 const items = new Map<string, Skylander>();
@@ -50,11 +54,12 @@ function publish()
 function seed(): Promise<void>
 {
     seeded ??= Promise.all(
-        samples.map(async ([name, count]) =>
+        samples.map(async ([name, count, variants]) =>
         {
             const details = await lookup(name);
+            const id = idFor(details.name);
 
-            items.set(idFor(details.name), { ...details, id: idFor(details.name), count });
+            items.set(id, { ...details, id, count, variants });
         }),
     ).then(publish);
 
@@ -109,20 +114,27 @@ export function watchCollection(
 export async function addSkylander(item: SkylanderDetails): Promise<number>
 {
     const id = idFor(item.name);
-    const count = (items.get(id)?.count ?? 0) + 1;
+    const existing = items.get(id);
+    const count = (existing?.count ?? 0) + 1;
 
-    items.set(id, { ...item, id, count });
+    items.set(id, { ...item, id, count, variants: existing?.variants ?? {} });
     publish();
 
     return count;
 }
 
-export async function changeCount(id: string, delta: number): Promise<void>
+export async function changeCount(id: string, delta: number, variant?: VariantId): Promise<void>
 {
     const item = items.get(id);
 
     if (item)
-        items.set(id, { ...item, count: item.count + delta });
+    {
+        const variants = variant
+            ? { ...item.variants, [variant]: (item.variants[variant] ?? 0) + delta }
+            : item.variants;
+
+        items.set(id, { ...item, count: item.count + delta, variants });
+    }
 
     publish();
 }

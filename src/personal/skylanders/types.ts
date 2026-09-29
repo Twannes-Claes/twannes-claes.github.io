@@ -1,3 +1,5 @@
+import type { VariantCounts, VariantId } from './content/variants';
+
 /**
  * The Firebase module, typed without importing it, because the page loads it on demand and a
  * normal import would pull Firebase into the portfolio bundle.
@@ -17,12 +19,19 @@ export interface Skylander
     game: string;
     /** Wiki page, empty when the name did not match one. */
     url: string;
-    /** How many of this figure we own, at least 1. */
+    /** How many of this figure we own, at least 1, special versions included. */
     count: number;
+    /** The special versions among those copies, see content/variants.ts. */
+    variants: VariantCounts;
+    /**
+     * The special versions this figure was released in, from the wiki. Missing on figures saved
+     * before it was tracked, until Collection.tsx looks them up again.
+     */
+    versions?: VariantId[];
 }
 
 /** What a wiki lookup knows about a figure, before it is stored. */
-export type SkylanderDetails = Omit<Skylander, 'id' | 'count'>;
+export type SkylanderDetails = Omit<Skylander, 'id' | 'count' | 'variants'>;
 
 /** One search suggestion, with a small picture for the dropdown. */
 export interface CatalogEntry
