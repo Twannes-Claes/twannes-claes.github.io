@@ -1,4 +1,4 @@
-import type { Skylander } from './types';
+import type { Skylander } from '../types';
 
 /*
  * There is no official Skylanders API, so this reads the fan wiki at skylanders.fandom.com through

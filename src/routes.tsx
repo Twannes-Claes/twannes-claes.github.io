@@ -1,6 +1,6 @@
 import type { RouteRecord } from 'vite-react-ssg';
 
-import Skylanders from './personal/skylanders/Skylanders';
+import Skylanders from './personal/skylanders/pages/Skylanders';
 import { allProjects } from './portfolio/content/projects';
 import Home from './portfolio/pages/Home';
 import { ProjectPage } from './portfolio/pages/ProjectPage';
@@ -34,7 +34,7 @@ export const routes: RouteRecord[] = [
             {
                 path: 'skylanders',
                 element: <Skylanders />,
-                entry: 'src/personal/skylanders/Skylanders.tsx',
+                entry: 'src/personal/skylanders/pages/Skylanders.tsx',
             },
             // Prerendered so the build emits a real 404.html for GitHub Pages.
             {

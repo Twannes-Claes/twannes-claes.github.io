@@ -15,6 +15,6 @@ Names, pictures, elements and games come from the fan wiki at skylanders.fandom.
 6. **Firestore Database**, Create database, production mode, a region near you (`eur3`).
 7. **Firestore Database**, Rules: paste `firestore.rules` and publish.
 8. **Project settings**, Your apps, add a Web app, and copy `apiKey`, `authDomain`, `projectId`
-   and `appId` into `config.ts`.
+   and `appId` into `services/config.ts`.
 
 To change the password later, reset it on the user under Authentication, Users.

@@ -1,7 +1,8 @@
 rules_version = '2';
 
-// Paste into the Firebase console, Firestore Database, Rules. The email must match accountEmail
-// in config.ts, so a stray sign-up on the same project still cannot touch the collection.
+// Paste into the Firebase console, Firestore Database, Rules. The email must match
+// accountEmail in services/config.ts, so a stray sign-up on the same project still cannot
+// touch the collection.
 service cloud.firestore {
   match /databases/{database}/documents {
     match /skylanders/{id} {

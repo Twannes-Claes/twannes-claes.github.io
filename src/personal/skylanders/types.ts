@@ -1,6 +1,12 @@
+/**
+ * The Firebase module, typed without importing it, because the page loads it on demand and a
+ * normal import would pull Firebase into the portfolio bundle.
+ */
+export type Db = typeof import('./services/db');
+
 export interface Skylander
 {
-    /** Firestore document id, derived from the name in db.ts. */
+    /** Firestore document id, derived from the name in services/db.ts. */
     id: string;
     name: string;
     /** Thumbnail from the Skylanders wiki, empty when the wiki has none. */

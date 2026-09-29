@@ -17,12 +17,12 @@ import {
     serverTimestamp,
 } from 'firebase/firestore';
 
-import type { Skylander } from './types';
+import type { Skylander } from '../types';
 
 import { accountEmail, firebaseConfig } from './config';
 
 /*
- * Only ever loaded with a dynamic import from Skylanders.tsx, so Firebase stays out of the
+ * Only ever loaded with a dynamic import from pages/Skylanders.tsx, so Firebase stays out of the
  * portfolio bundle and never runs during the static prerender.
  */
 
