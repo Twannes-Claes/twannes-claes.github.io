@@ -28,6 +28,41 @@ npm run dev
 
 `typecheck` and `lint` both run in CI before the build, so either one failing blocks the deploy.
 
+### Code style
+
+4-space indent, single quotes, and braces on their own line (Allman), matching the C++ and C#
+conventions the rest of my work uses. Array and object literals in a property follow the same rule,
+with the bracket under its key, and anything that fits on one line stays on one line:
+
+```ts
+tags: ['Unity', 'C#', 'Perforce', 'Team'],
+images:
+[
+    { src: '/assets/projects/adapta-solva/gallery-1.jpg' },
+],
+```
+
+A single-line `if` body drops its braces and sits on the next line. Blank lines separate
+declarations from the logic that follows, and always precede a `return`:
+
+```ts
+const embedUrl = image.href ? toYouTubeEmbed(image.href) : null;
+
+if (embedUrl)
+    return { type: 'youtube', embedUrl };
+
+return { src: image.href ?? image.src };
+```
+
+One exception: a top-level `export const x = {` keeps its brace on the same line, because
+`@stylistic/indent` forces a continuation indent otherwise, and the only way to suppress that also
+switches off indent checking for the whole literal.
+
+Prettier cannot place braces on their own line, so `.ts` and `.tsx` are excluded from it in
+`.prettierignore` and formatted by ESLint instead, via `@stylistic` rules in `eslint.config.js`.
+Prettier still handles CSS, Markdown, JSON, YAML and HTML, configured in the `"prettier"` block of
+`package.json`. `npm run format` runs both, in that order.
+
 ## Adding a project
 
 1. Create `src/content/projects/<slug>.tsx` exporting a `Project`. Copy an existing one as a

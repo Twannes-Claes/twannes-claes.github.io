@@ -1,4 +1,9 @@
 dist
 node_modules
-public
 package-lock.json
+public
+
+# TypeScript is formatted by ESLint (@stylistic) instead, because Prettier
+# cannot put braces on their own line.
+*.ts
+*.tsx

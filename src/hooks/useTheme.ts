@@ -2,44 +2,54 @@ import { useCallback, useSyncExternalStore } from 'react';
 
 export type Theme = 'light' | 'dark';
 
-/**
- * The theme lives on <html data-theme>, written by the inline script in
- * index.html before first paint. That attribute is the source of truth, so it is
- * read as an external store rather than mirrored into React state.
+/*
+ * The theme lives on <html data-theme>, set by the inline script in index.html
+ * before first paint. That attribute is the source of truth, so it is read as
+ * an external store instead of being mirrored into React state.
  */
-function subscribe(onChange: () => void): () => void {
-  const observer = new MutationObserver(onChange);
-  observer.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ['data-theme'],
-  });
-  return () => observer.disconnect();
+
+function subscribe(onChange: () => void): () => void
+{
+    const observer = new MutationObserver(onChange);
+
+    observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['data-theme'],
+    });
+
+    return () => observer.disconnect();
 }
 
-function getSnapshot(): Theme {
-  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+function readTheme(): Theme
+{
+    return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
 }
 
-/** During prerender there is no document; the inline script corrects this on load. */
-function getServerSnapshot(): Theme {
-  return 'light';
+/** No document during prerender. The inline script fixes this on load. */
+function readServerTheme(): Theme
+{
+    return 'light';
 }
 
-export function useTheme() {
-  const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+export function useTheme()
+{
+    const theme = useSyncExternalStore(subscribe, readTheme, readServerTheme);
 
-  const setTheme = useCallback((next: Theme) => {
-    document.documentElement.setAttribute('data-theme', next);
-    try {
-      localStorage.setItem('theme', next);
-    } catch {
-      // Private mode or blocked storage: the theme still applies for this page.
-    }
-  }, []);
+    const toggleTheme = useCallback(() =>
+    {
+        const next = readTheme() === 'light' ? 'dark' : 'light';
 
-  const toggleTheme = useCallback(() => {
-    setTheme(getSnapshot() === 'light' ? 'dark' : 'light');
-  }, [setTheme]);
+        document.documentElement.setAttribute('data-theme', next);
 
-  return { theme, setTheme, toggleTheme };
+        try
+        {
+            localStorage.setItem('theme', next);
+        }
+        catch
+        {
+            // Blocked storage. The theme still applies to this page.
+        }
+    }, []);
+
+    return { theme, toggleTheme };
 }

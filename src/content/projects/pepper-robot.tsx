@@ -1,62 +1,67 @@
 import type { Project } from '../types';
 
 export const pepperRobot: Project = {
-  slug: 'pepper-robot',
-  title: 'Pepper Robot',
-  category: 'Professional Work',
-  active: true,
-  order: 3,
-  cardImage: '/assets/projects/pepper-robot/card.png',
-  tags: ['C++', 'Python', 'MQTT', 'VUE'],
-  sections: [
-    {
-      label: 'The Job',
-      body: (
-        <>
-          <p>
-            A professor at MCT Kortrijk contacted me to work on reprogramming a Pepper Robot that
-            would be used in a hotel.
-          </p>
-          <p>
-            The robot needed functionality to work with the website displayed on its tablet. I
-            programmed the functionality to make her move, speak and display the site, allow editing
-            of settings, and integrated <strong>face recognition and animations</strong>.
-          </p>
-        </>
-      ),
-    },
-    {
-      label: 'Building It',
-      body: (
-        <>
-          I initially developed the robot control system using C++, where I successfully implemented
-          command execution through a library that interfaces directly with the robot. The original
-          plan was to connect this system to a Vue.js based website developed by my supervisor,
-          allowing the site to send commands to the robot. However,{' '}
-          <strong>
-            due to integration issues between the website and the C++ backend, I transitioned the
-            rest of the project to Python
-          </strong>{' '}
-          for improved connectivity and ease of use. Throughout the project, I also contributed to
-          the Vue.js frontend by adding content and supporting features needed to control the robot
-          remotely.
-        </>
-      ),
-    },
-    {
-      label: 'My Implementations',
-      list: [
-        'Movement, speech and tablet display control',
-        'Settings editor',
-        'Face recognition & animations',
-        'C++ robot command library',
-        'Python backend for the website connection',
-        'Vue.js frontend contributions',
-      ],
-    },
-  ],
-  images: [
-    { src: '/assets/projects/pepper-robot/card.png' },
-    { src: '/assets/projects/pepper-robot/gallery-1.png' },
-  ],
+    slug: 'pepper-robot',
+    title: 'Pepper Robot',
+    category: 'Professional Work',
+    active: true,
+    order: 3,
+    cardImage: '/assets/projects/pepper-robot/card.png',
+    tags: ['C++', 'Python', 'MQTT', 'VUE'],
+    sections:
+    [
+        {
+            label: 'The Job',
+            body: (
+                <>
+                    <p>
+                        A professor at MCT Kortrijk contacted me to work on reprogramming a Pepper
+                        Robot that would be used in a hotel.
+                    </p>
+                    <p>
+                        The robot needed functionality to work with the website displayed on its
+                        tablet. I programmed the functionality to make her move, speak and display
+                        the site, allow editing of settings, and integrated{' '}
+                        <strong>face recognition and animations</strong>.
+                    </p>
+                </>
+            ),
+        },
+        {
+            label: 'Building It',
+            body: (
+                <>
+                    I initially developed the robot control system using C++, where I successfully
+                    implemented command execution through a library that interfaces directly with
+                    the robot. The original plan was to connect this system to a Vue.js based
+                    website developed by my supervisor, allowing the site to send commands to the
+                    robot. However,{' '}
+                    <strong>
+                        due to integration issues between the website and the C++ backend, I
+                        transitioned the rest of the project to Python
+                    </strong>{' '}
+                    for improved connectivity and ease of use. Throughout the project, I also
+                    contributed to the Vue.js frontend by adding content and supporting features
+                    needed to control the robot remotely.
+                </>
+            ),
+        },
+        {
+            label: 'My Implementations',
+            list:
+            [
+                'Movement, speech and tablet display control',
+                'Settings editor',
+                'Face recognition & animations',
+                'C++ robot command library',
+                'Python backend for the website connection',
+                'Vue.js frontend contributions',
+            ],
+        },
+    ],
+    images:
+    [
+        { src: '/assets/projects/pepper-robot/card.png' },
+        { src: '/assets/projects/pepper-robot/gallery-1.png' },
+    ],
 };

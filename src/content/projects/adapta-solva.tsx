@@ -3,58 +3,59 @@ import { faItchIo, faSteam, faYoutube } from '@fortawesome/free-brands-svg-icons
 import type { Project } from '../types';
 
 export const adaptaSolva: Project = {
-  slug: 'adapta-solva',
-  title: 'Adapta Solva',
-  category: 'Game Dev',
-  active: true,
-  order: 10,
-  cardImage: '/assets/projects/adapta-solva/card.png',
-  tags: ['Unity', 'C#', 'Perforce', 'Team'],
-  sections: [
-    {
-      label: 'The Project',
-      body: (
-        <>
-          Adapta Solva was a group project I worked on for <strong>six months</strong>. As part of
-          the team, <strong>I took on the majority of the programming work</strong>, gaining
-          valuable experience in a professional group setting where communication and collaboration
-          were key. This project helped me grow both my technical skills and my ability to work
-          effectively with a team toward a common goal.
-        </>
-      ),
-    },
-    {
-      label: 'My Implementations',
-      list: [
-        'Interactable item/treasure system',
-        'Transparent camera dithering',
-        'Custom player/input movement system',
-        'Wall climbing ability',
-        'Door/Button interactions',
-        'Optimizing game performance',
-      ],
-    },
-  ],
-  links: [
-    {
-      url: 'https://kayahx.itch.io/adapta-solva',
-      icon: faItchIo,
-      text: 'Play on itch.io',
-    },
-    {
-      url: 'https://store.steampowered.com/app/2752680/Adapta_Solva/',
-      icon: faSteam,
-      text: 'Play on Steam',
-    },
-  ],
-  images: [
-    {
-      src: '/assets/projects/adapta-solva/video-thumbnail.jpg',
-      href: 'https://www.youtube.com/watch?v=YdgIpqYobBI',
-      icon: faYoutube,
-    },
-    { src: '/assets/projects/adapta-solva/gallery-1.jpg' },
-    { src: '/assets/projects/adapta-solva/gallery-2.jpg' },
-    { src: '/assets/projects/adapta-solva/gallery-3.jpg' },
-  ],
+    slug: 'adapta-solva',
+    title: 'Adapta Solva',
+    category: 'Game Dev',
+    active: true,
+    order: 10,
+    cardImage: '/assets/projects/adapta-solva/card.png',
+    tags: ['Unity', 'C#', 'Perforce', 'Team'],
+    sections:
+    [
+        {
+            label: 'The Project',
+            body: (
+                <>
+                    Adapta Solva was a group project I worked on for <strong>six months</strong>. As
+                    part of the team,{' '}
+                    <strong>I took on the majority of the programming work</strong>, gaining
+                    valuable experience in a professional group setting where communication and
+                    collaboration were key. This project helped me grow both my technical skills and
+                    my ability to work effectively with a team toward a common goal.
+                </>
+            ),
+        },
+        {
+            label: 'My Implementations',
+            list:
+            [
+                'Interactable item/treasure system',
+                'Transparent camera dithering',
+                'Custom player/input movement system',
+                'Wall climbing ability',
+                'Door/Button interactions',
+                'Optimizing game performance',
+            ],
+        },
+    ],
+    links:
+    [
+        { url: 'https://kayahx.itch.io/adapta-solva', icon: faItchIo, text: 'Play on itch.io' },
+        {
+            url: 'https://store.steampowered.com/app/2752680/Adapta_Solva/',
+            icon: faSteam,
+            text: 'Play on Steam',
+        },
+    ],
+    images:
+    [
+        {
+            src: '/assets/projects/adapta-solva/video-thumbnail.jpg',
+            href: 'https://www.youtube.com/watch?v=YdgIpqYobBI',
+            icon: faYoutube,
+        },
+        { src: '/assets/projects/adapta-solva/gallery-1.jpg' },
+        { src: '/assets/projects/adapta-solva/gallery-2.jpg' },
+        { src: '/assets/projects/adapta-solva/gallery-3.jpg' },
+    ],
 };
