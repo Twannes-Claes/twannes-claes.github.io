@@ -62,11 +62,15 @@
     transition:
       background-color 0.3s ease,
       color 0.3s ease;
-    cursor: url('/assets/site/cursor-dark.svg') 3 1, auto;
+    cursor:
+      url('/assets/site/cursor-dark.svg') 3 1,
+      auto;
   }
 
   [data-theme='light'] body {
-    cursor: url('/assets/site/cursor-light.svg') 3 1, auto;
+    cursor:
+      url('/assets/site/cursor-light.svg') 3 1,
+      auto;
   }
 
   a,
@@ -77,7 +81,9 @@
   textarea,
   label,
   summary {
-    cursor: url('/assets/site/cursor-pointer.svg') 13 13, pointer;
+    cursor:
+      url('/assets/site/cursor-pointer.svg') 13 13,
+      pointer;
   }
 
   a {

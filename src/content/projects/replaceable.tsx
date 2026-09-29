@@ -16,8 +16,9 @@ export const replaceable: Project = {
       body: (
         <>
           Freelance, April - May 2025. I was brought on as an all-round Unity developer at{' '}
-          <strong>The Pack</strong> to help keep <strong>Replaceable</strong>, their Unity DOTS/ECS-based
-          stealth adventure, moving forward while the core team was heads-down on other projects.
+          <strong>The Pack</strong> to help keep <strong>Replaceable</strong>, their Unity
+          DOTS/ECS-based stealth adventure, moving forward while the core team was heads-down on
+          other projects.
         </>
       ),
     },

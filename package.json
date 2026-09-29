@@ -6,11 +6,17 @@
   "description": "Portfolio of Twannes Claes",
   "scripts": {
     "dev": "vite",
-    "build": "vite-react-ssg build && node scripts/write-redirects.mjs",
+    "build": "vite-react-ssg build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write ."
+  },
+  "prettier": {
+    "singleQuote": true,
+    "semi": true,
+    "printWidth": 100,
+    "trailingComma": "all"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "6.7.2",
@@ -30,6 +36,7 @@
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@fontsource-variable/onest": "^5.3.1",
     "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^26.6.3",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
