@@ -1,7 +1,7 @@
 import { Nav } from '../components/Nav';
 import { Seo } from '../components/Seo';
 import { TiltButton } from '../components/TiltButton';
-import { site } from '../content/site';
+import { site } from '../site';
 
 export default function NotFound()
 {

@@ -38,22 +38,27 @@ The site is then on <http://localhost:5173>.
 ## Project structure
 
 ```
-src/content/        All copy and project data, typed
-src/components/     Nav, buttons, cards, carousel, gallery
-src/pages/          Home, ProjectPage, NotFound
-src/hooks/          useTheme, useMediaQuery
-src/styles/         Design tokens and component classes
-public/assets/      Images, PDFs, cursors
+src/shared/          Used by every page: site info, Nav, Seo, buttons, layout, hooks, 404
+src/portfolio/       The portfolio itself
+  content/           All copy and project data, typed
+  components/        Cards, carousel, gallery, footer
+  pages/             Home, ProjectPage
+src/personal/        Private side projects, one folder each (skylanders/)
+src/styles/          Design tokens and component classes
+public/assets/       Images, PDFs, cursors
 ```
 
-Content is fully separated from markup. Everything you read on the site lives in `src/content/`,
-and the components only know how to render it.
+Content is fully separated from markup. Everything you read on the portfolio lives in
+`src/portfolio/content/`, and the components only know how to render it.
+
+Personal projects keep their page and everything it needs in their own folder under
+`src/personal/`, and get one route in `src/routes.tsx`. Nothing in the portfolio links to them.
 
 ## Adding a project
 
-1. Create `src/content/projects/<slug>.tsx` exporting a `Project`. Copy an existing one as a
-   starting point, and see `src/content/types.ts` for what each field does.
-2. Add it to the list in `src/content/projects/index.ts`.
+1. Create `src/portfolio/content/projects/<slug>.tsx` exporting a `Project`. Copy an existing one
+   as a starting point, and see `src/portfolio/content/types.ts` for what each field does.
+2. Add it to the list in `src/portfolio/content/projects/index.ts`.
 
 That is the only wiring step. The route and the prerendered page are both generated from that list.
 Set `order` to position it within its category, or `active: false` to hide it.

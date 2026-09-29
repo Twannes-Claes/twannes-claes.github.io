@@ -2,15 +2,15 @@ import { faEnvelope, faFolderOpen, faUser } from '@fortawesome/free-regular-svg-
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Fragment } from 'react';
 
-import { Nav } from '../components/Nav';
-import { SiteFooter } from '../components/SiteFooter';
+import { Nav } from '../../shared/components/Nav';
+import { Seo } from '../../shared/components/Seo';
+import { TiltButton } from '../../shared/components/TiltButton';
 import { ProjectShowcase } from '../components/ProjectShowcase';
 import { SectionHeading } from '../components/SectionHeading';
-import { Seo } from '../components/Seo';
-import { TiltButton } from '../components/TiltButton';
+import { SiteFooter } from '../components/SiteFooter';
 import { aboutBlocks, introParagraphs, skillGroups } from '../content/about';
+import { contactLinks, hero } from '../content/home';
 import { CATEGORY_HEADINGS, getProjectGroups } from '../content/projects';
-import { contactLinks, hero } from '../content/site';
 
 /**
  * Vertical rhythm for the top-level sections. Values copied from the old

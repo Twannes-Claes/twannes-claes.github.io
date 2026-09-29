@@ -1,10 +1,11 @@
 import type { RouteRecord } from 'vite-react-ssg';
 
-import { Layout } from './components/Layout';
-import { allProjects } from './content/projects';
-import Home from './pages/Home';
-import NotFound from './pages/NotFound';
-import { ProjectPage } from './pages/ProjectPage';
+import Skylanders from './personal/skylanders/Skylanders';
+import { allProjects } from './portfolio/content/projects';
+import Home from './portfolio/pages/Home';
+import { ProjectPage } from './portfolio/pages/ProjectPage';
+import { Layout } from './shared/components/Layout';
+import NotFound from './shared/pages/NotFound';
 
 /**
  * One concrete route per project instead of a `projects/:slug` dynamic route.
@@ -17,29 +18,35 @@ export const routes: RouteRecord[] = [
     {
         path: '/',
         element: <Layout />,
-        entry: 'src/components/Layout.tsx',
+        entry: 'src/shared/components/Layout.tsx',
         children: [
             {
                 index: true,
                 element: <Home />,
-                entry: 'src/pages/Home.tsx',
+                entry: 'src/portfolio/pages/Home.tsx',
             },
             ...allProjects.map((project): RouteRecord => ({
                 path: `projects/${project.slug}`,
                 element: <ProjectPage project={project} />,
-                entry: 'src/pages/ProjectPage.tsx',
+                entry: 'src/portfolio/pages/ProjectPage.tsx',
             })),
+            // Private, not linked from anywhere, see the page for how it is locked.
+            {
+                path: 'skylanders',
+                element: <Skylanders />,
+                entry: 'src/personal/skylanders/Skylanders.tsx',
+            },
             // Prerendered so the build emits a real 404.html for GitHub Pages.
             {
                 path: '404',
                 element: <NotFound />,
-                entry: 'src/pages/NotFound.tsx',
+                entry: 'src/shared/pages/NotFound.tsx',
             },
             // Catches anything else on the client.
             {
                 path: '*',
                 element: <NotFound />,
-                entry: 'src/pages/NotFound.tsx',
+                entry: 'src/shared/pages/NotFound.tsx',
             },
         ],
     },

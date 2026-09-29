@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 
 import type { Project } from '../content/types';
 
-import { TiltButton } from './TiltButton';
+import { TiltButton } from '../../shared/components/TiltButton';
 
 export function ProjectCard({ project }: { project: Project })
 {

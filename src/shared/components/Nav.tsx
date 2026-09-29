@@ -3,7 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useCallback, type MouseEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
-import { navItems } from '../content/site';
+import { navItems } from '../site';
 
 import { ThemeToggle } from './ThemeToggle';
 import { TiltButton } from './TiltButton';

@@ -2,10 +2,11 @@ import useEmblaCarousel from 'embla-carousel-react';
 import { useCallback } from 'react';
 
 import type { Project } from '../content/types';
-import { useMediaQuery } from '../hooks/useMediaQuery';
+
+import { TiltButton } from '../../shared/components/TiltButton';
+import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 
 import { ProjectCard } from './ProjectCard';
-import { TiltButton } from './TiltButton';
 
 /**
  * Three columns, two under 992px, a looping carousel under 768px.

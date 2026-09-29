@@ -1,12 +1,13 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Fragment } from 'react';
 
-import { Nav } from '../components/Nav';
-import { ProjectGallery } from '../components/ProjectGallery';
-import { Seo } from '../components/Seo';
-import { TiltButton } from '../components/TiltButton';
-import { site } from '../content/site';
 import type { Project } from '../content/types';
+
+import { Nav } from '../../shared/components/Nav';
+import { Seo } from '../../shared/components/Seo';
+import { TiltButton } from '../../shared/components/TiltButton';
+import { site } from '../../shared/site';
+import { ProjectGallery } from '../components/ProjectGallery';
 
 export function ProjectPage({ project }: { project: Project })
 {

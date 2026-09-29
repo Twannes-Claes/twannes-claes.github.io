@@ -1,6 +1,6 @@
 import { Head } from 'vite-react-ssg';
 
-import { site } from '../content/site';
+import { site } from '../site';
 
 interface SeoProps
 {
