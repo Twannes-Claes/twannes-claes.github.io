@@ -1,7 +1,6 @@
 {
     "name": "twannes-claes-portfolio",
     "private": true,
-    "version": "1.0.0",
     "type": "module",
     "description": "Portfolio of Twannes Claes",
     "scripts": {

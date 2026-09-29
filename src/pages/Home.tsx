@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Fragment } from 'react';
 
 import { Nav } from '../components/Nav';
+import { SiteFooter } from '../components/SiteFooter';
 import { ProjectShowcase } from '../components/ProjectShowcase';
 import { SectionHeading } from '../components/SectionHeading';
 import { Seo } from '../components/Seo';
@@ -107,6 +108,8 @@ export default function Home()
                     </div>
                 </section>
             </main>
+
+            <SiteFooter />
         </>
     );
 }

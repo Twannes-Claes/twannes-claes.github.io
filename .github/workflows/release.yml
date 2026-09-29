@@ -48,13 +48,6 @@ jobs:
                       exit 1
                   fi
 
-                  packaged=$(node -p "require('./package.json').version")
-
-                  if [ "$version" != "$packaged" ]; then
-                      echo "::error file=version.txt::version.txt says $version but package.json says $packaged. Update both."
-                      exit 1
-                  fi
-
                   echo "version=$version" >> "$GITHUB_OUTPUT"
 
                   if git rev-parse -q --verify "refs/tags/v$version" > /dev/null; then

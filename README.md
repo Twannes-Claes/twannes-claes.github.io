@@ -78,7 +78,7 @@ use elsewhere. Prettier cannot do the brace placement, so TypeScript is formatte
 Day to day work happens on `main`. The live site only updates when `main` is merged into
 `release`.
 
-To publish a new version, set the same number in `version.txt` and `package.json`, then merge:
+To publish a new version, bump `version.txt`, then merge:
 
 ```bash
 git checkout release
