@@ -1,190 +1,36 @@
----
----
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <!--
+      Resolve the theme before first paint so there is no flash of the wrong
+      palette. Must stay a blocking inline script in <head>.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('theme');
+          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.setAttribute('data-theme', stored || (prefersDark ? 'dark' : 'light'));
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ site.title }}</title>
-
-    <meta property="og:title" content="{{ site.title }}">
-    <meta property="og:description" content="{{ site.description }}">
-    <meta property="og:image" content="https://twannes-claes.github.io/assets/site/og-banner.jpg">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://twannes-claes.github.io/">
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Onest:wght@100..900&display=swap"
-        rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/reset.css">
-    <link rel="stylesheet" href="assets/css/general.css">
-    <link rel="stylesheet" href="assets/css/home.css">
-    <link rel="stylesheet" type="text/css" href="//cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.css" />
-    <script src="assets/js/theme-init.js"></script>
-</head>
-
-<body>
-
-    {% include nav.html %}
-
-    <header class="container">
-        <div class="header">
-            <div class="header__content">
-                <div class="tag tag--big">Game Systems Engineer</div>
-                <h1>Twannes Claes</h1>
-                <p>
-                    <strong>Hi there, and welcome to my portfolio!</strong>
-                    <br>
-                    <br>
-                    This is a collection of the projects I'm most proud of, showcasing my journey through game development and software engineering.
-                    <br>
-                    <br>
-                    You'll find both personal and collaborative works here, some created during my studies at Digital Arts and Entertainment, others from my professional work, and the rest crafted during my free time. I hope you enjoy exploring my work as much as I enjoyed creating it!
-                </p>
-            </div>
-            <div class="header__img">
-                <img src="/assets/site/home-picture.jpg" alt="">
-            </div>
-        </div>
-    </header>
-
-    <main class="container">
-        {% assign active_projects = site.projects | where: "active", true | sort: "order" %}
-        {% assign professional_work = active_projects | where: "category", "Professional Work" %}
-        {% assign game_dev = active_projects | where: "category", "Game Dev" %}
-        {% assign game_jams = active_projects | where: "category", "Game Jam" %}
-
-        <section id="projects">
-            <h2>Projects <i class="fa-regular fa-folder-open"></i></h2>
-
-            {% if professional_work.size > 0 %}
-            <h3 class="projects__group-title">Professional Work</h3>
-            <div class="projects slick--projects">
-                {% for project in professional_work %}
-                {% include project-card.html project=project %}
-                {% endfor %}
-            </div>
-            <div class="slick-arrows"></div>
-            {% endif %}
-
-            {% if game_dev.size > 0 %}
-            <h3 class="projects__group-title">Game Dev</h3>
-            <div class="projects slick--projects">
-                {% for project in game_dev %}
-                {% include project-card.html project=project %}
-                {% endfor %}
-            </div>
-            <div class="slick-arrows"></div>
-            {% endif %}
-
-            {% if game_jams.size > 0 %}
-            <h3 class="projects__group-title">Game Jams</h3>
-            <div class="projects slick--projects">
-                {% for project in game_jams %}
-                {% include project-card.html project=project %}
-                {% endfor %}
-            </div>
-            <div class="slick-arrows"></div>
-            {% endif %}
-        </section>
-
-        <section id="about">
-            <h2>About me <i class="fa-regular fa-user"></i></h2>
-            <div class="about">
-                <div class="about__desc">
-                    <p>
-                        <span class="tag tag--label">Who I Am</span>
-                        Hi, I'm Twannes Claes, a Digital Arts and Entertainment graduate (class of 2024) and Game Systems Engineer, with growing experience in software engineering more broadly.
-                        <span class="tag tag--label">What I'm Looking For</span>
-                        Having just wrapped up my time at Vintecc, I'm now looking for my next opportunity in C++, C#, or game development, so if you're hiring, or know someone who is, don't hesitate to reach out!
-                        <span class="tag tag--label">What Drives Me</span>
-                        I am passionate about crafting and improving my skills, whether it's through programming, drawing, cooking, or something else to spark my creativity.
-                        <br>
-                        Above all, I love programming. There's nothing more exciting to me than bringing ideas to life through code, turning simple thoughts into something real and interactive that other people can enjoy. Lately that passion has grown into a deeper interest in software engineering as a whole, especially building advanced, well-structured, and scalable systems.
-                        <span class="tag tag--label">Indie Games</span>
-                        I'm also a big fan of indie games. I love the creativity and originality small teams manage to pack into their work, often with a fraction of the resources bigger studios have.
-                    </p>
-                </div>
-                <div class="about__skills">
-                    <div class="about__skill">
-                        <strong>Languages</strong><br>
-                        C++, C#, C, CMake, SQL, Python, Matlab, HLSL, XAML, ASP.NET, CSS, JS, HTML
-                    </div>
-                    <div class="about__skill">
-                        <strong>Architecture & practices</strong><br>
-                        OOP, DOD/ECS, Dependency Injection (DI), Reflection, Unit Testing, Test-Driven Development (TDD)
-                    </div>
-                    <div class="about__skill">
-                        <strong>Engines</strong><br>
-                        Unity, Unreal Engine, Godot, DirectX11, in-house
-                    </div>
-                    <div class="about__skill">
-                        <strong>DevOps & tooling</strong><br>
-                        CI/CD pipelines, Docker, build automation, editor scripting, release management
-                    </div>
-                    <div class="about__skill">
-                        <strong>Networking</strong><br>
-                        Photon (Bolt, Fusion), Unity Netcode, multiplayer programming
-                    </div>
-                    <div class="about__skill">
-                        <strong>Source control</strong><br>
-                        Github, Gitlab, Git, Fork, Perforce, Azure
-                    </div>
-                    <div class="about__skill">
-                        <strong>API/Libraries</strong><br>
-                        PhysX, SDL, FMOD, ImGui, Raylib
-                    </div>
-                    <div class="about__skill">
-                        <strong>Databases</strong><br>
-                        SQL, ERD diagrams
-                    </div>
-                    <div class="about__skill">
-                        <strong>Soft skills</strong><br>
-                        Communication, problem-solver, adaptable, quick learner, self-management, life-time learner, helpful
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section id="contact">
-            <h2>Contact & links <i class="fa-regular fa-envelope"></i></h2>
-            <div class="contact">
-
-                <div class="button">
-                    <a href="mailto:twannes.claes@outlook.com" target="_blank"><i class="fa-solid fa-envelope"></i>E-mail me</a>
-                </div>
-                <div class="button">
-                    <a href="/assets/documents/CV_TwannesClaes.pdf"  target="_blank"><i class="fa-solid fa-file-lines"></i>Check out my CV</a>
-                </div>
-                <div class="button">
-                    <a href="https://github.com/Twannes-Claes?tab=repositories" target="_blank"><i class="fa-brands fa-github"></i>Explore my GitHub repos</a>
-                </div>
-                <div class="button">
-                    <a href="https://www.linkedin.com/in/twannes-claes-b4a762232/" target="_blank"><i class="fa-brands fa-linkedin"></i>Connect with me on LinkedIn</a>
-                </div>
-            </div>
-        </section>
-    </main>
-
-
-
-</body>
-
-<script src="https://kit.fontawesome.com/7ab46062e1.js" crossorigin="anonymous"></script>
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"
-    integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
-<script type="text/javascript" src="//code.jquery.com/jquery-1.11.0.min.js"></script>
-<script type="text/javascript" src="//code.jquery.com/jquery-migrate-1.2.1.min.js"></script>
-<script type="text/javascript" src="//cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.min.js"></script>
-
-<script src="assets/js/projects-slider.js"></script>
-
-<script src="assets/js/theme-toggle.js"></script>
-<script src="assets/js/button-tilt.js"></script>
-
+        // The old Jekyll site served project pages at /projects/<slug>.html and
+        // the build still publishes the page at that path for old links. The
+        // router only knows the clean URL, so rewrite it before the router boots
+        // or hydration would fall through to the 404 route.
+        var legacy = location.pathname.match(/^(\/projects\/[^/]+)\.html$/);
+        if (legacy) {
+          history.replaceState(null, '', legacy[1] + location.search + location.hash);
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"><!--app-html--></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>

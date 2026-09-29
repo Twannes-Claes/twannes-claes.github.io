@@ -1,12 +1,13 @@
-# Ignore the .vs folder
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.vite/
+
+# Editor / OS
 .vs/
-
-# Jekyll build output
-_site/
-.jekyll-cache/
-.jekyll-metadata
-
-# Optional: Ignore other common files and folders
+.vscode/
 *.log
 *.tmp
 *.bak

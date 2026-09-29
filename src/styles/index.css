@@ -1,0 +1,453 @@
+@import 'tailwindcss';
+
+/* ---------------------------------------------------------------------------
+   Design tokens
+
+   Ported verbatim from the previous assets/css/general.css so both themes stay
+   identical. The raw --c-* variables remain the source of truth; @theme inline
+   re-exports them to Tailwind so utilities such as bg-bg / text-fg / border-edge
+   resolve per-theme without needing a single dark: variant.
+--------------------------------------------------------------------------- */
+
+:root {
+  --c-black: #1e1d1f;
+  --c-white: #fcf8ec;
+  --c-purple: #683c9b;
+  --c-green: #1e5631;
+  --c-accent: var(--c-purple);
+  --c-bg: var(--c-black);
+  --c-fg: var(--c-white);
+  --c-chip-bg: var(--c-white);
+  --c-chip-fg: var(--c-black);
+  --c-border: color-mix(in srgb, var(--c-fg) 75%, var(--c-accent) 25%);
+}
+
+[data-theme='light'] {
+  --c-accent: var(--c-green);
+  --c-bg: var(--c-white);
+  --c-fg: var(--c-black);
+  --c-chip-bg: var(--c-black);
+  --c-chip-fg: var(--c-white);
+}
+
+@theme inline {
+  --color-bg: var(--c-bg);
+  --color-fg: var(--c-fg);
+  --color-accent: var(--c-accent);
+  --color-edge: var(--c-border);
+  --color-chip-bg: var(--c-chip-bg);
+  --color-chip-fg: var(--c-chip-fg);
+  --color-paper: var(--c-white);
+  --color-ink: var(--c-black);
+
+  --font-sans: 'Onest Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+}
+
+/* ---------------------------------------------------------------------------
+   Base
+--------------------------------------------------------------------------- */
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--c-bg);
+    color: var(--c-fg);
+    font-family: var(--font-sans);
+    font-weight: 200;
+    line-height: 1.5;
+    transition:
+      background-color 0.3s ease,
+      color 0.3s ease;
+    cursor: url('/assets/site/cursor-dark.svg') 3 1, auto;
+  }
+
+  [data-theme='light'] body {
+    cursor: url('/assets/site/cursor-light.svg') 3 1, auto;
+  }
+
+  a,
+  button,
+  .button,
+  input,
+  select,
+  textarea,
+  label,
+  summary {
+    cursor: url('/assets/site/cursor-pointer.svg') 13 13, pointer;
+  }
+
+  a {
+    color: var(--c-fg);
+    text-decoration: none;
+  }
+
+  strong {
+    font-weight: 600;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Components
+
+   Only the pieces that genuinely need pseudo-elements or theme-aware internals
+   live here. Everything else is expressed as utilities in the JSX.
+--------------------------------------------------------------------------- */
+
+@layer components {
+  .container-page {
+    /* content-box, not Tailwind's global border-box: the original site used the
+       Meyer reset, which never set box-sizing, so max-width capped the content
+       and the padding sat outside it. Under border-box the same numbers shrink
+       the content by up to 280px. */
+    box-sizing: content-box;
+    padding: 0 clamp(20px, 6vw, 140px);
+    max-width: 1440px;
+    margin-inline: auto;
+    overflow-x: hidden;
+  }
+
+  /* Preflight strips list styling; project section lists want it back, with
+     accent-coloured markers. */
+  .prose-list {
+    list-style: disc;
+    list-style-position: outside;
+    padding-inline-start: 1.25em;
+    line-height: 1.75;
+  }
+
+  .prose-list li::marker {
+    color: var(--c-accent);
+  }
+
+  /* The original copy separated paragraphs with a literal <br><br>, which at
+     16px/1.5 is exactly 24px of blank space. Real <p> elements reproduce that
+     gap without the stray line breaks. */
+  .rich-text p + p,
+  .rich-text p + ul,
+  .rich-text ul + p {
+    margin-block-start: 1.5rem;
+  }
+
+  /* --- Headings ---------------------------------------------------------- */
+
+  .section-heading {
+    font-family: var(--font-mono);
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: clamp(1.5rem, 2vw + 1rem, 2.5rem);
+    width: 100%;
+    display: flex;
+    align-items: center;
+    margin-block-end: 3rem;
+  }
+
+  .section-heading::before {
+    content: '';
+    display: inline-block;
+    width: clamp(2rem, 2vw + 1rem, 5rem);
+    height: 1px;
+    margin-inline-end: clamp(0.5rem, 1vw + 0.25rem, 1rem);
+    background-color: var(--c-fg);
+  }
+
+  .section-heading svg {
+    margin-inline-start: auto;
+    display: inline-block;
+  }
+
+  .group-heading {
+    display: flex;
+    align-items: center;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-size: clamp(1.1rem, 1.2vw + 0.75rem, 1.5rem);
+    color: var(--c-fg);
+    margin-block: 9rem 1.5rem;
+  }
+
+  .group-heading:first-of-type {
+    margin-block-start: 0;
+  }
+
+  .group-heading::before {
+    content: '';
+    display: inline-block;
+    width: clamp(1.5rem, 1.5vw + 1rem, 3rem);
+    height: 1px;
+    margin-inline-end: 0.75rem;
+    background-color: var(--c-fg);
+  }
+
+  /* --- Tags -------------------------------------------------------------- */
+
+  .tag {
+    font-family: var(--font-mono);
+    color: var(--c-chip-fg);
+    background-color: var(--c-chip-bg);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    width: fit-content;
+    border-radius: 5px;
+    padding: 0.3rem 0.65rem;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    border: 2px solid var(--c-accent);
+    box-shadow: 0 0 10px rgb(0 0 0 / 0.25);
+  }
+
+  .tag--big {
+    background-color: var(--c-accent);
+    color: var(--c-white);
+    border-radius: 5px;
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+  }
+
+  @media (max-width: 992px) {
+    .tag--big {
+      font-size: 14px;
+      padding: 0.4rem 0.8rem 0.2rem 0.8rem;
+    }
+  }
+
+  .tag--label {
+    display: block;
+    background-color: var(--c-accent);
+    color: var(--c-white);
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    margin-block: 2.5rem 0.75rem;
+  }
+
+  .tag--label:first-child {
+    margin-block-start: 0;
+  }
+
+  /* --- Buttons ----------------------------------------------------------- */
+
+  .button {
+    position: relative;
+    width: fit-content;
+  }
+
+  .button::before {
+    content: '';
+    display: block;
+    position: absolute;
+    inset: -4px;
+    border: var(--c-fg) 2px solid;
+    border-radius: 5px;
+    z-index: -2;
+    opacity: 0;
+    transition: 0.3s ease all;
+  }
+
+  /* The inner element is an <a>, <span> or <button> depending on the use, so
+     everything below targets the single child rather than a tag name. */
+  .button > :is(a, span, button) {
+    background-color: var(--c-accent);
+    color: var(--c-white);
+    font-size: clamp(1rem, 2vw + 0.5rem, 1.25rem);
+    padding: 0.5rem 1rem;
+    border: 0;
+    border-radius: 5px;
+    position: relative;
+    display: inline-block;
+    transition: 0.3s ease transform;
+    white-space: nowrap;
+    /* TiltButton sets --tilt to a random angle on hover, matching the old
+       button-tilt.js which wrote an inline transform. */
+    transform: rotate(var(--tilt, 0deg));
+  }
+
+  .button > :is(a, span, button) svg {
+    margin-inline-end: 8px;
+    display: inline-block;
+  }
+
+  .button > :is(a, span, button)::after {
+    content: url('/assets/site/arrow.svg');
+    position: relative;
+    margin-inline-start: 0.5rem;
+    transition: margin 0.3s ease;
+  }
+
+  .button:hover::before {
+    opacity: 1;
+  }
+
+  /* Icon-only variants: square, no trailing arrow. */
+  .button--back > :is(a, span, button),
+  .button--icon > :is(a, span, button) {
+    display: grid;
+    place-items: center;
+    padding: 0;
+  }
+
+  .button--back > :is(a, span, button)::after,
+  .button--icon > :is(a, span, button)::after {
+    content: none;
+  }
+
+  .button--back > :is(a, span, button) svg,
+  .button--icon > :is(a, span, button) svg {
+    margin: 0;
+    font-size: 1rem;
+  }
+
+  .button--back > :is(a, span, button) {
+    width: 38px;
+    height: 38px;
+  }
+
+  .button--icon > :is(a, span, button) {
+    width: 42px;
+    height: 42px;
+  }
+
+  .button--back::before,
+  .button--icon::before {
+    inset: -2px;
+  }
+
+  /* The carousel arrows have no icon child, so arrow.svg is drawn by ::after.
+     Declared after .button--icon so it wins at equal specificity. */
+  .button--arrow > :is(a, span, button)::after {
+    content: url('/assets/site/arrow.svg');
+    display: block;
+    margin: 0;
+  }
+
+  .button--arrow-prev > :is(a, span, button)::after {
+    transform: rotate(180deg);
+  }
+
+  /* --- Nav --------------------------------------------------------------- */
+
+  .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    position: relative;
+  }
+
+  .nav-link::after {
+    content: '';
+    display: block;
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    border-block-end: 1px solid var(--c-fg);
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+
+  .nav-link:hover::after {
+    width: 100%;
+  }
+
+  /* --- The rotated accent slab behind cards, skills and galleries -------- */
+
+  .accent-slab {
+    position: relative;
+  }
+
+  .accent-slab::before {
+    content: '';
+    background-color: var(--c-accent);
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: -1;
+    transform: rotate(var(--slab-rotate, -2deg));
+  }
+
+  @media (max-width: 768px) {
+    .accent-slab--cards::before {
+      width: calc(100% - 100px);
+      top: 50%;
+      left: 50%;
+      transform: rotate(-2.5deg) translate(-50%, -50%);
+    }
+  }
+
+  /* The skills panel paints its slab with ::after, matching the original. */
+  .accent-slab-after {
+    position: relative;
+  }
+
+  .accent-slab-after::after {
+    content: '';
+    background-color: var(--c-accent);
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform: rotate(var(--slab-rotate, 4deg));
+    z-index: -1;
+  }
+
+  /* --- Gallery images ---------------------------------------------------- */
+
+  .gallery-img {
+    display: block;
+    overflow: hidden;
+    position: relative;
+    border-radius: 5px;
+    border: 2px solid var(--c-border);
+    width: 100%;
+  }
+
+  .gallery-img img {
+    width: 100%;
+    display: block;
+  }
+
+  /* Entries with an overlay icon (currently only the video thumbnail) get a
+     tinted wash and a shrink-on-hover badge. */
+  .gallery-img--video {
+    transition: 0.3s ease all;
+  }
+
+  .gallery-img--video img {
+    scale: 1.05;
+  }
+
+  .gallery-img--video::before {
+    content: '';
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    background-color: var(--c-accent);
+    opacity: 0.2;
+    top: 0;
+    left: 0;
+    z-index: 1;
+  }
+
+  .gallery-img--video svg {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    font-size: 3rem;
+    transition: 0.3s ease all;
+    transform: translate(-50%, -50%);
+    filter: drop-shadow(0 0 10px rgb(0 0 0 / 0.6));
+    color: var(--c-white);
+    z-index: 2;
+  }
+
+  .gallery-img--video:hover svg {
+    font-size: 2.5rem;
+  }
+}
