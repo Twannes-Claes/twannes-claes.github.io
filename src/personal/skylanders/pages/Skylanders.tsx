@@ -1,15 +1,20 @@
-import { useEffect, useState } from 'react';
+import '@fontsource/lilita-one';
+import '@fontsource-variable/nunito';
+import '../styles/skylanders.css';
+
+import { useCallback, useEffect, useState } from 'react';
 import { Head } from 'vite-react-ssg';
 
 import type { Db } from '../types';
 
-import { Nav } from '../../../shared/components/Nav';
 import { Collection } from '../components/Collection';
 import { PasswordForm } from '../components/PasswordForm';
+import { SkyBackdrop } from '../components/SkyBackdrop';
 
 /**
  * A private page for tracking the Skylanders collection. It is left out of the nav and marked
  * noindex, so only people with the link find it, and only people with the password see the list.
+ * It deliberately shares none of the portfolio styling, see styles/skylanders.css.
  */
 export default function Skylanders()
 {
@@ -39,29 +44,49 @@ export default function Skylanders()
         };
     }, []);
 
+    const signOut = useCallback(() => void db?.signOut(), [db]);
+
     let body;
 
     if (!db || signedIn === null)
-        body = <p>Loading.</p>;
+        body = <p className="sky-loading">Powering up the portal</p>;
     else if (!signedIn)
         body = <PasswordForm db={db} />;
     else
         body = <Collection db={db} />;
 
     return (
-        <>
+        <div className="sky">
             <Head>
-                <title>Skylanders</title>
+                <title>Our Skylanders</title>
                 <meta name="robots" content="noindex, nofollow" />
+                <meta name="theme-color" content="#060d2e" />
             </Head>
-            <Nav back />
+            <SkyBackdrop />
 
-            <main className="container-page">
-                <div className="my-[clamp(4rem,5vw+2rem,8rem)]">
-                    <h1 className="section-heading">Skylanders</h1>
-                    {body}
-                </div>
-            </main>
-        </>
+            <div className="sky-inner">
+                <header className="sky-header">
+                    <h1 className="sky-logo" data-text="Skylanders">
+                        Skylanders
+                    </h1>
+                    <p className="sky-ribbon">Our collection</p>
+                </header>
+
+                <main>{body}</main>
+
+                <footer className="sky-footer">
+                    Pictures and details from the{' '}
+                    <a href="https://skylanders.fandom.com" target="_blank" rel="noreferrer">
+                        Skylanders Wiki
+                    </a>
+                    .
+                    {db && signedIn && (
+                        <button type="button" className="sky-logout" onClick={signOut}>
+                            Log out
+                        </button>
+                    )}
+                </footer>
+            </div>
+        </div>
     );
 }

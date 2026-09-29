@@ -10,14 +10,16 @@ import {
     deleteDoc,
     doc,
     getFirestore,
+    increment,
     onSnapshot,
     orderBy,
     query,
     runTransaction,
     serverTimestamp,
+    updateDoc,
 } from 'firebase/firestore';
 
-import type { Skylander } from '../types';
+import type { Skylander, SkylanderDetails } from '../types';
 
 import { accountEmail, firebaseConfig } from './config';
 
@@ -63,26 +65,51 @@ export function watchCollection(
     return onSnapshot(
         query(skylanders, orderBy('name')),
         (snapshot) =>
-            callback(snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }) as Skylander)),
+            callback(
+                snapshot.docs.map((entry) =>
+                {
+                    const data = entry.data();
+
+                    // Entries saved before counts existed have none, and mean one figure.
+                    return { ...data, id: entry.id, count: data.count ?? 1 } as Skylander;
+                }),
+            ),
         onError,
     );
 }
 
-/** Resolves to false when the Skylander is already in the collection. */
-export async function addSkylander(item: Omit<Skylander, 'id'>): Promise<boolean>
+/**
+ * Adds a figure, or counts one more when it is already in the collection. Resolves to how many
+ * of it there are now.
+ */
+export async function addSkylander(item: SkylanderDetails): Promise<number>
 {
     const ref = doc(skylanders, idFor(item.name));
 
-    // A transaction, so two people adding the same figure at once cannot both succeed.
+    // A transaction, so two people adding the same figure at once both get counted.
     return runTransaction(db, async (transaction) =>
     {
-        if ((await transaction.get(ref)).exists())
-            return false;
+        const existing = await transaction.get(ref);
 
-        transaction.set(ref, { ...item, addedAt: serverTimestamp() });
+        if (existing.exists())
+        {
+            const count = ((existing.data().count as number | undefined) ?? 1) + 1;
 
-        return true;
+            transaction.update(ref, { count });
+
+            return count;
+        }
+
+        transaction.set(ref, { ...item, count: 1, addedAt: serverTimestamp() });
+
+        return 1;
     });
+}
+
+/** Adds or takes away copies. increment() keeps two quick clicks from overwriting each other. */
+export async function changeCount(id: string, delta: number): Promise<void>
+{
+    await updateDoc(doc(skylanders, id), { count: increment(delta) });
 }
 
 export async function removeSkylander(id: string): Promise<void>

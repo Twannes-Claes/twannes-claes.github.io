@@ -17,4 +17,17 @@ export interface Skylander
     game: string;
     /** Wiki page, empty when the name did not match one. */
     url: string;
+    /** How many of this figure we own, at least 1. */
+    count: number;
+}
+
+/** What a wiki lookup knows about a figure, before it is stored. */
+export type SkylanderDetails = Omit<Skylander, 'id' | 'count'>;
+
+/** One search suggestion, with a small picture for the dropdown. */
+export interface CatalogEntry
+{
+    name: string;
+    /** Small wiki thumbnail, empty for the few pages without one. */
+    thumb: string;
 }

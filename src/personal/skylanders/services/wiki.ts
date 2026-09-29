@@ -1,4 +1,6 @@
-import type { Skylander } from '../types';
+import type { CatalogEntry, SkylanderDetails } from '../types';
+
+import { elements } from '../content/elements';
 
 /*
  * There is no official Skylanders API, so this reads the fan wiki at skylanders.fandom.com through
@@ -6,20 +8,6 @@ import type { Skylander } from '../types';
  */
 
 const api = 'https://skylanders.fandom.com/api.php';
-
-const elements = [
-    'Magic',
-    'Tech',
-    'Water',
-    'Fire',
-    'Earth',
-    'Air',
-    'Life',
-    'Undead',
-    'Light',
-    'Dark',
-    'Kaos',
-];
 
 /** Release order, so the first category match is the game a figure debuted in. */
 const games = [
@@ -42,20 +30,6 @@ async function call(params: Record<string, string>): Promise<unknown>
     return response.json();
 }
 
-/** Every page in Category:Skylanders, used for the name suggestions. */
-export async function fetchNames(): Promise<string[]>
-{
-    const data = (await call({
-        action: 'query',
-        list: 'categorymembers',
-        cmtitle: 'Category:Skylanders',
-        cmnamespace: '0',
-        cmlimit: '500',
-    })) as { query: { categorymembers: { title: string }[] } };
-
-    return data.query.categorymembers.map((member) => member.title);
-}
-
 interface WikiPage
 {
     title: string;
@@ -64,8 +38,30 @@ interface WikiPage
     categories?: { title: string }[];
 }
 
+/**
+ * Every page in Category:Skylanders with a small thumbnail, for the search dropdown. The category
+ * holds a few hundred pages, which a single request covers.
+ */
+export async function fetchCatalog(): Promise<CatalogEntry[]>
+{
+    const data = (await call({
+        action: 'query',
+        generator: 'categorymembers',
+        gcmtitle: 'Category:Skylanders',
+        gcmnamespace: '0',
+        gcmlimit: '500',
+        prop: 'pageimages',
+        piprop: 'thumbnail',
+        pithumbsize: '96',
+    })) as { query: { pages: Record<string, WikiPage> } };
+
+    return Object.values(data.query.pages)
+        .map((page) => ({ name: page.title, thumb: page.thumbnail?.source ?? '' }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 /** Looks a name up on the wiki. Unknown names still come back, just without the extras. */
-export async function lookup(name: string): Promise<Omit<Skylander, 'id'>>
+export async function lookup(name: string): Promise<SkylanderDetails>
 {
     const data = (await call({
         action: 'query',
@@ -87,7 +83,8 @@ export async function lookup(name: string): Promise<Omit<Skylander, 'id'>>
     return {
         name: page.title,
         image: page.thumbnail?.source ?? '',
-        element: elements.find((element) => categories.has(`Category:${element} Skylanders`)) ?? '',
+        element:
+            elements.find(({ name }) => categories.has(`Category:${name} Skylanders`))?.name ?? '',
         game:
             games.find((game) => categories.has(`Category:Skylanders: ${game} Characters`)) ?? '',
         url: `https://skylanders.fandom.com/wiki/${encodeURIComponent(page.title.replace(/ /g, '_'))}`,
