@@ -73,7 +73,24 @@ is no flash of the wrong colours.
 use elsewhere. Prettier cannot do the brace placement, so TypeScript is formatted by ESLint instead
 (see `eslint.config.js`) and Prettier handles everything else. `npm run format` runs both.
 
-## Deployment
+## Releasing
 
-Pushing to `main` typechecks, lints, builds and publishes to GitHub Pages via
-[GitHub Actions](.github/workflows/deploy.yml). A failing check blocks the deploy.
+Day to day work happens on `main`. The live site only updates when `main` is merged into
+`release`.
+
+To publish a new version, set the same number in `version.txt` and `package.json`, then merge:
+
+```bash
+git checkout release
+git merge main
+git push
+```
+
+[The pipeline](.github/workflows/release.yml) typechecks, lints and builds on both branches, so
+`main` always tells you whether the code is healthy. On `release`, if the version in `version.txt`
+has no matching tag yet, it also deploys to GitHub Pages and creates the `v1.1.0` tag and a GitHub
+Release with notes from the commits since the last one.
+
+Merging without a bump still runs the checks, it just does not deploy. The build must pass before
+anything is published, and the tag is only created after the deploy succeeds, so a tag always marks
+something that actually went live.

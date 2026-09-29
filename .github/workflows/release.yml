@@ -1,0 +1,111 @@
+name: Release
+
+on:
+    push:
+        branches: [main, release]
+    pull_request:
+    workflow_dispatch:
+
+permissions:
+    contents: read
+    pages: write
+    id-token: write
+
+# Let a running deploy finish; queue at most one more.
+concurrency:
+    group: pages
+    cancel-in-progress: false
+
+jobs:
+    # Always runs. Decides whether this commit is a release by comparing
+    # version.txt against the tags that already exist.
+    check:
+        runs-on: ubuntu-latest
+        outputs:
+            version: ${{ steps.version.outputs.version }}
+            release: ${{ steps.version.outputs.release }}
+        steps:
+            - uses: actions/checkout@v7
+              with:
+                  # Tags are needed to tell a bump from a repeat.
+                  fetch-depth: 0
+                  fetch-tags: true
+
+            - uses: actions/setup-node@v7
+              with:
+                  node-version: 24
+                  cache: npm
+
+            - run: npm ci
+
+            - name: Resolve version
+              id: version
+              run: |
+                  version=$(tr -d ' \t\n\r' < version.txt)
+
+                  if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+                      echo "::error file=version.txt::Expected a version like 2.1.0, found '$version'"
+                      exit 1
+                  fi
+
+                  packaged=$(node -p "require('./package.json').version")
+
+                  if [ "$version" != "$packaged" ]; then
+                      echo "::error file=version.txt::version.txt says $version but package.json says $packaged. Update both."
+                      exit 1
+                  fi
+
+                  echo "version=$version" >> "$GITHUB_OUTPUT"
+
+                  if git rev-parse -q --verify "refs/tags/v$version" > /dev/null; then
+                      echo "release=false" >> "$GITHUB_OUTPUT"
+                      echo "::notice::v$version is already released. Bump version.txt to publish a new one."
+                  else
+                      echo "release=true" >> "$GITHUB_OUTPUT"
+                      echo "::notice::Releasing v$version"
+                  fi
+
+            - run: npm run typecheck
+
+            - run: npm run lint
+
+            - run: npm run build
+
+            - uses: actions/configure-pages@v6
+              if: steps.version.outputs.release == 'true' && github.ref == 'refs/heads/release'
+
+            - uses: actions/upload-pages-artifact@v5
+              if: steps.version.outputs.release == 'true' && github.ref == 'refs/heads/release'
+              with:
+                  path: dist
+
+    deploy:
+        needs: check
+        if: needs.check.outputs.release == 'true' && github.ref == 'refs/heads/release'
+        runs-on: ubuntu-latest
+        environment:
+            name: github-pages
+            url: ${{ steps.deployment.outputs.page_url }}
+        steps:
+            - id: deployment
+              uses: actions/deploy-pages@v5
+
+    # Tags only after a successful deploy, so a tag always marks something live.
+    tag:
+        needs: [check, deploy]
+        if: needs.check.outputs.release == 'true' && github.ref == 'refs/heads/release'
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Create tag and release
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  VERSION: ${{ needs.check.outputs.version }}
+              run: |
+                  gh release create "v$VERSION" \
+                      --title "v$VERSION" \
+                      --target "$GITHUB_SHA" \
+                      --generate-notes
