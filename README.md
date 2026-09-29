@@ -67,6 +67,16 @@ overrides it, and Tailwind reads both, so utilities like `bg-bg` and `text-accen
 on their own. A small inline script in `index.html` picks the theme before the first paint so there
 is no flash of the wrong colours.
 
+## Analytics
+
+Page views go to [GoatCounter](https://www.goatcounter.com), which is cookieless, so the site needs
+no consent banner. The snippet in `index.html` counts the page a visitor lands on, and
+`src/analytics.ts` reports the navigations that happen without a reload, such as opening a project
+from the home page.
+
+The script ignores localhost, so running the site locally does not touch the numbers. The dashboard
+is at <https://twannes-claes.goatcounter.com>.
+
 ## Code style
 
 4-space indent, single quotes, and braces on their own line, matching the C++ and C# conventions I
