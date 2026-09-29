@@ -71,7 +71,7 @@ is no flash of the wrong colours.
 
 4-space indent, single quotes, and braces on their own line, matching the C++ and C# conventions I
 use elsewhere. Prettier cannot do the brace placement, so TypeScript is formatted by ESLint instead
-(see `eslint.config.js`) and Prettier handles everything else. `npm run format` runs both.
+(see `eslint.config.ts`) and Prettier handles everything else. `npm run format` runs both.
 
 ## Releasing
 
