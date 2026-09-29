@@ -1,5 +1,7 @@
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faHouse } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { useCallback, type MouseEvent } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import { navItems } from '../content/site';
 
@@ -15,15 +17,35 @@ interface NavProps
 export function Nav({ back = false }: NavProps)
 {
     const prefix = back ? '/' : '';
+    const navigate = useNavigate();
+    const { key } = useLocation();
+
+    // Router names the entry a visitor lands on 'default', so any other key means
+    // the home page is still sitting behind this one in the history.
+    const cameFromHome = key !== 'default';
+
+    const goHome = useCallback(
+        (event: MouseEvent) =>
+        {
+            if (!cameFromHome)
+                return;
+
+            // Stepping back rather than pushing a new entry, so the home page
+            // returns with the offset it was left at.
+            event.preventDefault();
+            navigate(-1);
+        },
+        [cameFromHome, navigate],
+    );
 
     return (
         <nav className="container-page sticky top-0 z-2 bg-bg transition-colors duration-300">
             <div className="flex flex-wrap items-center gap-4 border-b border-fg">
                 {back && (
                     <TiltButton className="button--back" magnitude={12}>
-                        {/* A real navigation rather than a Link, so the browser performs the
-                #projects anchor scroll on arrival. */}
-                        <a href="/#projects" aria-label="Back to overview">
+                        {/* Stays a real link for visitors who land on a project
+                            directly and have no home page to go back to. */}
+                        <a href="/#projects" aria-label="Back to overview" onClick={goHome}>
                             <FontAwesomeIcon icon={faHouse} />
                         </a>
                     </TiltButton>

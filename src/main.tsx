@@ -11,4 +11,5 @@ export const createRoot = ViteReactSSG({ routes }, ({ router, isClient }) =>
 {
     if (isClient && router)
         trackPageViews(router);
+
 });

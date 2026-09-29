@@ -10,6 +10,8 @@ import { ProjectPage } from './pages/ProjectPage';
  * One concrete route per project instead of a `projects/:slug` dynamic route.
  * vite-react-ssg prerenders static routes automatically, so every project
  * becomes a real HTML file with no extra configuration.
+ *
+ * Every page hangs off the layout route, which handles the scroll position.
  */
 export const routes: RouteRecord[] = [
     {
