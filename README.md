@@ -1,127 +1,79 @@
-# twannes-claes.github.io
+# Portfolio
 
-My portfolio, at [twannes-claes.github.io](https://twannes-claes.github.io).
+My personal portfolio: **[twannes-claes.github.io](https://twannes-claes.github.io)**
 
-Built with React 19, TypeScript and Tailwind CSS v4 on Vite, prerendered to static HTML with
-[vite-react-ssg](https://github.com/Daydreamer-riri/vite-react-ssg) so every project page ships its
-own `<title>` and Open Graph tags.
+A collection of the game development and software engineering projects I am most proud of, from my
+studies at Digital Arts and Entertainment, my professional work, and my free time.
 
-## Getting started
+![Twannes Claes portfolio](public/assets/site/og-banner.jpg)
 
-Requires Node 22+.
+## Built with
+
+React 19, TypeScript, Tailwind CSS v4 and Vite.
+
+Every page is prerendered to static HTML with
+[vite-react-ssg](https://github.com/Daydreamer-riri/vite-react-ssg), so each project has its own
+title and link preview, loads fast, and works without JavaScript.
+
+## Running it locally
+
+Requires Node 22 or newer.
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Scripts
+The site is then on <http://localhost:5173>.
 
-| Script              | What it does                                     |
-| ------------------- | ------------------------------------------------ |
-| `npm run dev`       | Dev server on http://localhost:5173              |
-| `npm run build`     | Prerenders every route to `dist/` as static HTML |
-| `npm run preview`   | Serves the built `dist/` locally                 |
-| `npm run typecheck` | `tsc --noEmit` over `src/` and `vite.config.ts`  |
-| `npm run lint`      | ESLint                                           |
-| `npm run format`    | Prettier                                         |
+| Script              | What it does                  |
+| ------------------- | ----------------------------- |
+| `npm run dev`       | Dev server with hot reload    |
+| `npm run build`     | Static build into `dist/`     |
+| `npm run preview`   | Serves the built site locally |
+| `npm run typecheck` | TypeScript, no emit           |
+| `npm run lint`      | ESLint                        |
+| `npm run format`    | Formats everything            |
 
-`typecheck` and `lint` both run in CI before the build, so either one failing blocks the deploy.
+## Project structure
 
-### Code style
-
-4-space indent, single quotes, and braces on their own line (Allman), matching the C++ and C#
-conventions the rest of my work uses. Array and object literals in a property follow the same rule,
-with the bracket under its key, and anything that fits on one line stays on one line:
-
-```ts
-tags: ['Unity', 'C#', 'Perforce', 'Team'],
-images:
-[
-    { src: '/assets/projects/adapta-solva/gallery-1.jpg' },
-],
+```
+src/content/        All copy and project data, typed
+src/components/     Nav, buttons, cards, carousel, gallery
+src/pages/          Home, ProjectPage, NotFound
+src/hooks/          useTheme, useMediaQuery
+src/styles/         Design tokens and component classes
+public/assets/      Images, PDFs, cursors
 ```
 
-A single-line `if` body drops its braces and sits on the next line. Blank lines separate
-declarations from the logic that follows, and always precede a `return`:
-
-```ts
-const embedUrl = image.href ? toYouTubeEmbed(image.href) : null;
-
-if (embedUrl)
-    return { type: 'youtube', embedUrl };
-
-return { src: image.href ?? image.src };
-```
-
-One exception: a top-level `export const x = {` keeps its brace on the same line, because
-`@stylistic/indent` forces a continuation indent otherwise, and the only way to suppress that also
-switches off indent checking for the whole literal.
-
-Prettier cannot place braces on their own line, so `.ts` and `.tsx` are excluded from it in
-`.prettierignore` and formatted by ESLint instead, via `@stylistic` rules in `eslint.config.js`.
-Prettier still handles CSS, Markdown, JSON, YAML and HTML, configured in the `"prettier"` block of
-`package.json`. `npm run format` runs both, in that order.
+Content is fully separated from markup. Everything you read on the site lives in `src/content/`,
+and the components only know how to render it.
 
 ## Adding a project
 
 1. Create `src/content/projects/<slug>.tsx` exporting a `Project`. Copy an existing one as a
-   starting point; `src/content/types.ts` documents every field.
-2. Register it in `src/content/projects/index.ts`.
+   starting point, and see `src/content/types.ts` for what each field does.
+2. Add it to the list in `src/content/projects/index.ts`.
 
-`order` controls position within a category (ascending) and `active: false` hides a project from the
-home page while keeping its page reachable. The route and the prerendered HTML file are both
-generated from that list, so there is nothing else to wire up.
+That is the only wiring step. The route and the prerendered page are both generated from that list.
+Set `order` to position it within its category, or `active: false` to hide it.
 
-Images live in `public/assets/projects/<slug>/` and are referenced by absolute path
-(`/assets/projects/<slug>/card.png`).
+Images go in `public/assets/projects/<slug>/`.
 
-Page copy is JSX rather than strings, so emphasis and lists are real markup. Font Awesome icons are
-imported as objects, which means a wrong icon name fails to compile instead of silently rendering
-nothing.
+## Theming
 
-## Structure
+`src/styles/index.css` holds the colour tokens. `:root` is the dark palette and `[data-theme=light]`
+overrides it, and Tailwind reads both, so utilities like `bg-bg` and `text-accent` resolve per theme
+on their own. A small inline script in `index.html` picks the theme before the first paint so there
+is no flash of the wrong colours.
 
-```
-src/content/        All copy and project data (typed)
-src/components/     Nav, buttons, cards, carousel, gallery, SEO
-src/pages/          Home, ProjectPage, NotFound
-src/hooks/          useTheme, useMediaQuery
-src/styles/         Tailwind entry, design tokens, component classes
-src/routes.tsx      One static route per project, derived from the content
-public/assets/      Images, PDFs, cursors, arrow.svg
-.github/workflows/  CI: typecheck, lint, build, deploy
-```
+## Code style
 
-Everything in the repo root is there because its tooling requires it: `index.html` is Vite's
-entry, `tsconfig.json` covers both `src/` and `vite.config.ts`, and Prettier's settings live in
-the `"prettier"` block of `package.json` rather than a separate dotfile.
-
-### Theming
-
-`src/styles/index.css` holds the `--c-*` design tokens. `:root` is the dark palette and
-`[data-theme='light']` overrides it; `@theme inline` re-exports both to Tailwind, so utilities like
-`bg-bg` and `text-accent` resolve per theme without any `dark:` variants.
-
-The theme is resolved by a small inline script in `index.html` before first paint, which avoids a
-flash of the wrong palette. It must stay inline and blocking.
+4-space indent, single quotes, and braces on their own line, matching the C++ and C# conventions I
+use elsewhere. Prettier cannot do the brace placement, so TypeScript is formatted by ESLint instead
+(see `eslint.config.js`) and Prettier handles everything else. `npm run format` runs both.
 
 ## Deployment
 
-Pushing to `main` runs `.github/workflows/deploy.yml`, which typechecks, lints, builds and publishes
-`dist/` to GitHub Pages. The repo's Pages source must be set to **GitHub Actions** (Settings →
-Pages → Build and deployment).
-
-### URLs
-
-The build writes each project to `dist/projects/<slug>.html`, which happens to be the exact path
-Jekyll used, so links from before the rewrite still resolve with no redirects or aliases involved.
-The 404 page lands at `dist/404.html`, which is the only path GitHub Pages reads it from.
-
-The canonical URL is the extensionless `/projects/<slug>`, which static hosts serve from the same
-`.html` file. A page reached at the `.html` address has its URL rewritten by the inline script in
-`index.html` before the router boots, so React Router always sees the clean path.
-
-This relies on the host resolving `/projects/<slug>` to `<slug>.html`. GitHub Pages does; if a
-future host does not, set `ssgOptions: { dirStyle: 'nested' }` in `vite.config.ts` and publish a
-copy of each page at the old `.html` path instead.
+Pushing to `main` typechecks, lints, builds and publishes to GitHub Pages via
+[GitHub Actions](.github/workflows/deploy.yml). A failing check blocks the deploy.
