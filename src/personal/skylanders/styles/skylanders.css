@@ -935,6 +935,9 @@
     position: relative;
     display: flex;
     flex-direction: column;
+    /* Keeps children in real 3D, so the stepper can float in front of the card
+       and turn with the tilt instead of reading as pasted on. */
+    transform-style: preserve-3d;
     border: 4px solid transparent;
     border-radius: 20px;
     background:
@@ -1117,7 +1120,7 @@
     position: absolute;
     right: 8px;
     bottom: 8px;
-    padding: 0.15rem 0.6rem 0.25rem;
+    padding: 0.35rem 0.6rem;
     border: 2px solid var(--sky-outline);
     border-radius: 999px;
     background: linear-gradient(180deg, #fff08a, #ffc93a 45%, #f08a12);
@@ -1125,6 +1128,10 @@
     font-family: var(--sky-display);
     font-size: 1.1rem;
     line-height: 1;
+    /* Trims the line box to the digits themselves, from the top of the capitals
+       to the baseline, so even padding centres them. Lilita One otherwise
+       carries extra room above the letters. */
+    text-box: trim-both cap alphabetic;
     box-shadow: 0 3px 0 var(--sky-outline);
     animation: sky-bump 0.4s var(--sky-ease);
 }
@@ -1145,6 +1152,8 @@
     gap: 0.2rem;
     padding: 0.8rem 0.9rem 1rem;
     text-align: center;
+    /* Passes the card's 3D space on to the stepper inside. */
+    transform-style: preserve-3d;
 }
 
 .sky-card__name {
@@ -1186,6 +1195,8 @@ a.sky-card__name:hover {
     border-radius: 999px;
     background: rgb(4 10 38 / 0.6);
     box-shadow: inset 0 2px 6px rgb(0 0 0 / 0.5);
+    /* Raised off the card face, so the tilt visibly carries it along. */
+    transform: translateZ(22px);
     transition:
         border-color 0.25s ease,
         box-shadow 0.25s ease;
@@ -1223,11 +1234,13 @@ a.sky-card__name:hover {
     transition: transform 0.35s var(--sky-ease);
 }
 
+/* A pure scale from the centre, with the bottom shadow kept at its resting 2px,
+   because a lift or a deeper shadow reads as the button sliding upwards. */
 .sky-stepper__btn:hover {
-    transform: translateY(-2px) scale(1.12);
+    transform: scale(1.12);
     filter: brightness(1.06);
     box-shadow:
-        0 3px 0 var(--sky-outline),
+        0 2px 0 var(--sky-outline),
         inset 0 2px 0 rgb(255 255 255 / 0.6),
         0 0 0 3px rgb(255 214 90 / 0.3),
         0 0 16px rgb(255 200 80 / 0.55);
@@ -1246,14 +1259,14 @@ a.sky-card__name:hover {
     background: linear-gradient(180deg, #ffab9c, #f0473a 45%, #a3160f);
     color: var(--sky-ink);
     box-shadow:
-        0 3px 0 var(--sky-outline),
+        0 2px 0 var(--sky-outline),
         inset 0 2px 0 rgb(255 255 255 / 0.5),
         0 0 0 3px rgb(240 71 58 / 0.3),
         0 0 16px rgb(240 71 58 / 0.55);
 }
 
 .sky-stepper__btn:active {
-    transform: translateY(2px) scale(0.92);
+    transform: scale(0.92);
     transition-duration: 0.08s;
     box-shadow:
         0 0 0 var(--sky-outline),
