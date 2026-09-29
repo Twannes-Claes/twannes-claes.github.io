@@ -281,22 +281,6 @@
     flex: 1 1 240px;
 }
 
-.sky-logout {
-    margin-inline-start: 0.4rem;
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--sky-muted);
-    font: inherit;
-    text-decoration: underline;
-    text-underline-offset: 3px;
-    transition: color 0.2s ease;
-}
-
-.sky-logout:hover {
-    color: var(--sky-gold-hi);
-}
-
 /* --- Inputs and buttons -------------------------------------------------- */
 
 .sky-input {
@@ -1520,15 +1504,241 @@ a.sky-card__name:hover {
 
 /* --- Footer -------------------------------------------------------------- */
 
+/* A small pill in the same outlined style as the chips, with the log out
+   button tucked into its right end. */
 .sky-footer {
-    margin-block-start: 3.5rem;
-    text-align: center;
-    font-size: 0.85rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem 0.8rem;
+    width: fit-content;
+    max-width: 100%;
+    margin: 3.5rem auto 0;
+    padding: 0.3rem 0.3rem 0.3rem 0.95rem;
+    border: 2px solid var(--sky-outline);
+    border-radius: 999px;
+    background: rgb(8 19 56 / 0.75);
+    box-shadow:
+        inset 0 1px 0 rgb(255 224 120 / 0.25),
+        0 3px 0 rgb(0 0 0 / 0.3);
+    font-size: 0.8rem;
     color: var(--sky-muted);
+}
+
+.sky-footer__credit {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0;
+}
+
+/* Signed out the credit is alone, so it gets even padding on both sides. */
+.sky-footer:has(.sky-footer__credit:only-child) {
+    padding: 0.45rem 0.95rem;
+}
+
+.sky-footer__icon {
+    color: var(--sky-gold);
 }
 
 .sky-footer a {
     color: var(--sky-gold-hi);
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.sky-footer a:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+/* A small version of the chunky buttons, sized to sit inside the footer pill. */
+.sky-logout {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.6rem;
+    border: 2px solid var(--sky-outline);
+    border-radius: 999px;
+    background: linear-gradient(180deg, #8fd6ff 0%, #3b8cf0 45%, #1f4fb8 100%);
+    color: var(--sky-ink);
+    font-family: var(--sky-display);
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    text-transform: uppercase;
+    text-shadow: 0 1px 0 var(--sky-outline);
+    box-shadow:
+        0 2px 0 var(--sky-outline),
+        inset 0 2px 0 rgb(255 255 255 / 0.45);
+    transition:
+        scale 0.18s var(--sky-ease),
+        filter 0.2s ease;
+    /* Scales the button as one layer. Otherwise the icon and the text snap to
+       the pixel grid separately while it grows, and the icon visibly jumps. */
+    will-change: scale;
+}
+
+.sky-logout:hover {
+    scale: 1.03;
+    filter: brightness(1.1);
+}
+
+.sky-logout:active {
+    scale: 0.95;
+}
+
+.sky-logout:focus-visible {
+    outline: 3px solid var(--sky-portal);
+    outline-offset: 2px;
+}
+
+/* --- Phones -------------------------------------------------------------- */
+
+@media (max-width: 560px) {
+    .sky-toolbar {
+        padding: 1rem;
+    }
+
+    /* The keyboard takes half the screen, so the list stays above it. */
+    .sky-search__list {
+        max-height: min(430px, 45dvh);
+    }
+
+    /* No wrapping, because a wrapping column sizes itself to its widest child,
+       which is the full chip row, and pushed the coins off centre. */
+    .sky-stats {
+        flex-direction: column;
+        flex-wrap: nowrap;
+        align-items: stretch;
+        gap: 1rem;
+        margin-block: 1.25rem 1.25rem;
+    }
+
+    .sky-tally {
+        justify-content: center;
+    }
+
+    /* One swipeable row instead of four wrapped ones. It runs to the screen
+       edges and fades out there, so it reads as scrollable. */
+    .sky-filters {
+        flex-wrap: nowrap;
+        margin-inline: -16px;
+        padding: 0.4rem 16px 0.6rem;
+        overflow-x: auto;
+        scrollbar-width: none;
+        mask-image: linear-gradient(
+            90deg,
+            transparent,
+            #000 16px,
+            #000 calc(100% - 16px),
+            transparent
+        );
+    }
+
+    .sky-filters::-webkit-scrollbar {
+        display: none;
+    }
+
+    .sky-chip {
+        flex: none;
+        padding: 0.5rem 0.85rem;
+        font-size: 0.9rem;
+    }
+
+    /* Two cards a row, the one column minmax() falls back to is far too big. */
+    .sky-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1.1rem 0.85rem;
+    }
+
+    .sky-card {
+        border-width: 3px;
+        border-radius: 16px;
+    }
+
+    .sky-card__portrait {
+        margin: 7px 7px 0;
+        border-radius: 11px;
+    }
+
+    .sky-card__body {
+        padding: 0.6rem 0.5rem 0.75rem;
+    }
+
+    .sky-card__name {
+        font-size: 1.05rem;
+        overflow-wrap: anywhere;
+    }
+
+    .sky-card__game {
+        font-size: 0.72rem;
+    }
+
+    .sky-card__copies {
+        right: 6px;
+        bottom: 6px;
+        font-size: 0.95rem;
+    }
+
+    .sky-medal {
+        top: -9px;
+        left: -9px;
+        width: 34px;
+        border-width: 2px;
+        font-size: 0.85rem;
+        box-shadow:
+            0 0 0 2px var(--sky-gold),
+            0 3px 8px rgb(0 0 0 / 0.5);
+    }
+
+    .sky-card__remove {
+        top: -8px;
+        right: -8px;
+        width: 30px;
+        border-width: 2px;
+        font-size: 0.8rem;
+    }
+
+    .sky-portal {
+        width: min(260px, 66vw);
+    }
+
+    .sky-login__form {
+        padding: 1.1rem;
+    }
+
+    .sky-login__form .sky-btn {
+        flex: 1 1 100%;
+    }
+
+    /* The credit and log out only just miss one line on a phone, and a two line
+       pill looks broken, so the gap shrinks and the book icon goes. */
+    .sky-footer {
+        gap: 0.5rem;
+        padding-inline-start: 0.8rem;
+    }
+
+    .sky-footer__icon {
+        display: none;
+    }
+}
+
+/* A tap leaves :hover stuck on touch screens, so the lift only happens with a
+   real pointer. */
+@media (hover: none) {
+    .sky-card:hover {
+        transform: none;
+        box-shadow:
+            0 0 0 2px var(--sky-outline),
+            0 10px 24px rgb(0 0 0 / 0.45);
+    }
+
+    .sky-card:hover .sky-card__portrait img,
+    .sky-card:hover .sky-medal {
+        transform: none;
+    }
 }
 
 /* --- Reduced motion ------------------------------------------------------ */

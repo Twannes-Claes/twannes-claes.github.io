@@ -1,6 +1,14 @@
 import { faStar } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react';
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type CSSProperties,
+    type FormEvent,
+} from 'react';
 import { flushSync } from 'react-dom';
 
 import type { CatalogEntry, Db, Skylander } from '../types';
@@ -81,6 +89,35 @@ export function Collection({ db }: { db: Db })
             .then(setCatalog)
             .catch(() => undefined);
     }, []);
+
+    // Ids already looked up again, so a figure the wiki still has no game for is asked once.
+    const repaired = useRef(new Set<string>());
+
+    useEffect(() =>
+    {
+        // Figures saved before the lookup matched every game category have none, so they get
+        // looked up again once and patched. Failures are left for the next visit to retry.
+        for (const item of items ?? [])
+        {
+            if ((item.game && item.element) || !item.url || repaired.current.has(item.id))
+                continue;
+
+            repaired.current.add(item.id);
+            lookup(item.name)
+                .then((details) =>
+                {
+                    if (details.game !== item.game || details.element !== item.element)
+                    {
+                        return db.updateDetails(item.id, {
+                            game: details.game,
+                            element: details.element,
+                        });
+                    }
+
+                })
+                .catch(() => undefined);
+        }
+    }, [items, db]);
 
     const owned = useMemo(() => new Set(items?.map((item) => item.name)), [items]);
     const suggestions = useMemo(

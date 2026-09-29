@@ -2,6 +2,8 @@ import '@fontsource/lilita-one';
 import '@fontsource-variable/nunito';
 import '../styles/skylanders.css';
 
+import { faBookOpen, faRightFromBracket } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useCallback, useEffect, useState } from 'react';
 import { Head } from 'vite-react-ssg';
 
@@ -28,7 +30,14 @@ export default function Skylanders()
 
         // Loaded here rather than imported, so Firebase is not in the portfolio bundle and
         // never runs during the prerender.
-        import('../services/db').then((module) =>
+        // ?mock under npm run dev swaps in fake in-memory data, see services/mock.ts. The DEV
+        // check folds away in a production build, so the mock never ships.
+        const load =
+            import.meta.env.DEV && new URLSearchParams(location.search).has('mock')
+                ? import('../services/mock')
+                : import('../services/db');
+
+        load.then((module) =>
         {
             if (cancelled)
                 return;
@@ -75,13 +84,18 @@ export default function Skylanders()
                 <main>{body}</main>
 
                 <footer className="sky-footer">
-                    Pictures and details from the{' '}
-                    <a href="https://skylanders.fandom.com" target="_blank" rel="noreferrer">
-                        Skylanders Wiki
-                    </a>
-                    .
+                    <p className="sky-footer__credit">
+                        <FontAwesomeIcon icon={faBookOpen} className="sky-footer__icon" />
+                        <span>
+                            Pictures from the{' '}
+                            <a href="https://skylanders.fandom.com" target="_blank" rel="noreferrer">
+                                Skylanders Wiki
+                            </a>
+                        </span>
+                    </p>
                     {db && signedIn && (
                         <button type="button" className="sky-logout" onClick={signOut}>
+                            <FontAwesomeIcon icon={faRightFromBracket} />
                             Log out
                         </button>
                     )}

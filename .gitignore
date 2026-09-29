@@ -14,3 +14,6 @@ dist/
 *.swp
 *.DS_Store
 *.Thumbs.db
+
+# Local secrets, such as the dev auto-login password
+*.local

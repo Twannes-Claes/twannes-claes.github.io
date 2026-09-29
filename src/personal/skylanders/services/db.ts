@@ -112,6 +112,12 @@ export async function changeCount(id: string, delta: number): Promise<void>
     await updateDoc(doc(skylanders, id), { count: increment(delta) });
 }
 
+/** Fills in details a figure was saved without, such as a game an older lookup missed. */
+export async function updateDetails(id: string, details: Partial<SkylanderDetails>): Promise<void>
+{
+    await updateDoc(doc(skylanders, id), details);
+}
+
 export async function removeSkylander(id: string): Promise<void>
 {
     await deleteDoc(doc(skylanders, id));

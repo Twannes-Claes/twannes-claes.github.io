@@ -133,7 +133,7 @@ export function SkylanderSearch({ value, onChange, catalog, onPick }: SkylanderS
                 aria-activedescendant={expanded && target >= 0 ? `${listId}-${target}` : undefined}
                 autoComplete="off"
                 spellCheck={false}
-                placeholder="Search a Skylander to add, like Spyro"
+                placeholder="Add a Skylander, like Spyro"
                 value={value}
                 onChange={(event) =>
                 {

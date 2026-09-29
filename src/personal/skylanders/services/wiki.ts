@@ -85,8 +85,13 @@ export async function lookup(name: string): Promise<SkylanderDetails>
         image: page.thumbnail?.source ?? '',
         element:
             elements.find(({ name }) => categories.has(`Category:${name} Skylanders`))?.name ?? '',
+        // Every figure is in the plain game category, only some also in the "Characters" one.
         game:
-            games.find((game) => categories.has(`Category:Skylanders: ${game} Characters`)) ?? '',
+            games.find(
+                (game) =>
+                    categories.has(`Category:Skylanders: ${game}`) ||
+                    categories.has(`Category:Skylanders: ${game} Characters`),
+            ) ?? '',
         url: `https://skylanders.fandom.com/wiki/${encodeURIComponent(page.title.replace(/ /g, '_'))}`,
     };
 }

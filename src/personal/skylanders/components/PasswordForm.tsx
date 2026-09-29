@@ -1,8 +1,14 @@
-import { faEye, faEyeSlash, faKey } from '@fortawesome/free-solid-svg-icons';
+import { faBolt, faEye, faEyeSlash, faKey } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useCallback, useState, type FormEvent } from 'react';
 
 import type { Db } from '../types';
+
+/**
+ * Only set under `npm run dev` with .env.development.local filled in. A production build leaves
+ * this undefined, so the auto login button is never shipped.
+ */
+const devPassword = import.meta.env.DEV ? import.meta.env.VITE_SKYLANDERS_DEV_PASSWORD : undefined;
 
 /** The lock screen, styled as the Portal of Power the figures stand on. */
 export function PasswordForm({ db }: { db: Db })
@@ -16,16 +22,15 @@ export function PasswordForm({ db }: { db: Db })
 
     const toggle = useCallback(() => setVisible((shown) => !shown), []);
 
-    const submit = useCallback(
-        async (event: FormEvent) =>
+    const enter = useCallback(
+        async (secret: string) =>
         {
-            event.preventDefault();
             setBusy(true);
             setError('');
 
             try
             {
-                await db.signIn(password);
+                await db.signIn(secret);
             }
             catch
             {
@@ -34,8 +39,19 @@ export function PasswordForm({ db }: { db: Db })
                 setBusy(false);
             }
         },
-        [db, password],
+        [db],
     );
+
+    const submit = useCallback(
+        (event: FormEvent) =>
+        {
+            event.preventDefault();
+            void enter(password);
+        },
+        [enter, password],
+    );
+
+    const devEnter = useCallback(() => void enter(devPassword ?? ''), [enter]);
 
     return (
         <div className="sky-login">
@@ -69,10 +85,22 @@ export function PasswordForm({ db }: { db: Db })
                     </button>
                 </div>
                 <button type="submit" className="sky-btn" disabled={busy || !password}>
-                    {busy ? 'Opening' : 'Unlock'}
+                    {busy ? 'Entering' : 'Enter'}
                 </button>
                 {error && <p className="sky-error">{error}</p>}
             </form>
+
+            {devPassword && (
+                <button
+                    type="button"
+                    className="sky-btn sky-btn--blue sky-btn--small"
+                    onClick={devEnter}
+                    disabled={busy}
+                >
+                    <FontAwesomeIcon icon={faBolt} />
+                    Dev login
+                </button>
+            )}
         </div>
     );
 }
