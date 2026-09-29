@@ -54,6 +54,13 @@ if (!cameFromHome)
 A comment earns its place by saying something the code cannot. Never restate the
 code, and never leave a comment that names something which no longer exists.
 
+**Keep them short.** One line is the default. Write the surprise and stop, do not
+explain around it: a reader who knows the language does not need the mechanism
+spelled out, only the reason it is there. Anything that runs past three lines
+needs three lines of reasoning to carry it, and most of the time it does not have
+them. Prefer trimming a comment to deleting it, but delete it if what is left is
+the code said twice.
+
 Four shapes, all written as full sentences ending in a full stop:
 
 1. A JSDoc block above an export, for why it exists and what a reader would
