@@ -945,8 +945,8 @@
 
 .sky-message {
     min-height: 1.5rem;
-    /* Even room above and below, so a message never touches the coins. */
-    margin: 0.875rem 0;
+    /* A little more room below than above, so a message never crowds the coins. */
+    margin: 0.875rem 0 1.5rem;
     text-align: center;
     color: var(--sky-gold-hi);
     text-shadow: 0 2px 0 var(--sky-outline);
@@ -982,14 +982,14 @@
 
 /* The coins centred over the filter chips, the same as on phones, and midway
    between the search and the chips. The status line over it already leaves
-   3.25rem, so the gap below the coins matches that and the top has no margin.
+   3.875rem, so the gap below the coins matches that and the top has no margin.
    A container, so the chips can size themselves to its width. */
 .sky-stats {
     container-type: inline-size;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 3.25rem;
+    gap: 3.875rem;
     /* The bottom also makes room for the card medals poking up. */
     margin-block: 0 1.75rem;
 }
