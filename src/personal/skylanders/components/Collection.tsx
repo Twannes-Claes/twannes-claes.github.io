@@ -15,9 +15,9 @@ import type { CatalogEntry, Db, Skylander, SkylanderDetails } from '../types';
 
 import { elements, giant } from '../content/elements';
 import { addedMessage } from '../content/messages';
-import { ownedVariants, plainCount, variants, type VariantId } from '../content/variants';
+import { offeredVersions, type VersionId } from '../content/variants';
 import { playVoice } from '../services/voice';
-import { fetchCatalog, lookup } from '../services/wiki';
+import { detailsVersion, fetchCatalog, lookup } from '../services/wiki';
 
 import { ChooseVersion } from './ChooseVersion';
 import { ConfirmRemove } from './ConfirmRemove';
@@ -104,26 +104,24 @@ export function Collection({ db }: { db: Db })
 
     useEffect(() =>
     {
-        // Figures saved before the lookup matched every game category have none, and ones saved
-        // before versions, Giants, version pictures or catchphrases were tracked miss those, so
-        // they get looked up again once and patched. Failures are left for the next visit to retry.
+        // Figures saved by an older lookup, or missing a game or element it did not find, get
+        // looked up again once and patched, see detailsVersion in services/wiki.ts. Failures
+        // are left for the next visit to retry.
         for (const item of items ?? [])
         {
             const complete =
-                item.game &&
-                item.element &&
-                item.versions &&
-                item.giant !== undefined &&
-                item.looks &&
-                item.catchphrase !== undefined;
+                item.game && item.element && item.detailsVersion === detailsVersion;
 
             if (complete || !item.url || repaired.current.has(item.id))
                 continue;
 
             repaired.current.add(item.id);
-            lookup(item.name)
+            lookup(item.title ?? item.name)
                 .then((details) =>
                     db.updateDetails(item.id, {
+                        // Figures saved with the wiki's "(character)" get the cleaner name.
+                        name: details.name,
+                        title: details.title,
                         game: details.game || item.game,
                         element: details.element || item.element,
                         versions: details.versions,
@@ -131,6 +129,8 @@ export function Collection({ db }: { db: Db })
                         looks: details.looks,
                         catchphrase: details.catchphrase,
                         voice: details.voice,
+                        editions: details.editions,
+                        detailsVersion: details.detailsVersion,
                     }),
                 )
                 .catch(() => undefined);
@@ -179,11 +179,14 @@ export function Collection({ db }: { db: Db })
 
     /** Stores a looked up figure, as a plain copy or one of a special version. */
     const save = useCallback(
-        async (details: SkylanderDetails, variant?: VariantId) =>
+        async (details: SkylanderDetails, variant?: VersionId) =>
         {
             const count = await db.addSkylander(details, variant);
-            const version = variants.find(({ id }) => id === variant);
-            const name = version ? `${version.name} ${details.name}` : details.name;
+            const version = offeredVersions({ ...details, variants: {} }).find(
+                ({ id }) => id === variant,
+            );
+            // "Series 2 Spyro", or an edition's own page name, like "Springtime Trigger Happy".
+            const name = version ? (version.title ?? `${version.name} ${details.name}`) : details.name;
 
             // A copy of one already owned is counted by the figure, whichever version it is.
             setMessage(addedMessage(count > 1 ? details.name : name, count));
@@ -206,9 +209,12 @@ export function Collection({ db }: { db: Db })
 
             // Only real Skylanders get in. Matching here also fixes the capitals, because wiki
             // titles are case sensitive.
+            // Looked up by its wiki title, which can differ from the name shown, see wiki.ts.
             const known = catalog.find(
-                (entry) => entry.name.toLowerCase() === typed.toLowerCase(),
-            )?.name;
+                (entry) =>
+                    entry.name.toLowerCase() === typed.toLowerCase() ||
+                    entry.title.toLowerCase() === typed.toLowerCase(),
+            )?.title;
 
             if (catalog.length > 0 && !known)
             {
@@ -248,7 +254,7 @@ export function Collection({ db }: { db: Db })
     );
 
     const choose = useCallback(
-        (details: SkylanderDetails, variant?: VariantId) =>
+        (details: SkylanderDetails, variant?: VersionId) =>
         {
             setChoosing(null);
             // Straight away, while the click still counts as the reason for the sound, rather
@@ -259,6 +265,8 @@ export function Collection({ db }: { db: Db })
         [save],
     );
 
+    // The search is left as it was, still open behind the dialog, see holdOpen in
+    // SkylanderSearch.tsx.
     const cancelChoosing = useCallback(() => setChoosing(null), []);
 
     const submit = useCallback(
@@ -270,14 +278,8 @@ export function Collection({ db }: { db: Db })
         [addByName, name],
     );
 
-    const pick = useCallback(
-        (picked: string) =>
-        {
-            setName(picked);
-            void addByName(picked);
-        },
-        [addByName],
-    );
+    // Leaves the typed text alone, so the list behind the dialog keeps its place for a cancel.
+    const pick = useCallback((picked: string) => void addByName(picked), [addByName]);
 
     const confirmRemove = useCallback(
         (item: Skylander) =>
@@ -291,7 +293,7 @@ export function Collection({ db }: { db: Db })
     const cancelRemove = useCallback(() => setPending(null), []);
 
     const changeCount = useCallback(
-        (item: Skylander, delta: number, variant?: VariantId) =>
+        (item: Skylander, delta: number, variant?: VersionId) =>
         {
             // Taking away the last copy removes the figure, so that goes through the dialog.
             if (item.count + delta < 1)
@@ -301,14 +303,7 @@ export function Collection({ db }: { db: Db })
                 return;
             }
 
-            let target = variant;
-
-            // Minus on the card takes a plain copy first. With none left, it takes the last
-            // special version instead, so the total and the versions keep adding up.
-            if (!target && delta < 0 && plainCount(item.count, item.variants) === 0)
-                target = ownedVariants(item.variants).at(-1)?.id;
-
-            db.changeCount(item.id, delta, target).catch((error: Error) =>
+            db.changeCount(item.id, delta, variant).catch((error: Error) =>
                 setMessage(error.message),
             );
         },
@@ -332,6 +327,7 @@ export function Collection({ db }: { db: Db })
                     catalog={catalog}
                     owned={owned}
                     onPick={pick}
+                    holdOpen={choosing !== null}
                 />
             </form>
 
@@ -399,7 +395,6 @@ export function Collection({ db }: { db: Db })
                         key={activeFilter ?? 'all'}
                         items={shown}
                         onRemove={setPending}
-                        onChangeCount={changeCount}
                         onVariants={openVersions}
                     />
                 </>

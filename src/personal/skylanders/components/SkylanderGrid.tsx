@@ -8,7 +8,6 @@ interface SkylanderGridProps
 {
     items: Skylander[];
     onRemove: (item: Skylander) => void;
-    onChangeCount: (item: Skylander, delta: number) => void;
     onVariants: (item: Skylander) => void;
 }
 
@@ -18,7 +17,7 @@ interface SkylanderGridProps
  * the transition would capture that empty frame. Collection.tsx keys this on the filter, so a
  * new filter mounts it fresh and replays the entrance.
  */
-export function SkylanderGrid({ items, onRemove, onChangeCount, onVariants }: SkylanderGridProps)
+export function SkylanderGrid({ items, onRemove, onVariants }: SkylanderGridProps)
 {
     const [intro] = useState(() => new Set(items.map((item) => item.id)));
 
@@ -31,7 +30,6 @@ export function SkylanderGrid({ items, onRemove, onChangeCount, onVariants }: Sk
                     index={index}
                     intro={intro.has(item.id)}
                     onRemove={onRemove}
-                    onChangeCount={onChangeCount}
                     onVariants={onVariants}
                 />
             ))}

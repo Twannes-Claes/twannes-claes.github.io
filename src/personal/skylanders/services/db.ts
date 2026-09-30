@@ -19,7 +19,7 @@ import {
     updateDoc,
 } from 'firebase/firestore';
 
-import type { VariantId } from '../content/variants';
+import type { VersionId } from '../content/variants';
 import type { Skylander, SkylanderDetails } from '../types';
 
 import { accountEmail, firebaseConfig } from './config';
@@ -89,9 +89,11 @@ export function watchCollection(
  * Adds a figure, or counts one more when it is already in the collection, as a plain copy or one
  * of a special version. Resolves to how many of it there are now.
  */
-export async function addSkylander(item: SkylanderDetails, variant?: VariantId): Promise<number>
+export async function addSkylander(item: SkylanderDetails, variant?: VersionId): Promise<number>
 {
-    const ref = doc(skylanders, idFor(item.name));
+    // From the wiki title rather than the shown name, which drops "(character)", so a figure
+    // saved before names were cleaned up still matches its document.
+    const ref = doc(skylanders, idFor(item.title ?? item.name));
 
     // A transaction, so two people adding the same figure at once both get counted.
     return runTransaction(db, async (transaction) =>
@@ -126,7 +128,7 @@ export async function addSkylander(item: SkylanderDetails, variant?: VariantId):
  * variant, because plain copies are the total minus the variants. increment() keeps two quick
  * clicks from overwriting each other.
  */
-export async function changeCount(id: string, delta: number, variant?: VariantId): Promise<void>
+export async function changeCount(id: string, delta: number, variant?: VersionId): Promise<void>
 {
     await updateDoc(
         doc(skylanders, id),

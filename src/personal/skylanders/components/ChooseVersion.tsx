@@ -3,25 +3,36 @@ import { useCallback, useEffect, useRef, type CSSProperties, type MouseEvent } f
 import type { SkylanderDetails } from '../types';
 
 import { elementFor } from '../content/elements';
-import { normal, normalFor, offeredVariants, type VariantId } from '../content/variants';
+import {
+    normal,
+    normalFor,
+    offeredVersions,
+    versionImage,
+    type VersionId,
+} from '../content/variants';
 
 interface ChooseVersionProps
 {
     /** The figure being added, or null when the dialog is closed. */
     details: SkylanderDetails | null;
     /** A variant of undefined means the plain version. */
-    onChoose: (details: SkylanderDetails, variant?: VariantId) => void;
+    onChoose: (details: SkylanderDetails, variant?: VersionId) => void;
     onCancel: () => void;
 }
 
 /**
- * Closing the dialog hands focus back to the search, which would open its suggestions again right
- * after a version was picked, so it lets go of it.
+ * Where focus goes once the dialog closes. It hands focus back to the search on its own, which
+ * opens the suggestions. That is wanted after a cancel, to look for another name straight away,
+ * but not after a version was picked, so then it lets go of the search.
  */
-function leaveSearch()
+function settleFocus(picked: boolean)
 {
-    if (document.activeElement instanceof HTMLInputElement)
-        document.activeElement.blur();
+    const search = document.querySelector<HTMLInputElement>('.sky-search .sky-input');
+
+    if (picked)
+        search?.blur();
+    else
+        search?.focus();
 
 }
 
@@ -32,6 +43,8 @@ function leaveSearch()
 export function ChooseVersion({ details, onChoose, onCancel }: ChooseVersionProps)
 {
     const dialog = useRef<HTMLDialogElement>(null);
+    /** Whether a version was picked, rather than the dialog cancelled, see settleFocus(). */
+    const picked = useRef(false);
 
     useEffect(() =>
     {
@@ -42,6 +55,7 @@ export function ChooseVersion({ details, onChoose, onCancel }: ChooseVersionProp
 
         if (details && !element.open)
         {
+            picked.current = false;
             element.showModal();
             // showModal() focuses the first tile, which then looks picked before anything is.
             element.focus();
@@ -49,7 +63,7 @@ export function ChooseVersion({ details, onChoose, onCancel }: ChooseVersionProp
         else if (!details && element.open)
         {
             element.close();
-            leaveSearch();
+            settleFocus(picked.current);
         }
 
     }, [details]);
@@ -57,9 +71,18 @@ export function ChooseVersion({ details, onChoose, onCancel }: ChooseVersionProp
     // Escape closes the dialog without going through the effect above.
     const closed = useCallback(() =>
     {
-        leaveSearch();
+        settleFocus(picked.current);
         onCancel();
     }, [onCancel]);
+
+    const choose = useCallback(
+        (chosen: SkylanderDetails, variant?: VersionId) =>
+        {
+            picked.current = true;
+            onChoose(chosen, variant);
+        },
+        [onChoose],
+    );
 
     // A click on the dialog element itself, rather than its contents, landed on the backdrop.
     const onBackdrop = useCallback(
@@ -78,9 +101,9 @@ export function ChooseVersion({ details, onChoose, onCancel }: ChooseVersionProp
     const choices = details
         ? [
             { ...normalFor(details.versions), src: details.looks?.normal ?? details.image },
-            ...offeredVariants(details.versions, {}).map((variant) => ({
-                ...variant,
-                src: details.looks?.[variant.id] ?? '',
+            ...offeredVersions({ ...details, variants: {} }).map((version) => ({
+                ...version,
+                src: versionImage(details, version),
             })),
         ]
         : [];
@@ -115,7 +138,7 @@ export function ChooseVersion({ details, onChoose, onCancel }: ChooseVersionProp
                                     className="sky-choice"
                                     style={{ '--v': choice.color } as CSSProperties}
                                     onClick={() =>
-                                        onChoose(
+                                        choose(
                                             details,
                                             choice.id === normal.id ? undefined : choice.id,
                                         )
@@ -145,7 +168,7 @@ export function ChooseVersion({ details, onChoose, onCancel }: ChooseVersionProp
                             <button
                                 type="button"
                                 className="sky-btn"
-                                onClick={() => onChoose(details)}
+                                onClick={() => choose(details)}
                             >
                                 Add
                             </button>

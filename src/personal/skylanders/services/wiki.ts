@@ -1,7 +1,15 @@
 import type { CatalogEntry, SkylanderDetails } from '../types';
 
 import { elements } from '../content/elements';
-import { variants, wikiPage, type Look, type Looks, type VariantId } from '../content/variants';
+import {
+    editionId,
+    variants,
+    wikiPage,
+    type Edition,
+    type Look,
+    type Looks,
+    type VariantId,
+} from '../content/variants';
 
 /*
  * There is no official Skylanders API, so this reads the fan wiki at skylanders.fandom.com through
@@ -79,23 +87,69 @@ const figureCategories = [
     'Category:Female Senseis',
 ];
 
+/**
+ * Characters that never came out as a figure, so they are no use in a collection: the mobile
+ * game Lost Islands' own characters like Birthday Bash, the digital-only ones from the Trap Team
+ * tablet, pre-made Imaginators, TV-only characters, and scrapped or unreleased ones.
+ */
+const notFigureCategories = [
+    'Category:Lost Islands Exclusive Skylanders',
+    'Category:Tablet Exclusives',
+    'Category:Instant Skylanders',
+    'Category:Imaginators',
+    'Category:TV Exclusive Characters',
+    'Category:Non-Playable Characters',
+    'Category:Scrapped Content',
+];
+
 /** The eight Giants and their repaints, plus a couple of pages that are not figures. */
 const giantCategory = 'Category:Giants';
+
+/**
+ * Special paint jobs of a figure, like Legendary Stealth Elf or Springtime Trigger Happy. The wiki
+ * gives each a page of its own, but here they are versions of the figure, see content/variants.ts.
+ */
+const altDecoCategory = 'Category:Alt Deco Skylanders';
+
+/**
+ * A figure's SuperChargers release, like Double Dare Trigger Happy. A figure of its own on the
+ * wiki, but collected as a version of the original here, the same as a paint job.
+ */
+const reissueCategory = 'Category:SuperCharger Versions of Previous Skylanders';
 
 function elementOf(categories: Set<string>): string
 {
     return elements.find(({ name }) => categories.has(`Category:${name} Skylanders`))?.name ?? '';
 }
 
-/**
- * Every figure in Category:Skylanders with a small thumbnail, for the search dropdown. The
- * category holds a few hundred pages, which a single request covers. Dark and Eon's Elite repaints
- * have pages of their own in it, but they are versions of a figure here, see content/variants.ts,
- * so they are left out.
- */
-export async function fetchCatalog(): Promise<CatalogEntry[]>
+interface CatalogPage
 {
-    const [data, ...repaints] = await Promise.all([
+    title: string;
+    thumb: string;
+    categories: Set<string>;
+    /** An actual figure, see figureCategories. */
+    figure: boolean;
+    /** Never came out as a figure, see notFigureCategories. */
+    unreleased: boolean;
+    /**
+     * For a paint job or a SuperChargers release of another figure, the original figure's name,
+     * empty for everything else. Found through the longest figure name the title ends with, and
+     * followed down, so Dark Super Shot Stealth Elf comes back to Stealth Elf through Super Shot
+     * Stealth Elf.
+     */
+    base: string;
+}
+
+let catalogPages: Promise<CatalogPage[]> | undefined;
+
+/**
+ * Every page in Category:Skylanders, fetched once and shared by the search and the lookups. The
+ * category holds a few hundred pages, which a single request covers. Dark and Eon's Elite repaints
+ * are found through their own categories as well, since not all of them are marked Alt Deco.
+ */
+function fetchPages(): Promise<CatalogPage[]>
+{
+    catalogPages ??= Promise.all([
         call({
             action: 'query',
             generator: 'categorymembers',
@@ -105,27 +159,119 @@ export async function fetchCatalog(): Promise<CatalogEntry[]>
             prop: 'pageimages|categories',
             piprop: 'thumbnail',
             pithumbsize: '96',
-            // Only asks about the figure categories and Giants, so each page lists at most a few.
-            clcategories: [...figureCategories, giantCategory].join('|'),
+            // Only asks about the categories used here, so each page lists at most a few.
+            clcategories: [
+                ...figureCategories,
+                ...notFigureCategories,
+                giantCategory,
+                altDecoCategory,
+                reissueCategory,
+            ].join('|'),
             cllimit: '500',
         }) as Promise<{ query: { pages: Record<string, WikiPage> } }>,
         ...repaintCategories.map(members),
-    ]);
-    const skip = new Set(repaints.flat());
+    ]).then(([data, ...repaints]) =>
+    {
+        const repainted = new Set(repaints.flat());
+        const pages = Object.values(data.query.pages).map((page) =>
+        {
+            const categories = new Set(page.categories?.map(({ title }) => title));
 
-    return Object.values(data.query.pages)
-        .map((page) => ({ page, categories: new Set(page.categories?.map(({ title }) => title)) }))
-        // Giants alone does not make a figure, it also holds pages like "Giant Chest".
-        .filter(
-            ({ page, categories }) =>
-                figureCategories.some((category) => categories.has(category)) &&
-                !skip.has(page.title),
-        )
-        .map(({ page, categories }) => ({
-            name: page.title,
-            thumb: page.thumbnail?.source ?? '',
-            element: elementOf(categories),
-            giant: categories.has(giantCategory),
+            return {
+                title: page.title,
+                thumb: page.thumbnail?.source ?? '',
+                categories,
+                // Giants alone does not make a figure, it also holds pages like "Giant Chest".
+                figure: figureCategories.some((category) => categories.has(category)),
+                unreleased: notFigureCategories.some((category) => categories.has(category)),
+                repaint:
+                    categories.has(altDecoCategory) ||
+                    categories.has(reissueCategory) ||
+                    repainted.has(page.title),
+            };
+        });
+        const figures = pages.filter((page) => page.figure).map((page) => page.title);
+        // Each version's direct original, before following it down.
+        const parents = new Map(
+            pages
+                .filter((page) => page.repaint)
+                .map((page) => [
+                    page.title,
+                    figures
+                        .filter((name) => name !== page.title && page.title.endsWith(` ${name}`))
+                        .sort((a, b) => b.length - a.length)[0] ?? '',
+                ]),
+        );
+        const original = (title: string): string =>
+        {
+            const parent = parents.get(title);
+
+            return parent ? original(parent) : title;
+        };
+
+        return pages.map(({ repaint, ...page }) => ({
+            ...page,
+            base: repaint && parents.get(page.title) ? original(page.title) : '',
+        }));
+    });
+
+    // A failed request is asked again next time rather than kept.
+    catalogPages.catch(() =>
+    {
+        catalogPages = undefined;
+    });
+
+    return catalogPages;
+}
+
+/**
+ * A figure's name as shown, without the "(character)" the wiki adds to tell it apart from a page
+ * of the same name, like Blaster-Tron (character). The page title stays in `title`, for lookups.
+ */
+function displayName(title: string): string
+{
+    return title.replace(/\s*\(character\)$/i, '');
+}
+
+/**
+ * Every figure with a small thumbnail, for the search dropdown. Paint jobs of another figure are
+ * left out, since they are picked as a version of that figure when adding it.
+ */
+export async function fetchCatalog(): Promise<CatalogEntry[]>
+{
+    const pages = await fetchPages();
+
+    return pages
+        .filter((page) => page.figure && !page.unreleased && !page.base)
+        .map((page) => ({
+            name: displayName(page.title),
+            title: page.title,
+            thumb: page.thumb,
+            element: elementOf(page.categories),
+            giant: page.categories.has(giantCategory),
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * A figure's special paint jobs, like Springtime and Power Blue for Trigger Happy, with the
+ * picture from their page at the size of the other version pictures. Legendary, Dark and Eon's
+ * Elite are left to the variants, which cover them for every figure.
+ */
+async function editionsOf(name: string): Promise<Edition[]>
+{
+    const pages = await fetchPages();
+    const variantPrefixes = new Set(pageVersions.map(({ prefix }) => prefix));
+
+    return pages
+        .filter((page) => page.base === name && !page.unreleased)
+        .map((page) => ({ page, prefix: page.title.slice(0, -name.length - 1) }))
+        .filter(({ prefix }) => !variantPrefixes.has(prefix))
+        .map(({ page, prefix }) => ({
+            id: editionId(prefix),
+            name: prefix,
+            title: page.title,
+            image: page.thumb.replace(/scale-to-width-down\/\d+/, `scale-to-width-down/${lookSize}`),
         }))
         .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -292,7 +438,17 @@ function looksOf(
     return Object.fromEntries(Object.entries(looks).filter(([, thumb]) => thumb)) as Looks;
 }
 
-/** Looks a name up on the wiki. Unknown names still come back, just without the extras. */
+/**
+ * Which version of lookup() saved a figure's details. Raised whenever the lookup finds something
+ * new for figures it already knew, like more editions, so Collection.tsx looks saved figures up
+ * again once.
+ */
+export const detailsVersion = 3;
+
+/**
+ * Looks a figure up on the wiki by its page title, see CatalogEntry. Unknown names still come
+ * back, just without the extras.
+ */
 export async function lookup(name: string): Promise<SkylanderDetails>
 {
     const data = (await call({
@@ -314,7 +470,8 @@ export async function lookup(name: string): Promise<SkylanderDetails>
     if (!page || page.missing !== undefined)
     {
         return {
-            name,
+            name: displayName(name),
+            title: name,
             image: '',
             element: '',
             giant: false,
@@ -324,6 +481,8 @@ export async function lookup(name: string): Promise<SkylanderDetails>
             looks: {},
             catchphrase: '',
             voice: '',
+            editions: [],
+            detailsVersion,
         };
     }
 
@@ -333,9 +492,11 @@ export async function lookup(name: string): Promise<SkylanderDetails>
     const pictures = infoboxFiles(wikitext);
     const catchphrase = catchphraseOf(wikitext);
     // The version pictures and the recording in one request.
-    const [repaints, links] = await Promise.all([
+    // A lookup without the editions still adds the figure, it just offers none.
+    const [repaints, links, editions] = await Promise.all([
         repaintsOf(page.title),
         fileThumbs([...pictures.values(), catchphrase.file].filter(Boolean)),
+        editionsOf(page.title).catch(() => []),
     ]);
     const looks = looksOf(pictures, links, image, repaints);
     const found = new Set([
@@ -346,7 +507,8 @@ export async function lookup(name: string): Promise<SkylanderDetails>
     ]);
 
     return {
-        name: page.title,
+        name: displayName(page.title),
+        title: page.title,
         image,
         element: elementOf(categories),
         giant: categories.has(giantCategory),
@@ -363,5 +525,7 @@ export async function lookup(name: string): Promise<SkylanderDetails>
         looks,
         catchphrase: catchphrase.line,
         voice: links.get(catchphrase.file) ?? '',
+        editions,
+        detailsVersion,
     };
 }

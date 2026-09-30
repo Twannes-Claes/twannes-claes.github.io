@@ -1,6 +1,4 @@
 import {
-    faMinus,
-    faPlus,
     faQuoteLeft,
     faStar,
     faVolumeHigh,
@@ -19,7 +17,7 @@ import {
 import type { Skylander } from '../types';
 
 import { elementFor, giant } from '../content/elements';
-import { normalFor, ownedVariants, plainCount } from '../content/variants';
+import { normalFor, ownedVersions, plainCount, versionImage } from '../content/variants';
 import { playVoice, stopVoice, watchVoice } from '../services/voice';
 
 import { PortraitCarousel, type Slide } from './PortraitCarousel';
@@ -32,9 +30,7 @@ interface SkylanderCardProps
     /** Plays the staggered entrance. Off for cards added later, see SkylanderGrid.tsx. */
     intro: boolean;
     onRemove: (item: Skylander) => void;
-    /** +1 or -1. Collection.tsx turns the last -1 into the remove dialog. */
-    onChangeCount: (item: Skylander, delta: number) => void;
-    /** Opens the versions dialog in Collection.tsx. */
+    /** Opens the versions dialog in Collection.tsx, where the copies are counted. */
     onVariants: (item: Skylander) => void;
 }
 
@@ -162,7 +158,6 @@ export function SkylanderCard({
     index,
     intro,
     onRemove,
-    onChangeCount,
     onVariants,
 }: SkylanderCardProps)
 {
@@ -174,18 +169,6 @@ export function SkylanderCard({
         },
         [item, onRemove],
     );
-    const increase = useCallback(() => onChangeCount(item, 1), [item, onChangeCount]);
-    const decrease = useCallback(
-        (event: MouseEvent<HTMLButtonElement>) =>
-        {
-            // The last copy goes through the remove dialog, see Collection.tsx.
-            if (item.count === 1)
-                straightenCard(event);
-
-            onChangeCount(item, -1);
-        },
-        [item, onChangeCount],
-    );
     const versions = useCallback(
         (event: MouseEvent<HTMLButtonElement>) =>
         {
@@ -195,17 +178,19 @@ export function SkylanderCard({
         [item, onVariants],
     );
     const element = elementFor(item.element);
-    const special = ownedVariants(item.variants);
+    const special = ownedVersions(item);
     // A picture of each version owned, for the carousel. Versions the wiki has no picture of are
     // left out rather than shown as the plain one.
     const slides: Slide[] = [
         ...(plainCount(item.count, item.variants) > 0
             ? [{ ...normalFor(item.versions), src: item.looks?.normal ?? item.image }]
             : []),
-        ...special.map((variant) => ({ ...variant, src: item.looks?.[variant.id] ?? '' })),
+        ...special.map((version) => ({ ...version, src: versionImage(item, version) })),
     ].filter((slide) => slide.src);
     // One version, like a figure owned only as a Legendary, shows that picture on its own.
     const portrait = slides[0]?.src ?? item.image;
+    // The holographic frame is for the rarer ones. A Series 2 or 3 is just another release.
+    const rare = special.some(({ id }) => id !== 'series2' && id !== 'series3');
     const style = {
         '--el': element.color,
         '--i': index,
@@ -216,7 +201,7 @@ export function SkylanderCard({
 
     return (
         <li
-            className={`sky-card${intro ? ' sky-card--intro' : ''}${special.length > 0 ? ' sky-card--special' : ''}`}
+            className={`sky-card${intro ? ' sky-card--intro' : ''}${rare ? ' sky-card--special' : ''}`}
             style={style}
             onPointerEnter={glint}
             onPointerMove={tilt}
@@ -316,30 +301,6 @@ export function SkylanderCard({
                         )}
                     </ul>
                 )}
-
-                <div className="sky-stepper" role="group" aria-label={`Copies of ${item.name}`}>
-                    <button
-                        type="button"
-                        // At one copy, minus removes the figure, so its hover turns red.
-                        className={`sky-stepper__btn sky-stepper__btn--minus${item.count === 1 ? ' sky-stepper__btn--danger' : ''}`}
-                        onClick={decrease}
-                        aria-label={`One less ${item.name}`}
-                    >
-                        <FontAwesomeIcon icon={faMinus} />
-                    </button>
-                    {/* Keyed on the count, so the number bumps each time it changes. */}
-                    <span className="sky-stepper__count" key={item.count} aria-live="polite">
-                        {item.count}
-                    </span>
-                    <button
-                        type="button"
-                        className="sky-stepper__btn sky-stepper__btn--plus"
-                        onClick={increase}
-                        aria-label={`One more ${item.name}`}
-                    >
-                        <FontAwesomeIcon icon={faPlus} />
-                    </button>
-                </div>
             </div>
         </li>
     );

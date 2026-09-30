@@ -31,12 +31,34 @@ export function normalFor(versions: VariantId[] | undefined): typeof normal
     return series ? { ...normal, name: 'Series 1' } : normal;
 }
 
-/** How many copies of each special version are owned. Plain copies are not listed. */
-export type VariantCounts = Partial<Record<VariantId, number>>;
+/** An edition's id, from its name, like "edition-springtime" for Springtime Trigger Happy. */
+export type EditionId = `edition-${string}`;
 
-export interface Variant
+/** Anything a copy can be counted as besides the plain version: a variant or an edition. */
+export type VersionId = VariantId | EditionId;
+
+/** How many copies of each special version are owned. Plain copies are not listed. */
+export type VariantCounts = Partial<Record<VersionId, number>>;
+
+/**
+ * A special paint job of one figure that the wiki gives a page of its own, like Springtime
+ * Trigger Happy or Jade Fire Kraken, found by services/wiki.ts. Legendary, Dark and Eon's Elite
+ * are variants instead, since most figures have them.
+ */
+export interface Edition
 {
-    id: VariantId;
+    id: EditionId;
+    /** What sets it apart, like "Springtime". */
+    name: string;
+    /** The wiki page, like "Springtime Trigger Happy". */
+    title: string;
+    image: string;
+}
+
+/** One version as the dialogs and the card list it: a variant or an edition. */
+export interface Version
+{
+    id: VersionId;
     name: string;
     color: string;
     /**
@@ -44,6 +66,15 @@ export interface Variant
      * in "Legendary Spyro". The others only differ in small details, so they link to pictures.
      */
     page?: string;
+    /** An edition's own wiki page. */
+    title?: string;
+    /** An edition's picture. The variants' are in the figure's looks. */
+    image?: string;
+}
+
+export interface Variant extends Version
+{
+    id: VariantId;
 }
 
 /** The special versions collectors tell apart, in the order they are listed everywhere. */
@@ -66,15 +97,19 @@ export const variants: Variant[] = [
  */
 export function variantLink(
     figure: { name: string; url: string; looks?: Looks },
-    variant: { id: Look; name: string; page?: string },
+    variant: { id: Look | EditionId; name: string; page?: string; title?: string },
 ): string
 {
+    if (variant.title)
+        return wikiPage(variant.title);
+
     if (variant.page)
         return wikiPage(`${variant.page} ${figure.name}`);
 
     // The file name inside a picture link, like Series_2_Eruptor_Promo.jpg in
     // .../images/f/f7/Series_2_Eruptor_Promo.jpg/revision/latest/...
-    const file = /\/images\/[^/]+\/[^/]+\/([^/]+)\//.exec(figure.looks?.[variant.id] ?? '')?.[1];
+    const look = figure.looks?.[variant.id as Look] ?? '';
+    const file = /\/images\/[^/]+\/[^/]+\/([^/]+)\//.exec(look)?.[1];
 
     // ?file= makes Fandom open the page with that picture in its lightbox.
     if (file && figure.url)
@@ -111,14 +146,72 @@ export function offeredVariants(known: VariantId[] | undefined, counts: VariantC
     );
 }
 
-/** The variants a figure has at least one copy of, in list order. */
-export function ownedVariants(counts: VariantCounts): Variant[]
+/** The id an edition is counted under, from its name: "Power Blue" is "edition-power-blue". */
+export function editionId(name: string): EditionId
 {
-    return variants.filter((variant) => (counts[variant.id] ?? 0) > 0);
+    const slug = name
+        .normalize('NFKD')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+
+    return `edition-${slug}`;
+}
+
+/**
+ * A colour of its own for each edition, from its name, so they tell apart in the dialogs and on
+ * the card without a list to keep up. Bright enough to read on the dark panels.
+ */
+function editionColor(name: string): string
+{
+    let hash = 0;
+
+    for (const letter of name)
+        hash = (hash * 31 + letter.charCodeAt(0)) % 360;
+
+    return `hsl(${hash} 80% 66%)`;
+}
+
+/** A figure's editions as versions, for the lists next to its variants. */
+export function editionVersions(editions: Edition[] | undefined): Version[]
+{
+    return (editions ?? []).map((edition) => ({
+        id: edition.id,
+        name: edition.name,
+        color: editionColor(edition.name),
+        title: edition.title,
+        image: edition.image,
+    }));
+}
+
+/** The picture of a version: an edition's own, or a variant's from the figure's looks. */
+export function versionImage(figure: { looks?: Looks }, version: Version): string
+{
+    return version.image ?? figure.looks?.[version.id as Look] ?? '';
+}
+
+/** Every special version a figure offers: its variants, then its editions. */
+export function offeredVersions(item: {
+    versions?: VariantId[];
+    editions?: Edition[];
+    variants: VariantCounts;
+}): Version[]
+{
+    return [...offeredVariants(item.versions, item.variants), ...editionVersions(item.editions)];
+}
+
+/** The special versions a figure has at least one copy of, in list order. */
+export function ownedVersions(item: {
+    versions?: VariantId[];
+    editions?: Edition[];
+    variants: VariantCounts;
+}): Version[]
+{
+    return offeredVersions(item).filter((version) => (item.variants[version.id] ?? 0) > 0);
 }
 
 /** Copies that are not a special version: whatever the special counts do not account for. */
 export function plainCount(total: number, counts: VariantCounts): number
 {
-    return total - variants.reduce((sum, variant) => sum + (counts[variant.id] ?? 0), 0);
+    return total - Object.values(counts).reduce<number>((sum, count) => sum + (count ?? 0), 0);
 }

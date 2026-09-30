@@ -8,10 +8,11 @@ import { elementFor } from '../content/elements';
 import {
     normal,
     normalFor,
-    offeredVariants,
+    offeredVersions,
     plainCount,
     variantLink,
-    type VariantId,
+    versionImage,
+    type VersionId,
 } from '../content/variants';
 
 interface VariantsDialogProps
@@ -19,7 +20,7 @@ interface VariantsDialogProps
     /** The Skylander whose versions are being edited, or null when the dialog is closed. */
     item: Skylander | null;
     /** A variant of undefined means a plain copy. */
-    onChange: (item: Skylander, delta: number, variant?: VariantId) => void;
+    onChange: (item: Skylander, delta: number, variant?: VersionId) => void;
     onClose: () => void;
 }
 
@@ -33,7 +34,7 @@ interface RowProps
     href: string;
     /** A picture of this version from the wiki, when it has one. */
     image?: string;
-    variant?: VariantId;
+    variant?: VersionId;
     onChange: VariantsDialogProps['onChange'];
 }
 
@@ -160,16 +161,16 @@ export function VariantsDialog({ item, onChange, onClose }: VariantsDialogProps)
                             image={item.looks?.normal ?? item.image}
                             onChange={onChange}
                         />
-                        {offeredVariants(item.versions, item.variants).map((variant) => (
+                        {offeredVersions(item).map((version) => (
                             <Row
-                                key={variant.id}
+                                key={version.id}
                                 item={item}
-                                label={variant.name}
-                                color={variant.color}
-                                count={item.variants[variant.id] ?? 0}
-                                href={variantLink(item, variant)}
-                                image={item.looks?.[variant.id]}
-                                variant={variant.id}
+                                label={version.name}
+                                color={version.color}
+                                count={item.variants[version.id] ?? 0}
+                                href={variantLink(item, version)}
+                                image={versionImage(item, version) || undefined}
+                                variant={version.id}
                                 onChange={onChange}
                             />
                         ))}

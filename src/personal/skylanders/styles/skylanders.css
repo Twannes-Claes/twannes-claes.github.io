@@ -50,6 +50,16 @@
     cursor: not-allowed;
 }
 
+/* The page behind an open dialog stays put. The scrollbar's room is kept on
+   this page, so hiding the scrollbar does not shift everything sideways. */
+html:has(.sky) {
+    scrollbar-gutter: stable;
+}
+
+html:has(.sky-dialog[open]) {
+    overflow: hidden;
+}
+
 /* Quick clicks, like pressing + a few times, would otherwise select the nearest
    text, such as a button's label or the count, and paint it blue. */
 .sky button,
@@ -1728,12 +1738,6 @@ a.sky-card__name:hover {
     }
 }
 
-/* The stepper's auto margin is zero on the tallest card in a row, so the line
-   above it keeps a gap of its own. */
-.sky-card__body > :nth-last-child(2) {
-    margin-bottom: 0.55rem;
-}
-
 .sky-stepper {
     display: inline-flex;
     align-items: center;
@@ -1801,17 +1805,6 @@ a.sky-card__name:hover {
 
 .sky-stepper__btn--minus:hover svg {
     transform: scaleX(1.35);
-}
-
-/* At one copy, minus means remove, so it warns in red before the click. */
-.sky-stepper__btn--danger:hover {
-    background: linear-gradient(180deg, #ffab9c, #f0473a 45%, #a3160f);
-    color: var(--sky-ink);
-    box-shadow:
-        0 2px 0 var(--sky-outline),
-        inset 0 2px 0 rgb(255 255 255 / 0.5),
-        0 0 0 3px rgb(240 71 58 / 0.3),
-        0 0 16px rgb(240 71 58 / 0.55);
 }
 
 .sky-stepper__btn:active {

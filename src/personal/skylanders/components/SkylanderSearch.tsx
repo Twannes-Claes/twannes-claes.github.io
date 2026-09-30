@@ -91,6 +91,11 @@ interface SkylanderSearchProps
     owned: Map<string, number>;
     /** Called with a suggestion that was clicked or chosen with the keyboard. */
     onPick: (name: string) => void;
+    /**
+     * A picked figure is being confirmed in a dialog. The list stays open behind it, filter and
+     * scroll position included, so a cancel comes back to the same spot. Adding closes it.
+     */
+    holdOpen: boolean;
 }
 
 interface FilterButtonProps
@@ -130,7 +135,14 @@ function FilterButton({ element, pressed, onToggle }: FilterButtonProps)
  * A combobox with pictures. It replaces a native datalist, whose dropdown the browser draws
  * itself and cannot be styled or show images.
  */
-export function SkylanderSearch({ value, onChange, catalog, owned, onPick }: SkylanderSearchProps)
+export function SkylanderSearch({
+    value,
+    onChange,
+    catalog,
+    owned,
+    onPick,
+    holdOpen,
+}: SkylanderSearchProps)
 {
     const listId = useId();
     const [open, setOpen] = useState(false);
@@ -146,18 +158,26 @@ export function SkylanderSearch({ value, onChange, catalog, owned, onPick }: Sky
         [catalog],
     );
 
-    const { results, named } = useMemo(
-        () =>
-            match(
-                catalog.filter(
-                    (entry) =>
-                        (!elementFilter || entry.element === elementFilter) &&
-                        (!giantsOnly || entry.giant),
-                ),
-                value,
+    const { results, named } = useMemo(() =>
+    {
+        const found = match(
+            catalog.filter(
+                (entry) =>
+                    (!elementFilter || entry.element === elementFilter) &&
+                    (!giantsOnly || entry.giant),
             ),
-        [catalog, value, elementFilter, giantsOnly],
-    );
+            value,
+        );
+        // A name typed in full still comes up under a filter it falls outside, first in the
+        // list so Enter takes it.
+        const needle = value.trim().toLowerCase();
+        const exact = catalog.find((entry) => entry.name.toLowerCase() === needle);
+
+        if (!exact || found.results.includes(exact))
+            return found;
+
+        return { results: [exact, ...found.results], named: found.named + 1 };
+    }, [catalog, value, elementFilter, giantsOnly]);
     // Stays open on a filter with no matches, so it can be switched off again.
     const expanded = open && (results.length > 0 || filtering);
 
@@ -165,6 +185,26 @@ export function SkylanderSearch({ value, onChange, catalog, owned, onPick }: Sky
     // An empty box has no best match, so Enter there does not add the first name alphabetically,
     // and neither does typing "fire", which only matched the element.
     const target = active >= 0 ? active : named > 0 ? 0 : -1;
+
+    const input = useRef<HTMLInputElement>(null);
+
+    // Once the confirm dialog is gone the list follows the focus again: open after a cancel,
+    // which hands focus back to the box, closed after an add, which does not.
+    useEffect(() =>
+    {
+        if (holdOpen)
+            return;
+
+        // Checked a moment later, once the dialog has closed and handed the focus on.
+        const timer = window.setTimeout(() =>
+        {
+            if (document.activeElement !== input.current)
+                setOpen(false);
+
+        });
+
+        return () => window.clearTimeout(timer);
+    }, [holdOpen]);
 
     // Keeps the keyboard highlight in view while arrowing through the long list.
     useEffect(() =>
@@ -175,12 +215,8 @@ export function SkylanderSearch({ value, onChange, catalog, owned, onPick }: Sky
     }, [active, listId]);
 
     const pick = useCallback(
-        (name: string) =>
-        {
-            setOpen(false);
-            setActive(-1);
-            onPick(name);
-        },
+        // Leaves the list open, see holdOpen.
+        (name: string) => onPick(name),
         [onPick],
     );
 
@@ -223,8 +259,6 @@ export function SkylanderSearch({ value, onChange, catalog, owned, onPick }: Sky
         setActive(-1);
     }, []);
 
-    const input = useRef<HTMLInputElement>(null);
-
     // Stays in the box afterwards, ready for the next name.
     const clear = useCallback(() =>
     {
@@ -257,7 +291,13 @@ export function SkylanderSearch({ value, onChange, catalog, owned, onPick }: Sky
                 onFocus={() => setOpen(true)}
                 // Focus does not fire again after a pick, so a click reopens the list too.
                 onClick={() => setOpen(true)}
-                onBlur={() => setOpen(false)}
+                // The confirm dialog taking focus is not leaving the search, see holdOpen.
+                onBlur={() =>
+                {
+                    if (!holdOpen)
+                        setOpen(false);
+
+                }}
                 onKeyDown={onKeyDown}
             />
             {value && (
@@ -334,17 +374,19 @@ export function SkylanderSearch({ value, onChange, catalog, owned, onPick }: Sky
                                     <span className="sky-search__name">
                                         <Highlight name={entry.name} query={value} />
                                     </span>
-                                    {/* Shows why a search for an element or Giants listed it. */}
+                                    {/* Before the icons, so the element icons line up down the list
+                                        whether a figure is owned or not. */}
+                                    {copies > 0 && (
+                                        <span
+                                            className="sky-search__owned"
+                                            aria-label={`Owned ×${copies}`}
+                                        >
+                                            {`×${copies}`}
+                                        </span>
+                                    )}
+                                    {/* Shows why a search for an element or Giants listed it. The
+                                        element comes last, at the edge, for the same reason. */}
                                     <span className="sky-search__tags">
-                                        {entry.element && (
-                                            <span
-                                                className="sky-search__icon sky-tip sky-tip--left"
-                                                style={{ '--el': element.color } as CSSProperties}
-                                                data-tip={element.name}
-                                            >
-                                                <FontAwesomeIcon icon={element.icon} />
-                                            </span>
-                                        )}
                                         {entry.giant && (
                                             <span
                                                 className="sky-search__icon sky-tip sky-tip--left"
@@ -354,15 +396,16 @@ export function SkylanderSearch({ value, onChange, catalog, owned, onPick }: Sky
                                                 <FontAwesomeIcon icon={giant.icon} />
                                             </span>
                                         )}
+                                        {entry.element && (
+                                            <span
+                                                className="sky-search__icon sky-tip sky-tip--left"
+                                                style={{ '--el': element.color } as CSSProperties}
+                                                data-tip={element.name}
+                                            >
+                                                <FontAwesomeIcon icon={element.icon} />
+                                            </span>
+                                        )}
                                     </span>
-                                    {copies > 0 && (
-                                        <span
-                                            className="sky-search__owned"
-                                            aria-label={`Owned ×${copies}`}
-                                        >
-                                            {`×${copies}`}
-                                        </span>
-                                    )}
                                 </li>
                             );
                         })}
