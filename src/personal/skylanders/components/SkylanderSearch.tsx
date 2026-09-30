@@ -4,6 +4,7 @@ import {
     useEffect,
     useId,
     useMemo,
+    useRef,
     useState,
     type CSSProperties,
     type KeyboardEvent,
@@ -12,6 +13,53 @@ import {
 import type { CatalogEntry } from '../types';
 
 import { elementFor, elements, giant, type Element } from '../content/elements';
+
+/** The enlarged thumbnail over the list, centred on the one under the mouse. */
+interface Preview
+{
+    /** The small thumbnail, already loaded, shown until the larger one arrives. */
+    src: string;
+    x: number;
+    y: number;
+    /** Shrinking back after the mouse left, removed once the animation ends. */
+    leaving: boolean;
+}
+
+/**
+ * The same wiki picture at a size that stays sharp in the preview. Fandom thumbnail links end in
+ * their width, so any other link is used as it is.
+ */
+function largerThumb(url: string): string
+{
+    return url.replace(/scale-to-width-down\/\d+/, 'scale-to-width-down/240');
+}
+
+const prefetched = new Set<string>();
+
+/**
+ * Starts loading a row's larger picture when the mouse reaches the row, so it is usually cached
+ * by the time the mouse is on the thumbnail.
+ */
+function prefetch(thumb: string)
+{
+    const url = largerThumb(thumb);
+
+    if (!thumb || prefetched.has(url))
+        return;
+
+    prefetched.add(url);
+
+    const image = new Image();
+
+    image.referrerPolicy = 'no-referrer';
+    image.src = url;
+}
+
+/** Shows the larger picture over the small one once it has loaded, see skylanders.css. */
+function markLoaded(image: HTMLImageElement)
+{
+    image.dataset.loaded = '';
+}
 
 /** Short enough that "fi" still means a name, long enough that "fir" can mean Fire. */
 const minTagQuery = 3;
@@ -137,6 +185,8 @@ export function SkylanderSearch({ value, onChange, catalog, owned, onPick }: Sky
     const [elementFilter, setElementFilter] = useState<string | null>(null);
     const [giantsOnly, setGiantsOnly] = useState(false);
     const filtering = elementFilter !== null || giantsOnly;
+    const searchRef = useRef<HTMLDivElement>(null);
+    const [preview, setPreview] = useState<Preview | null>(null);
 
     /** Only elements the catalog has figures for get a filter. */
     const filterElements = useMemo(
@@ -177,6 +227,7 @@ export function SkylanderSearch({ value, onChange, catalog, owned, onPick }: Sky
         {
             setOpen(false);
             setActive(-1);
+            setPreview(null);
             onPick(name);
         },
         [onPick],
@@ -213,16 +264,56 @@ export function SkylanderSearch({ value, onChange, catalog, owned, onPick }: Sky
     {
         setElementFilter((current) => (current === name ? null : name));
         setActive(-1);
+        setPreview(null);
     }, []);
 
     const toggleGiants = useCallback(() =>
     {
         setGiantsOnly((current) => !current);
         setActive(-1);
+        setPreview(null);
     }, []);
 
+    /**
+     * Drawn outside the list, because the list and its panel clip anything that pokes out of
+     * them, so an enlarged thumbnail inside would lose its edges.
+     */
+    const showPreview = useCallback((thumb: HTMLElement, src: string) =>
+    {
+        const search = searchRef.current?.getBoundingClientRect();
+        const box = thumb.getBoundingClientRect();
+
+        if (search)
+        {
+            setPreview({
+                src,
+                x: box.left + box.width / 2 - search.left,
+                y: box.top + box.height / 2 - search.top,
+                leaving: false,
+            });
+        }
+    }, []);
+
+    const hidePreview = useCallback(() => setPreview(null), []);
+
+    const leavePreview = useCallback(() =>
+    {
+        // Reduced motion turns the animations off in skylanders.css, so no end would ever come.
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+            setPreview(null);
+        else
+            setPreview((current) => current && { ...current, leaving: true });
+
+    }, []);
+
+    // Only the shrink ends it, the pop finishing leaves the preview up.
+    const previewAnimated = useCallback(
+        () => setPreview((current) => (current?.leaving ? null : current)),
+        [],
+    );
+
     return (
-        <div className="sky-search">
+        <div className="sky-search" ref={searchRef}>
             <input
                 className="sky-input"
                 role="combobox"
@@ -240,11 +331,17 @@ export function SkylanderSearch({ value, onChange, catalog, owned, onPick }: Sky
                     onChange(event.target.value);
                     setOpen(true);
                     setActive(-1);
+                    // The rows move under the mouse without it leaving the thumbnail.
+                    setPreview(null);
                 }}
                 onFocus={() => setOpen(true)}
                 // Focus does not fire again after a pick, so a click reopens the list too.
                 onClick={() => setOpen(true)}
-                onBlur={() => setOpen(false)}
+                onBlur={() =>
+                {
+                    setOpen(false);
+                    setPreview(null);
+                }}
                 onKeyDown={onKeyDown}
             />
 
@@ -274,7 +371,12 @@ export function SkylanderSearch({ value, onChange, catalog, owned, onPick }: Sky
                         <p className="sky-search__none">No Skylanders match these filters.</p>
                     )}
 
-                    <ul className="sky-search__list" id={listId} role="listbox">
+                    <ul
+                        className="sky-search__list"
+                        id={listId}
+                        role="listbox"
+                        onScroll={hidePreview}
+                    >
                         {results.map((entry, index) =>
                         {
                             const copies = owned.get(entry.name) ?? 0;
@@ -294,9 +396,20 @@ export function SkylanderSearch({ value, onChange, catalog, owned, onPick }: Sky
                                         event.preventDefault();
                                         pick(entry.name);
                                     }}
-                                    onMouseEnter={() => setActive(index)}
+                                    onMouseEnter={() =>
+                                    {
+                                        setActive(index);
+                                        prefetch(entry.thumb);
+                                    }}
                                 >
-                                    <span className="sky-search__thumb">
+                                    <span
+                                        className="sky-search__thumb"
+                                        onMouseEnter={(event) =>
+                                            entry.thumb &&
+                                            showPreview(event.currentTarget, entry.thumb)
+                                        }
+                                        onMouseLeave={leavePreview}
+                                    >
                                         {entry.thumb && (
                                             <img
                                                 src={entry.thumb}
@@ -343,6 +456,33 @@ export function SkylanderSearch({ value, onChange, catalog, owned, onPick }: Sky
                         })}
                     </ul>
                 </div>
+            )}
+
+            {expanded && preview && (
+                // Keyed on the picture, so moving to the next thumbnail replays the pop.
+                <span
+                    key={preview.src}
+                    className={`sky-search__preview${preview.leaving ? ' sky-search__preview--leaving' : ''}`}
+                    style={{ left: preview.x, top: preview.y }}
+                    aria-hidden="true"
+                    onAnimationEnd={previewAnimated}
+                >
+                    <img
+                        className="sky-search__preview-sharp"
+                        src={largerThumb(preview.src)}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                        // A cached picture can finish before React listens, so the ref checks.
+                        ref={(image) =>
+                        {
+                            if (image?.complete)
+                                markLoaded(image);
+
+                        }}
+                        onLoad={(event) => markLoaded(event.currentTarget)}
+                    />
+                    <img src={preview.src} alt="" referrerPolicy="no-referrer" />
+                </span>
             )}
         </div>
     );
