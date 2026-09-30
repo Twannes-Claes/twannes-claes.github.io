@@ -14,7 +14,9 @@ import { flushSync } from 'react-dom';
 import type { CatalogEntry, Db, Skylander, SkylanderDetails } from '../types';
 
 import { elements, giant } from '../content/elements';
+import { addedMessage } from '../content/messages';
 import { ownedVariants, plainCount, variants, type VariantId } from '../content/variants';
+import { playVoice } from '../services/voice';
 import { fetchCatalog, lookup } from '../services/wiki';
 
 import { ChooseVersion } from './ChooseVersion';
@@ -103,12 +105,17 @@ export function Collection({ db }: { db: Db })
     useEffect(() =>
     {
         // Figures saved before the lookup matched every game category have none, and ones saved
-        // before versions, Giants or version pictures were tracked miss those, so they get looked
-        // up again once and patched. Failures are left for the next visit to retry.
+        // before versions, Giants, version pictures or catchphrases were tracked miss those, so
+        // they get looked up again once and patched. Failures are left for the next visit to retry.
         for (const item of items ?? [])
         {
             const complete =
-                item.game && item.element && item.versions && item.giant !== undefined && item.looks;
+                item.game &&
+                item.element &&
+                item.versions &&
+                item.giant !== undefined &&
+                item.looks &&
+                item.catchphrase !== undefined;
 
             if (complete || !item.url || repaired.current.has(item.id))
                 continue;
@@ -122,6 +129,8 @@ export function Collection({ db }: { db: Db })
                         versions: details.versions,
                         giant: details.giant,
                         looks: details.looks,
+                        catchphrase: details.catchphrase,
+                        voice: details.voice,
                     }),
                 )
                 .catch(() => undefined);
@@ -176,11 +185,8 @@ export function Collection({ db }: { db: Db })
             const version = variants.find(({ id }) => id === variant);
             const name = version ? `${version.name} ${details.name}` : details.name;
 
-            if (count > 1)
-                setMessage(`That makes ${count} of ${details.name}!`);
-            else
-                setMessage(`${name} joined the collection!`);
-
+            // A copy of one already owned is counted by the figure, whichever version it is.
+            setMessage(addedMessage(count > 1 ? details.name : name, count));
             setName('');
         },
         [db],
@@ -245,6 +251,9 @@ export function Collection({ db }: { db: Db })
         (details: SkylanderDetails, variant?: VariantId) =>
         {
             setChoosing(null);
+            // Straight away, while the click still counts as the reason for the sound, rather
+            // than after saving, which browsers could treat as a page playing on its own.
+            playVoice(details.voice ?? '');
             save(details, variant).catch((error: Error) => setMessage(error.message));
         },
         [save],
@@ -352,7 +361,13 @@ export function Collection({ db }: { db: Db })
                                 </div>
                             )}
                         </div>
-                        <div className="sky-filters" role="group" aria-label="Filter by element or Giants">
+                        <div
+                            className="sky-filters"
+                            role="group"
+                            aria-label="Filter by element or Giants"
+                            // How many chips share the line, All included, see skylanders.css.
+                            style={{ '--chips': counts.length + 1 } as CSSProperties}
+                        >
                             <button
                                 type="button"
                                 className="sky-chip"

@@ -1,11 +1,26 @@
-import { faMinus, faPlus, faStar, faXmark } from '@fortawesome/free-solid-svg-icons';
+import {
+    faMinus,
+    faPlus,
+    faQuoteLeft,
+    faStar,
+    faVolumeHigh,
+    faXmark,
+} from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useCallback, type CSSProperties, type MouseEvent, type PointerEvent } from 'react';
+import {
+    useCallback,
+    useEffect,
+    useState,
+    type CSSProperties,
+    type MouseEvent,
+    type PointerEvent,
+} from 'react';
 
 import type { Skylander } from '../types';
 
 import { elementFor, giant } from '../content/elements';
 import { normalFor, ownedVariants, plainCount } from '../content/variants';
+import { playVoice, stopVoice, watchVoice } from '../services/voice';
 
 import { PortraitCarousel, type Slide } from './PortraitCarousel';
 
@@ -95,6 +110,53 @@ function straightenCard(event: MouseEvent<HTMLButtonElement>)
 
 }
 
+interface VoiceButtonProps
+{
+    name: string;
+    voice: string;
+    catchphrase: string;
+}
+
+/** Says the figure's catchphrase, and stops it when pressed while talking. */
+function VoiceButton({ name, voice, catchphrase }: VoiceButtonProps)
+{
+    const [playing, setPlaying] = useState(false);
+
+    useEffect(() => watchVoice((current) => setPlaying(current === voice)), [voice]);
+
+    const toggle = useCallback(() =>
+    {
+        if (playing)
+            stopVoice();
+        else
+            playVoice(voice);
+
+    }, [playing, voice]);
+
+    const label = catchphrase ? `${name} says "${catchphrase}"` : `Hear ${name}`;
+
+    return (
+        <button
+            type="button"
+            // The label is the styled .sky-tip from skylanders.css, to the left over the card.
+            className={`sky-card__voice sky-tip sky-tip--left${playing ? ' sky-card__voice--playing' : ''}`}
+            onClick={toggle}
+            aria-label={playing ? 'Stop' : label}
+            aria-pressed={playing}
+            data-tip={catchphrase ? `"${catchphrase}"` : `Hear ${name}`}
+        >
+            <FontAwesomeIcon icon={faVolumeHigh} />
+            {/* Rings sent out while it talks. Elements, since ::after holds the label. */}
+            {playing && (
+                <>
+                    <span className="sky-card__voice-ring" aria-hidden="true" />
+                    <span className="sky-card__voice-ring" aria-hidden="true" />
+                </>
+            )}
+        </button>
+    );
+}
+
 export function SkylanderCard({
     item,
     index,
@@ -181,6 +243,26 @@ export function SkylanderCard({
             >
                 <FontAwesomeIcon icon={faStar} />
             </button>
+            {/* Below the remove and versions buttons: a speaker on figures the wiki has a
+                recording of, otherwise a quote that shows the catchphrase on hover. */}
+            {item.voice ? (
+                <VoiceButton
+                    name={item.name}
+                    voice={item.voice}
+                    catchphrase={item.catchphrase ?? ''}
+                />
+            ) : (
+                item.catchphrase && (
+                    <span
+                        className="sky-card__voice sky-card__voice--quote sky-tip sky-tip--left"
+                        data-tip={`"${item.catchphrase}"`}
+                        role="img"
+                        aria-label={`${item.name} says "${item.catchphrase}"`}
+                    >
+                        <FontAwesomeIcon icon={faQuoteLeft} />
+                    </span>
+                )
+            )}
 
             <div className="sky-card__portrait">
                 {slides.length > 1 ? (

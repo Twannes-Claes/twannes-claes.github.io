@@ -193,7 +193,32 @@ function infoboxFiles(wikitext: string): Map<Look, string>
     return files;
 }
 
-/** Picture links for wiki file names, keyed by the name they were asked for. */
+/**
+ * The catchphrase in the quote at the top of a figure's page, and the recording of it that some
+ * pages add inside the quote: {{Quote|All Fired Up!|Spyro's official catchphrase<br>[[File:Spyro
+ * Catchphrase.mp3]]}}.
+ */
+function catchphraseOf(wikitext: string): { line: string; file: string }
+{
+    const quote = /\{\{\s*quote\s*\|([^|}]*)\|([^\n]*?)\}\}/i.exec(wikitext);
+
+    if (!quote)
+        return { line: '', file: '' };
+
+    // Drops wiki markup: ''italics'', '''bold''' and [[links|with labels]].
+    const line = quote[1]
+        .replace(/'{2,}/g, '')
+        .replace(/\[\[(?:[^|\]]*\|)?([^\]]*)\]\]/g, '$1')
+        .trim();
+    const file = /\[\[(?:File|Media):([^|\]]+\.(?:mp3|ogg|oga|wav))/i.exec(quote[2])?.[1] ?? '';
+
+    return { line, file: file.trim() };
+}
+
+/**
+ * Links for wiki file names, keyed by the name they were asked for: a picture at the size of the
+ * version pictures, or a recording as it is.
+ */
 async function fileThumbs(files: string[]): Promise<Map<string, string>>
 {
     if (files.length === 0)
@@ -208,7 +233,10 @@ async function fileThumbs(files: string[]): Promise<Map<string, string>>
     })) as {
         query: {
             normalized?: { from: string; to: string }[];
-            pages: Record<string, { title: string; imageinfo?: { thumburl?: string }[] }>;
+            pages: Record<
+                string,
+                { title: string; imageinfo?: { thumburl?: string; url?: string }[] }
+            >;
         };
     };
     // The wiki answers with its own spelling of a name, spaces for underscores and a capital first.
@@ -217,7 +245,8 @@ async function fileThumbs(files: string[]): Promise<Map<string, string>>
 
     for (const page of Object.values(data.query.pages))
     {
-        const thumb = page.imageinfo?.[0]?.thumburl;
+        // Recordings have no thumbnail, only their own link.
+        const thumb = page.imageinfo?.[0]?.thumburl ?? page.imageinfo?.[0]?.url;
 
         if (thumb)
             thumbs.set((spelled.get(page.title) ?? page.title).replace(/^File:/, ''), thumb);
@@ -227,15 +256,17 @@ async function fileThumbs(files: string[]): Promise<Map<string, string>>
     return thumbs;
 }
 
-/** A picture of each version of a figure: the infobox tabs, and the repaint pages. */
-async function looksOf(
-    wikitext: string,
+/**
+ * A picture of each version of a figure: the infobox tabs, with their links from fileThumbs(),
+ * and the repaint pages.
+ */
+function looksOf(
+    files: Map<Look, string>,
+    thumbs: Map<string, string>,
     portrait: string,
     repaints: { id: VariantId; thumb: string }[],
-): Promise<Looks>
+): Looks
 {
-    const files = infoboxFiles(wikitext);
-    const thumbs = await fileThumbs([...files.values()]);
     const looks: Looks = {};
 
     for (const [look, file] of files)
@@ -291,13 +322,22 @@ export async function lookup(name: string): Promise<SkylanderDetails>
             url: '',
             versions: [],
             looks: {},
+            catchphrase: '',
+            voice: '',
         };
     }
 
     const categories = new Set((page.categories ?? []).map((category) => category.title));
     const image = page.thumbnail?.source ?? '';
-    const repaints = await repaintsOf(page.title);
-    const looks = await looksOf(page.revisions?.[0]?.slots.main['*'] ?? '', image, repaints);
+    const wikitext = page.revisions?.[0]?.slots.main['*'] ?? '';
+    const pictures = infoboxFiles(wikitext);
+    const catchphrase = catchphraseOf(wikitext);
+    // The version pictures and the recording in one request.
+    const [repaints, links] = await Promise.all([
+        repaintsOf(page.title),
+        fileThumbs([...pictures.values(), catchphrase.file].filter(Boolean)),
+    ]);
+    const looks = looksOf(pictures, links, image, repaints);
     const found = new Set([
         ...categoryVersions
             .filter(({ category }) => categories.has(category))
@@ -321,5 +361,7 @@ export async function lookup(name: string): Promise<SkylanderDetails>
         // In the order of content/variants.ts, so the dialog lists them the same way every time.
         versions: variants.map(({ id }) => id).filter((id) => found.has(id)),
         looks,
+        catchphrase: catchphrase.line,
+        voice: links.get(catchphrase.file) ?? '',
     };
 }

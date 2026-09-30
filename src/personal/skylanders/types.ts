@@ -38,6 +38,14 @@ export interface Skylander
      * until Collection.tsx looks them up again.
      */
     looks?: Looks;
+    /**
+     * The figure's official catchphrase from the wiki, like "All Fired Up!", empty when the page
+     * has none. Missing on figures saved before it was tracked, until Collection.tsx looks them up
+     * again.
+     */
+    catchphrase?: string;
+    /** A recording of the catchphrase, which only some wiki pages have, empty otherwise. */
+    voice?: string;
 }
 
 /** What a wiki lookup knows about a figure, before it is stored. */
