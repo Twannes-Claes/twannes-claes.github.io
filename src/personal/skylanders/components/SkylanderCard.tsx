@@ -5,7 +5,9 @@ import { useCallback, type CSSProperties, type MouseEvent, type PointerEvent } f
 import type { Skylander } from '../types';
 
 import { elementFor, giant } from '../content/elements';
-import { ownedVariants } from '../content/variants';
+import { normalFor, ownedVariants, plainCount } from '../content/variants';
+
+import { PortraitCarousel, type Slide } from './PortraitCarousel';
 
 interface SkylanderCardProps
 {
@@ -132,6 +134,16 @@ export function SkylanderCard({
     );
     const element = elementFor(item.element);
     const special = ownedVariants(item.variants);
+    // A picture of each version owned, for the carousel. Versions the wiki has no picture of are
+    // left out rather than shown as the plain one.
+    const slides: Slide[] = [
+        ...(plainCount(item.count, item.variants) > 0
+            ? [{ ...normalFor(item.versions), src: item.looks?.normal ?? item.image }]
+            : []),
+        ...special.map((variant) => ({ ...variant, src: item.looks?.[variant.id] ?? '' })),
+    ].filter((slide) => slide.src);
+    // One version, like a figure owned only as a Legendary, shows that picture on its own.
+    const portrait = slides[0]?.src ?? item.image;
     const style = {
         '--el': element.color,
         '--i': index,
@@ -171,9 +183,11 @@ export function SkylanderCard({
             </button>
 
             <div className="sky-card__portrait">
-                {item.image ? (
+                {slides.length > 1 ? (
+                    <PortraitCarousel slides={slides} figure={item.name} index={index} />
+                ) : portrait ? (
                     <img
-                        src={item.image}
+                        src={portrait}
                         alt={item.name}
                         loading="lazy"
                         referrerPolicy="no-referrer"
@@ -198,7 +212,7 @@ export function SkylanderCard({
                     <span className="sky-card__name">{item.name}</span>
                 )}
                 {item.game && <span className="sky-card__game">{item.game}</span>}
-                {(element.name || item.giant || special.length > 0) && (
+                {(element.name || item.giant) && (
                     <ul className="sky-card__tags" aria-label="Tags">
                         {element.name && (
                             <li
@@ -218,17 +232,6 @@ export function SkylanderCard({
                                 Giant
                             </li>
                         )}
-                        {special.map((variant) => (
-                            <li
-                                key={variant.id}
-                                className="sky-tag"
-                                style={{ '--v': variant.color } as CSSProperties}
-                            >
-                                {variant.short}
-                                {(item.variants[variant.id] ?? 0) > 1 &&
-                                    ` ×${item.variants[variant.id]}`}
-                            </li>
-                        ))}
                     </ul>
                 )}
 

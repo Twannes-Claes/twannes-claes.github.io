@@ -11,12 +11,13 @@ import {
 } from 'react';
 import { flushSync } from 'react-dom';
 
-import type { CatalogEntry, Db, Skylander } from '../types';
+import type { CatalogEntry, Db, Skylander, SkylanderDetails } from '../types';
 
 import { elements, giant } from '../content/elements';
-import { ownedVariants, plainCount, type VariantId } from '../content/variants';
+import { ownedVariants, plainCount, variants, type VariantId } from '../content/variants';
 import { fetchCatalog, lookup } from '../services/wiki';
 
+import { ChooseVersion } from './ChooseVersion';
 import { ConfirmRemove } from './ConfirmRemove';
 import { SkylanderGrid } from './SkylanderGrid';
 import { SkylanderSearch } from './SkylanderSearch';
@@ -56,6 +57,8 @@ export function Collection({ db }: { db: Db })
     const [pending, setPending] = useState<Skylander | null>(null);
     /** Id of the Skylander in the versions dialog, looked up in items so its counts stay live. */
     const [versionsOf, setVersionsOf] = useState<string | null>(null);
+    /** A figure being added, shown in ChooseVersion.tsx until it is confirmed or cancelled. */
+    const [choosing, setChoosing] = useState<SkylanderDetails | null>(null);
 
     useEffect(() =>
     {
@@ -100,12 +103,12 @@ export function Collection({ db }: { db: Db })
     useEffect(() =>
     {
         // Figures saved before the lookup matched every game category have none, and ones saved
-        // before versions or Giants were tracked miss those, so they get looked up again once
-        // and patched. Failures are left for the next visit to retry.
+        // before versions, Giants or version pictures were tracked miss those, so they get looked
+        // up again once and patched. Failures are left for the next visit to retry.
         for (const item of items ?? [])
         {
             const complete =
-                item.game && item.element && item.versions && item.giant !== undefined;
+                item.game && item.element && item.versions && item.giant !== undefined && item.looks;
 
             if (complete || !item.url || repaired.current.has(item.id))
                 continue;
@@ -118,6 +121,7 @@ export function Collection({ db }: { db: Db })
                         element: details.element || item.element,
                         versions: details.versions,
                         giant: details.giant,
+                        looks: details.looks,
                     }),
                 )
                 .catch(() => undefined);
@@ -164,6 +168,24 @@ export function Collection({ db }: { db: Db })
         [items, activeFilter],
     );
 
+    /** Stores a looked up figure, as a plain copy or one of a special version. */
+    const save = useCallback(
+        async (details: SkylanderDetails, variant?: VariantId) =>
+        {
+            const count = await db.addSkylander(details, variant);
+            const version = variants.find(({ id }) => id === variant);
+            const name = version ? `${version.name} ${details.name}` : details.name;
+
+            if (count > 1)
+                setMessage(`That makes ${count} of ${details.name}!`);
+            else
+                setMessage(`${name} joined the collection!`);
+
+            setName('');
+        },
+        [db],
+    );
+
     const addByName = useCallback(
         async (input: string) =>
         {
@@ -204,14 +226,8 @@ export function Collection({ db }: { db: Db })
                     return;
                 }
 
-                const count = await db.addSkylander(details);
-
-                if (count > 1)
-                    setMessage(`That makes ${count} of ${details.name}!`);
-                else
-                    setMessage(`${details.name} joined the collection!`);
-
-                setName('');
+                // Shows the figure first, to check the picture and pick a version, see save below.
+                setChoosing(details);
             }
             catch (error)
             {
@@ -222,8 +238,19 @@ export function Collection({ db }: { db: Db })
                 setBusy(false);
             }
         },
-        [busy, catalog, db],
+        [busy, catalog],
     );
+
+    const choose = useCallback(
+        (details: SkylanderDetails, variant?: VariantId) =>
+        {
+            setChoosing(null);
+            save(details, variant).catch((error: Error) => setMessage(error.message));
+        },
+        [save],
+    );
+
+    const cancelChoosing = useCallback(() => setChoosing(null), []);
 
     const submit = useCallback(
         (event: FormEvent) =>
@@ -365,6 +392,7 @@ export function Collection({ db }: { db: Db })
 
             <ConfirmRemove item={pending} onConfirm={confirmRemove} onCancel={cancelRemove} />
             <VariantsDialog item={versionsItem} onChange={changeCount} onClose={closeVersions} />
+            <ChooseVersion details={choosing} onChoose={choose} onCancel={cancelChoosing} />
         </>
     );
 }

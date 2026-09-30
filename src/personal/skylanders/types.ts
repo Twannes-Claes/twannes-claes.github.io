@@ -1,4 +1,4 @@
-import type { VariantCounts, VariantId } from './content/variants';
+import type { Looks, VariantCounts, VariantId } from './content/variants';
 
 /**
  * The Firebase module, typed without importing it, because the page loads it on demand and a
@@ -33,6 +33,11 @@ export interface Skylander
      * before it was tracked, until Collection.tsx looks them up again.
      */
     versions?: VariantId[];
+    /**
+     * A picture of each version, from the wiki. Missing on figures saved before it was tracked,
+     * until Collection.tsx looks them up again.
+     */
+    looks?: Looks;
 }
 
 /** What a wiki lookup knows about a figure, before it is stored. */

@@ -5,7 +5,14 @@ import { useCallback, useEffect, useRef, type CSSProperties, type MouseEvent } f
 import type { Skylander } from '../types';
 
 import { elementFor } from '../content/elements';
-import { offeredVariants, plainCount, type VariantId } from '../content/variants';
+import {
+    normal,
+    normalFor,
+    offeredVariants,
+    plainCount,
+    variantLink,
+    type VariantId,
+} from '../content/variants';
 
 interface VariantsDialogProps
 {
@@ -22,18 +29,46 @@ interface RowProps
     label: string;
     color: string;
     count: number;
+    /** Where this version can be seen, to check which one a figure is. */
+    href: string;
+    /** A picture of this version from the wiki, when it has one. */
+    image?: string;
     variant?: VariantId;
     onChange: VariantsDialogProps['onChange'];
 }
 
-function Row({ item, label, color, count, variant, onChange }: RowProps)
+function Row({ item, label, color, count, href, image, variant, onChange }: RowProps)
 {
     const increase = useCallback(() => onChange(item, 1, variant), [item, variant, onChange]);
     const decrease = useCallback(() => onChange(item, -1, variant), [item, variant, onChange]);
+    const name = (
+        <>
+            {image ? (
+                <span className="sky-variant__thumb">
+                    <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" />
+                </span>
+            ) : (
+                <span className="sky-variant__dot" aria-hidden="true" />
+            )}
+            {label}
+        </>
+    );
 
     return (
         <li className="sky-variant" style={{ '--v': color } as CSSProperties}>
-            <span className="sky-variant__name">{label}</span>
+            {href ? (
+                <a
+                    className="sky-variant__name"
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`See what ${label} ${item.name} looks like`}
+                >
+                    {name}
+                </a>
+            ) : (
+                <span className="sky-variant__name">{name}</span>
+            )}
             <div className="sky-stepper" role="group" aria-label={`${label} copies`}>
                 <button
                     type="button"
@@ -118,9 +153,11 @@ export function VariantsDialog({ item, onChange, onClose }: VariantsDialogProps)
                     <ul className="sky-variants">
                         <Row
                             item={item}
-                            label="Normal"
-                            color="#f5c542"
+                            label={normalFor(item.versions).name}
+                            color={normal.color}
                             count={plainCount(item.count, item.variants)}
+                            href={variantLink(item, normal)}
+                            image={item.looks?.normal ?? item.image}
                             onChange={onChange}
                         />
                         {offeredVariants(item.versions, item.variants).map((variant) => (
@@ -130,6 +167,8 @@ export function VariantsDialog({ item, onChange, onClose }: VariantsDialogProps)
                                 label={variant.name}
                                 color={variant.color}
                                 count={item.variants[variant.id] ?? 0}
+                                href={variantLink(item, variant)}
+                                image={item.looks?.[variant.id]}
                                 variant={variant.id}
                                 onChange={onChange}
                             />

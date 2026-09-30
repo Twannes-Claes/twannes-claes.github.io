@@ -327,6 +327,44 @@
     min-width: 0;
 }
 
+/* Room on the right for the clear button, so text never runs under it. */
+.sky-input--clearable {
+    padding-right: 3.4rem;
+}
+
+/* A small round × inside the right end of the box, shown once something is
+   typed. Centred on the box, which is all of .sky-search's own height. */
+.sky-search__clear {
+    position: absolute;
+    top: 50%;
+    right: 0.85rem;
+    display: grid;
+    place-items: center;
+    width: 30px;
+    aspect-ratio: 1;
+    padding: 0;
+    border: 2px solid color-mix(in srgb, var(--sky-gold-mid) 60%, transparent);
+    border-radius: 50%;
+    background: rgb(255 255 255 / 0.08);
+    color: var(--sky-ink);
+    font-size: 0.85rem;
+    cursor: pointer;
+    translate: 0 -50%;
+    animation: sky-fade 0.2s ease;
+    transition:
+        background-color 0.2s,
+        border-color 0.2s,
+        transform 0.2s var(--sky-ease);
+}
+
+.sky-search__clear:hover,
+.sky-search__clear:focus-visible {
+    border-color: var(--sky-gold-mid);
+    background: rgb(255 214 90 / 0.22);
+    transform: rotate(90deg);
+    outline: none;
+}
+
 /* The frame around the filter row and the list, so only the list scrolls. */
 .sky-search__panel {
     position: absolute;
@@ -490,79 +528,6 @@
     border: 2px solid var(--sky-gold-mid);
     background: radial-gradient(circle at 50% 42%, #fffdf4, #efe0b8);
     box-shadow: 0 2px 0 var(--sky-outline);
-}
-
-/* The thumbnail under the mouse, enlarged and centred on it, see SkylanderSearch.tsx. It lets
-   the mouse through, so the thumbnail below still hears it leave. */
-.sky-search__preview {
-    position: absolute;
-    z-index: 30;
-    width: 94px;
-    aspect-ratio: 1;
-    overflow: hidden;
-    border: 3px solid var(--sky-gold-mid);
-    border-radius: 50%;
-    background: radial-gradient(circle at 50% 42%, #fffdf4, #efe0b8);
-    box-shadow:
-        0 0 0 2px var(--sky-outline),
-        0 12px 28px rgb(0 0 0 / 0.55);
-    translate: -50% -50%;
-    pointer-events: none;
-    animation: sky-preview-pop 0.35s ease-out;
-}
-
-.sky-search__preview img {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: top;
-    mix-blend-mode: multiply;
-}
-
-/* The larger picture fades in over the small one, which then steps aside so the two do not
-   multiply into a darker image. */
-.sky-search__preview-sharp {
-    z-index: 1;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-}
-
-.sky-search__preview-sharp[data-loaded] {
-    opacity: 1;
-}
-
-.sky-search__preview-sharp[data-loaded] + img {
-    opacity: 0;
-    transition: opacity 0s 0.2s;
-}
-
-/* The shrink below played backwards, so opening and closing feel like one motion. */
-@keyframes sky-preview-pop {
-    from {
-        scale: 0.5;
-        opacity: 0;
-    }
-}
-
-/* Shrinks back onto the thumbnail after the mouse leaves, then SkylanderSearch.tsx removes it. */
-.sky-search__preview--leaving {
-    animation: sky-preview-shrink 0.35s ease-in forwards;
-}
-
-@keyframes sky-preview-shrink {
-    to {
-        scale: 0.5;
-        opacity: 0;
-    }
-}
-
-/* A tap picks the row, so phones never get the preview. */
-@media (hover: none) {
-    .sky-search__preview {
-        display: none;
-    }
 }
 
 .sky-search__thumb img {
@@ -972,7 +937,8 @@
 
 .sky-message {
     min-height: 1.5rem;
-    margin: 1rem 0 0;
+    /* Even room above and below, so a message never touches the coins. */
+    margin: 0.875rem 0;
     text-align: center;
     color: var(--sky-gold-hi);
     text-shadow: 0 2px 0 var(--sky-outline);
@@ -1006,12 +972,16 @@
 
 /* --- Stats and filters --------------------------------------------------- */
 
+/* The coins centred over the filter chips, the same as on phones, and midway
+   between the search and the chips. The status line over it already leaves
+   3.25rem, so the gap below the coins matches that and the top has no margin. */
 .sky-stats {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     align-items: center;
-    gap: 1rem 1.5rem;
-    margin-block: 1.75rem 1.5rem;
+    gap: 3.25rem;
+    /* The bottom also makes room for the card medals poking up. */
+    margin-block: 0 1.75rem;
 }
 
 /* The gold coin, joined by the blue one once there are duplicates. */
@@ -1102,6 +1072,7 @@
 .sky-filters {
     display: flex;
     flex-wrap: wrap;
+    justify-content: center;
     gap: 0.55rem;
 }
 
@@ -1315,10 +1286,14 @@
     box-shadow: inset 0 0 22px rgb(60 30 0 / 0.25);
 }
 
+/* Fills the frame edge to edge, cropping a little off a tall or wide picture,
+   rather than leaving bars at its sides. Leans to the top, where the heads
+   are. */
 .sky-card__portrait img {
     width: 100%;
     height: 100%;
-    object-fit: contain;
+    object-fit: cover;
+    object-position: 50% 30%;
     mix-blend-mode: multiply;
     transition: transform 0.45s var(--sky-ease);
 }
@@ -1362,6 +1337,109 @@
     to {
         transform: translateX(var(--glint-to, 100%));
     }
+}
+
+/* --- Version carousel, on figures owned in more than one version --------- */
+
+.sky-carousel {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    /* How long a picture and its label take to fade into the next. */
+    --sky-turn: 0.5s;
+    /* One cell exactly the size of the frame. An auto row would grow to a tall
+       picture's own height and push it out of the frame. */
+    grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+}
+
+/* Stacked in one cell, so the next fades in over the last without a jump. A
+   slow, even crossfade, since the pictures multiply into the portrait and any
+   overlap in timing shows as a darker blend. */
+.sky-carousel__slide {
+    grid-area: 1 / 1;
+    opacity: 0;
+}
+
+/* Scoped to the portrait to outrank its img rule, which would otherwise replace
+   this transition with its own and make the turns instant. */
+.sky-card__portrait .sky-carousel__slide {
+    transition:
+        opacity var(--sky-turn) ease-in-out,
+        transform 0.45s var(--sky-ease);
+}
+
+.sky-carousel__slide[data-active] {
+    opacity: 1;
+}
+
+/* Names the version on show, fading along with its picture. Styled like the tags
+   under the name, with a darker fill to stand out on the light portrait. */
+.sky-carousel__label {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    translate: -50% 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.6rem;
+    border: 2px solid color-mix(in srgb, var(--v) 70%, #000);
+    border-radius: 999px;
+    background: rgb(6 14 48 / 0.85);
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.3);
+    color: var(--sky-ink);
+    font-size: 0.75rem;
+    font-weight: 800;
+    line-height: 1;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--sky-turn) ease-in-out;
+}
+
+.sky-carousel__label[data-active] {
+    opacity: 1;
+}
+
+.sky-carousel__label::before {
+    content: '';
+    width: 7px;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: var(--v);
+}
+
+.sky-carousel__dots {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    display: flex;
+    gap: 5px;
+}
+
+.sky-carousel__dot {
+    width: 11px;
+    aspect-ratio: 1;
+    padding: 0;
+    border: 2px solid var(--sky-outline);
+    border-radius: 50%;
+    background: var(--v);
+    opacity: 0.45;
+    cursor: pointer;
+    transition:
+        opacity 0.2s,
+        transform 0.2s var(--sky-ease);
+}
+
+.sky-carousel__dot:hover,
+.sky-carousel__dot:focus-visible {
+    opacity: 0.85;
+    transform: scale(1.2);
+}
+
+.sky-carousel__dot[aria-pressed='true'] {
+    opacity: 1;
+    transform: scale(1.25);
 }
 
 /* The ×2 badge on figures owned more than once. */
@@ -1789,6 +1867,11 @@ a.sky-card__name:hover {
 
 /* The backdrop does not reliably inherit custom properties, so its colours are
    written out. */
+/* The choose dialog takes focus itself when it opens, see ChooseVersion.tsx. */
+.sky-dialog:focus {
+    outline: none;
+}
+
 .sky-dialog::backdrop {
     background: rgb(4 8 30 / 0.6);
     backdrop-filter: blur(4px);
@@ -1857,6 +1940,99 @@ a.sky-card__name:hover {
     gap: 0.9rem;
 }
 
+/* --- Choose version dialog ---------------------------------------------- */
+
+/* Room for three picture tiles side by side. */
+.sky-dialog--wide {
+    width: min(520px, calc(100vw - 32px));
+}
+
+.sky-choices {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+    gap: 0.7rem;
+    width: 100%;
+    margin: 0 0 1.2rem;
+    padding: 0;
+    list-style: none;
+}
+
+/* One version only: a single larger picture in the middle, to check it is the
+   right figure before adding it. */
+.sky-choices--single {
+    grid-template-columns: min(220px, 100%);
+    justify-content: center;
+}
+
+/* A small card per version, framed in its colour, lifting on hover like the
+   collection cards. */
+.sky-choice {
+    display: grid;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.45rem 0.45rem 0.6rem;
+    border: 2px solid color-mix(in srgb, var(--v) 70%, #000);
+    border-radius: 16px;
+    background: rgb(4 10 38 / 0.45);
+    color: var(--sky-ink);
+    font: inherit;
+    cursor: pointer;
+    transition:
+        transform 0.25s var(--sky-ease),
+        border-color 0.25s,
+        box-shadow 0.25s;
+}
+
+.sky-choice:hover,
+.sky-choice:focus-visible {
+    transform: translateY(-3px);
+    border-color: var(--v);
+    box-shadow:
+        0 6px 14px rgb(0 0 0 / 0.35),
+        0 0 0 2px color-mix(in srgb, var(--v) 35%, transparent);
+    outline: none;
+}
+
+.sky-choice__picture {
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border-radius: 11px;
+    background: radial-gradient(circle at 50% 42%, #fffdf4 0%, #f7edd2 60%, #efdcae 100%);
+}
+
+.sky-choice__picture img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 30%;
+    mix-blend-mode: multiply;
+}
+
+.sky-choice__picture .sky-card__placeholder {
+    font-size: 2.5rem;
+}
+
+.sky-choice__name {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 800;
+    line-height: 1.1;
+}
+
+.sky-choice__name::before {
+    content: '';
+    flex: none;
+    width: 8px;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: var(--v);
+}
+
 /* --- Versions dialog ----------------------------------------------------- */
 
 .sky-variants {
@@ -1874,8 +2050,8 @@ a.sky-card__name:hover {
     align-items: center;
     justify-content: space-between;
     gap: 0.8rem;
-    padding: 0.35rem 0.4rem 0.35rem 0.8rem;
-    border-radius: 999px;
+    padding: 0.4rem 0.4rem 0.4rem 0.45rem;
+    border-radius: 18px;
     background: rgb(4 10 38 / 0.45);
 }
 
@@ -1885,16 +2061,49 @@ a.sky-card__name:hover {
     gap: 0.55rem;
     font-weight: 800;
     text-align: start;
+    color: inherit;
+    text-decoration: none;
 }
 
-.sky-variant__name::before {
-    content: '';
+a.sky-variant__name {
+    transition: color 0.2s;
+}
+
+a.sky-variant__name:hover,
+a.sky-variant__name:focus-visible {
+    color: var(--v);
+}
+
+.sky-variant__dot {
     flex: none;
     width: 12px;
     aspect-ratio: 1;
+    /* Centred in the room a picture takes, so names line up either way. */
+    margin-inline: 20px;
     border: 2px solid var(--sky-outline);
     border-radius: 50%;
     background: var(--v);
+}
+
+/* A small copy of the card portrait, framed in the version's colour. */
+.sky-variant__thumb {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 52px;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border: 2px solid var(--v);
+    border-radius: 12px;
+    background: radial-gradient(circle at 50% 42%, #fffdf4 0%, #f7edd2 60%, #efdcae 100%);
+    box-shadow: 0 0 0 2px var(--sky-outline);
+}
+
+.sky-variant__thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    mix-blend-mode: multiply;
 }
 
 .sky-variant .sky-stepper {
@@ -2096,11 +2305,9 @@ a.sky-card__name:hover {
     /* No wrapping, because a wrapping column sizes itself to its widest child,
        which is the full chip row, and pushed the coins off centre. */
     .sky-stats {
-        flex-direction: column;
         flex-wrap: nowrap;
         align-items: stretch;
-        gap: 1rem;
-        margin-block: 1.25rem 1.25rem;
+        margin-block: 0 1.5rem;
     }
 
     .sky-tally {
@@ -2109,8 +2316,11 @@ a.sky-card__name:hover {
 
     /* One swipeable row instead of four wrapped ones. It runs to the screen
        edges and fades out there, so it reads as scrollable. */
+    /* Starts at the left, because a centred row that overflows cannot be
+       scrolled back to its first chips. */
     .sky-filters {
         flex-wrap: nowrap;
+        justify-content: flex-start;
         margin-inline: -16px;
         padding: 0.4rem 16px 0.6rem;
         overflow-x: auto;

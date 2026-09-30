@@ -86,10 +86,10 @@ export function watchCollection(
 }
 
 /**
- * Adds a figure, or counts one more when it is already in the collection. Resolves to how many
- * of it there are now.
+ * Adds a figure, or counts one more when it is already in the collection, as a plain copy or one
+ * of a special version. Resolves to how many of it there are now.
  */
-export async function addSkylander(item: SkylanderDetails): Promise<number>
+export async function addSkylander(item: SkylanderDetails, variant?: VariantId): Promise<number>
 {
     const ref = doc(skylanders, idFor(item.name));
 
@@ -102,12 +102,20 @@ export async function addSkylander(item: SkylanderDetails): Promise<number>
         {
             const count = ((existing.data().count as number | undefined) ?? 1) + 1;
 
-            transaction.update(ref, { count });
+            transaction.update(
+                ref,
+                variant ? { count, [`variants.${variant}`]: increment(1) } : { count },
+            );
 
             return count;
         }
 
-        transaction.set(ref, { ...item, count: 1, addedAt: serverTimestamp() });
+        transaction.set(ref, {
+            ...item,
+            count: 1,
+            variants: variant ? { [variant]: 1 } : {},
+            addedAt: serverTimestamp(),
+        });
 
         return 1;
     });

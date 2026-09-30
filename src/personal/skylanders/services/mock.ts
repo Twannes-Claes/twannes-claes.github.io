@@ -17,9 +17,9 @@ const samples: [name: string, count: number, variants: VariantCounts][] = [
     ['Spyro', 2, { dark: 1 }],
     ['Chop Chop', 1, {}],
     ['Dino-Rang', 3, { eonsElite: 1 }],
-    ['Trigger Happy', 2, {}],
+    ['Trigger Happy', 2, { series2: 1 }],
     ['Stealth Elf', 1, { legendary: 1 }],
-    ['Eruptor', 1, {}],
+    ['Eruptor', 3, { series2: 1, lightcore: 1 }],
     ['Gill Grunt', 1, {}],
     ['Hex', 1, {}],
     ['Tree Rex', 1, {}],
@@ -111,13 +111,17 @@ export function watchCollection(
     return () => listeners.delete(callback);
 }
 
-export async function addSkylander(item: SkylanderDetails): Promise<number>
+export async function addSkylander(item: SkylanderDetails, variant?: VariantId): Promise<number>
 {
     const id = idFor(item.name);
     const existing = items.get(id);
     const count = (existing?.count ?? 0) + 1;
+    const variants = { ...existing?.variants };
 
-    items.set(id, { ...item, id, count, variants: existing?.variants ?? {} });
+    if (variant)
+        variants[variant] = (variants[variant] ?? 0) + 1;
+
+    items.set(id, { ...item, id, count, variants });
     publish();
 
     return count;

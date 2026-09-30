@@ -4,8 +4,32 @@ export type VariantId =
     | 'lightcore'
     | 'legendary'
     | 'dark'
-    | 'eonsElite'
-    | 'special';
+    | 'eonsElite';
+
+/** A version a figure can look like: the plain one or one of the special versions. */
+export type Look = VariantId | 'normal';
+
+/** A picture of each version the wiki has one for, see services/wiki.ts. */
+export type Looks = Partial<Record<Look, string>>;
+
+/** The plain version, next to the special ones in the dialog and on the card. */
+export const normal: { id: 'normal'; name: string; color: string } = {
+    id: 'normal',
+    name: 'Normal',
+    color: '#f5c542',
+};
+
+/**
+ * The plain version under the name collectors use for it. That is the first release, so on
+ * figures that were released again as Series 2 or 3 it is Series 1, like the wiki's S1 tab.
+ * Figures that never had a series are just Normal.
+ */
+export function normalFor(versions: VariantId[] | undefined): typeof normal
+{
+    const series = versions?.some((id) => id === 'series2' || id === 'series3');
+
+    return series ? { ...normal, name: 'Series 1' } : normal;
+}
 
 /** How many copies of each special version are owned. Plain copies are not listed. */
 export type VariantCounts = Partial<Record<VariantId, number>>;
@@ -14,27 +38,64 @@ export interface Variant
 {
     id: VariantId;
     name: string;
-    /** Shorter label for the tags on a card. */
-    short: string;
     color: string;
+    /**
+     * For repaints the wiki gives a page of their own, the prefix of that page, like "Legendary"
+     * in "Legendary Spyro". The others only differ in small details, so they link to pictures.
+     */
+    page?: string;
 }
 
 /** The special versions collectors tell apart, in the order they are listed everywhere. */
 export const variants: Variant[] = [
-    { id: 'series2', name: 'Series 2', short: 'S2', color: '#c9d2e6' },
-    { id: 'series3', name: 'Series 3', short: 'S3', color: '#8fd6ff' },
-    { id: 'lightcore', name: 'Lightcore', short: 'Lightcore', color: '#ffe45c' },
-    { id: 'legendary', name: 'Legendary', short: 'Legendary', color: '#5b8cff' },
-    { id: 'dark', name: 'Dark', short: 'Dark', color: '#a77bff' },
-    { id: 'eonsElite', name: "Eon's Elite", short: 'Elite', color: '#f5c542' },
-    // Chrome, crystal, glow in the dark, gold and the other limited runs. The wiki has no list of
-    // these, so every figure offers it.
-    { id: 'special', name: 'Special edition', short: 'Special', color: '#ff7ad9' },
+    // Warm coral and bright cyan for the series, next to the gold of Series 1.
+    { id: 'series2', name: 'Series 2', color: '#ff8466' },
+    { id: 'series3', name: 'Series 3', color: '#33d6f0' },
+    // Lightcore figures glow, so an electric lime.
+    { id: 'lightcore', name: 'Lightcore', color: '#c4f24a' },
+    // The repaints after their paint: royal blue Legendaries, violet Darks, and a rich rose
+    // for Eon's Elite, which used to share Series 1's gold.
+    { id: 'legendary', name: 'Legendary', color: '#4d74ff', page: 'Legendary' },
+    { id: 'dark', name: 'Dark', color: '#9d6bff', page: 'Dark' },
+    { id: 'eonsElite', name: "Eon's Elite", color: '#ff5c8a', page: 'Elite' },
 ];
 
 /**
+ * Where a version of a figure can be seen: its own wiki page, the figure's page opened on that
+ * version's picture, or else an image search for the toy.
+ */
+export function variantLink(
+    figure: { name: string; url: string; looks?: Looks },
+    variant: { id: Look; name: string; page?: string },
+): string
+{
+    if (variant.page)
+        return wikiPage(`${variant.page} ${figure.name}`);
+
+    // The file name inside a picture link, like Series_2_Eruptor_Promo.jpg in
+    // .../images/f/f7/Series_2_Eruptor_Promo.jpg/revision/latest/...
+    const file = /\/images\/[^/]+\/[^/]+\/([^/]+)\//.exec(figure.looks?.[variant.id] ?? '')?.[1];
+
+    // ?file= makes Fandom open the page with that picture in its lightbox.
+    if (file && figure.url)
+        return `${figure.url}?file=${file}`;
+
+    const query = new URLSearchParams({
+        q: `Skylanders ${figure.name} ${variant.name} figure`,
+        udm: '2',
+    });
+
+    return `https://www.google.com/search?${query}`;
+}
+
+export function wikiPage(title: string): string
+{
+    return `https://skylanders.fandom.com/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`;
+}
+
+/**
  * The versions a figure's dialog offers: the ones the wiki knows it came in, see services/wiki.ts,
- * plus Special edition, plus any already owned so a count is never hidden. Figures looked up
+ * plus any already owned so a count is never hidden. Figures looked up
  * before versions were tracked have no list yet and get every version until the repair in
  * Collection.tsx fills it in.
  */
@@ -45,7 +106,6 @@ export function offeredVariants(known: VariantId[] | undefined, counts: VariantC
 
     return variants.filter(
         (variant) =>
-            variant.id === 'special' ||
             known.includes(variant.id) ||
             (counts[variant.id] ?? 0) > 0,
     );
