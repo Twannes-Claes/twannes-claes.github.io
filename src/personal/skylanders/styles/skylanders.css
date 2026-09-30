@@ -1187,8 +1187,10 @@
     }
 }
 
+/* Keyboard focus only, not :focus-within, because a closing dialog hands focus back to the
+   button that opened it and would leave the card lifted under a mouse that has moved on. */
 .sky-card:hover,
-.sky-card:focus-within {
+.sky-card:has(:focus-visible) {
     transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(-8px)
         scale(1.02);
     box-shadow:
@@ -1411,7 +1413,7 @@ a.sky-card__name:hover {
 }
 
 .sky-card:hover .sky-card__versions,
-.sky-card:focus-within .sky-card__versions,
+.sky-card:has(:focus-visible) .sky-card__versions,
 .sky-card--special .sky-card__versions {
     opacity: 1;
     transform: scale(1);
@@ -1614,7 +1616,7 @@ a.sky-card__name:hover {
 }
 
 .sky-card:hover .sky-card__remove,
-.sky-card:focus-within .sky-card__remove {
+.sky-card:has(:focus-visible) .sky-card__remove {
     opacity: 1;
     transform: scale(1);
 }

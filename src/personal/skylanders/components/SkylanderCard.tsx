@@ -1,6 +1,6 @@
 import { faMinus, faPlus, faStar, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useCallback, type CSSProperties, type PointerEvent } from 'react';
+import { useCallback, type CSSProperties, type MouseEvent, type PointerEvent } from 'react';
 
 import type { Skylander } from '../types';
 
@@ -69,12 +69,28 @@ function glint(event: PointerEvent<HTMLLIElement>)
     );
 }
 
-function untilt(event: PointerEvent<HTMLLIElement>)
+function straighten(card: HTMLElement)
 {
-    const card = event.currentTarget;
-
     card.style.setProperty('--rx', '0deg');
     card.style.setProperty('--ry', '0deg');
+}
+
+function untilt(event: PointerEvent<HTMLLIElement>)
+{
+    straighten(event.currentTarget);
+}
+
+/**
+ * Straightens the card behind a button that opens a dialog. The modal makes the card inert, so
+ * it never hears the pointer leave and would keep its tilt after the dialog closes.
+ */
+function straightenCard(event: MouseEvent<HTMLButtonElement>)
+{
+    const card = event.currentTarget.closest('li');
+
+    if (card)
+        straighten(card);
+
 }
 
 export function SkylanderCard({
@@ -86,10 +102,34 @@ export function SkylanderCard({
     onVariants,
 }: SkylanderCardProps)
 {
-    const remove = useCallback(() => onRemove(item), [item, onRemove]);
+    const remove = useCallback(
+        (event: MouseEvent<HTMLButtonElement>) =>
+        {
+            straightenCard(event);
+            onRemove(item);
+        },
+        [item, onRemove],
+    );
     const increase = useCallback(() => onChangeCount(item, 1), [item, onChangeCount]);
-    const decrease = useCallback(() => onChangeCount(item, -1), [item, onChangeCount]);
-    const versions = useCallback(() => onVariants(item), [item, onVariants]);
+    const decrease = useCallback(
+        (event: MouseEvent<HTMLButtonElement>) =>
+        {
+            // The last copy goes through the remove dialog, see Collection.tsx.
+            if (item.count === 1)
+                straightenCard(event);
+
+            onChangeCount(item, -1);
+        },
+        [item, onChangeCount],
+    );
+    const versions = useCallback(
+        (event: MouseEvent<HTMLButtonElement>) =>
+        {
+            straightenCard(event);
+            onVariants(item);
+        },
+        [item, onVariants],
+    );
     const element = elementFor(item.element);
     const special = ownedVariants(item.variants);
     const style = {
