@@ -100,6 +100,10 @@ export default function Skylanders()
                         </button>
                     )}
                 </footer>
+
+                {/* One template string, like SiteFooter.tsx, so the built HTML has no
+                    comment between the v and the number. */}
+                <p className="sky-version">{`v${__APP_VERSION__}`}</p>
             </div>
         </div>
     );

@@ -4,7 +4,7 @@ import { useCallback, type CSSProperties, type PointerEvent } from 'react';
 
 import type { Skylander } from '../types';
 
-import { elementFor } from '../content/elements';
+import { elementFor, giant } from '../content/elements';
 import { ownedVariants } from '../content/variants';
 
 interface SkylanderCardProps
@@ -108,7 +108,8 @@ export function SkylanderCard({
             onPointerMove={tilt}
             onPointerLeave={untilt}
         >
-            <span className="sky-medal" title={element.name || 'Unknown element'}>
+            {/* Decoration only, the element tag below names it. */}
+            <span className="sky-medal" aria-hidden="true">
                 <FontAwesomeIcon icon={element.icon} />
             </span>
             <button
@@ -157,8 +158,26 @@ export function SkylanderCard({
                     <span className="sky-card__name">{item.name}</span>
                 )}
                 {item.game && <span className="sky-card__game">{item.game}</span>}
-                {special.length > 0 && (
-                    <ul className="sky-card__tags" aria-label="Special versions">
+                {(element.name || item.giant || special.length > 0) && (
+                    <ul className="sky-card__tags" aria-label="Tags">
+                        {element.name && (
+                            <li
+                                className="sky-tag sky-tag--icon"
+                                style={{ '--v': element.color } as CSSProperties}
+                            >
+                                <FontAwesomeIcon icon={element.icon} />
+                                {element.name}
+                            </li>
+                        )}
+                        {item.giant && (
+                            <li
+                                className="sky-tag sky-tag--icon"
+                                style={{ '--v': giant.color } as CSSProperties}
+                            >
+                                <FontAwesomeIcon icon={giant.icon} />
+                                Giant
+                            </li>
+                        )}
                         {special.map((variant) => (
                             <li
                                 key={variant.id}

@@ -82,6 +82,14 @@ const figureCategories = [
     'Category:Female Senseis',
 ];
 
+/** The eight Giants and their repaints, plus a couple of pages that are not figures. */
+const giantCategory = 'Category:Giants';
+
+function elementOf(categories: Set<string>): string
+{
+    return elements.find(({ name }) => categories.has(`Category:${name} Skylanders`))?.name ?? '';
+}
+
 /**
  * Every figure in Category:Skylanders with a small thumbnail, for the search dropdown. The
  * category holds a few hundred pages, which a single request covers. Dark and Eon's Elite repaints
@@ -100,8 +108,8 @@ export async function fetchCatalog(): Promise<CatalogEntry[]>
             prop: 'pageimages|categories',
             piprop: 'thumbnail',
             pithumbsize: '96',
-            // Only asks about the figure categories, so each page lists at most a couple.
-            clcategories: figureCategories.join('|'),
+            // Only asks about the figure categories and Giants, so each page lists at most a few.
+            clcategories: [...figureCategories, giantCategory].join('|'),
             cllimit: '500',
         }) as Promise<{ query: { pages: Record<string, WikiPage> } }>,
         ...repaintCategories.map(members),
@@ -109,8 +117,19 @@ export async function fetchCatalog(): Promise<CatalogEntry[]>
     const skip = new Set(repaints.flat());
 
     return Object.values(data.query.pages)
-        .filter((page) => page.categories && !skip.has(page.title))
-        .map((page) => ({ name: page.title, thumb: page.thumbnail?.source ?? '' }))
+        .map((page) => ({ page, categories: new Set(page.categories?.map(({ title }) => title)) }))
+        // Giants alone does not make a figure, it also holds pages like "Giant Chest".
+        .filter(
+            ({ page, categories }) =>
+                figureCategories.some((category) => categories.has(category)) &&
+                !skip.has(page.title),
+        )
+        .map(({ page, categories }) => ({
+            name: page.title,
+            thumb: page.thumbnail?.source ?? '',
+            element: elementOf(categories),
+            giant: categories.has(giantCategory),
+        }))
         .sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -146,7 +165,7 @@ export async function lookup(name: string): Promise<SkylanderDetails>
     const page = Object.values(data.query.pages)[0];
 
     if (!page || page.missing !== undefined)
-        return { name, image: '', element: '', game: '', url: '', versions: [] };
+        return { name, image: '', element: '', giant: false, game: '', url: '', versions: [] };
 
     const categories = new Set((page.categories ?? []).map((category) => category.title));
     const repaints = await repaintsOf(page.title);
@@ -160,8 +179,8 @@ export async function lookup(name: string): Promise<SkylanderDetails>
     return {
         name: page.title,
         image: page.thumbnail?.source ?? '',
-        element:
-            elements.find(({ name }) => categories.has(`Category:${name} Skylanders`))?.name ?? '',
+        element: elementOf(categories),
+        giant: categories.has(giantCategory),
         // Every figure is in the plain game category, only some also in the "Characters" one.
         game:
             games.find(

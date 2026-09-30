@@ -4,6 +4,7 @@ import {
     faDroplet,
     faFire,
     faGear,
+    faHandFist,
     faLeaf,
     faMoon,
     faMountain,
@@ -39,6 +40,12 @@ export const elements: Element[] = [
 
 /** For figures the wiki gives no element, gold like the rest of the frame. */
 export const unknownElement: Element = { name: '', color: '#f5c542', icon: faStar };
+
+/**
+ * Giants are a size class, not an element, and still have an element of their own. They get a
+ * tag and a filter chip that look like an element's.
+ */
+export const giant: Element = { name: 'Giants', color: '#5ee0b0', icon: faHandFist };
 
 export function elementFor(name: string): Element
 {

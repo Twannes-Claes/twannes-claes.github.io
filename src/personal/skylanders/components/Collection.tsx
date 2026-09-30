@@ -13,7 +13,7 @@ import { flushSync } from 'react-dom';
 
 import type { CatalogEntry, Db, Skylander } from '../types';
 
-import { elements } from '../content/elements';
+import { elements, giant } from '../content/elements';
 import { ownedVariants, plainCount, type VariantId } from '../content/variants';
 import { fetchCatalog, lookup } from '../services/wiki';
 
@@ -100,11 +100,12 @@ export function Collection({ db }: { db: Db })
     useEffect(() =>
     {
         // Figures saved before the lookup matched every game category have none, and ones saved
-        // before versions were tracked have no list of them, so they get looked up again once
+        // before versions or Giants were tracked miss those, so they get looked up again once
         // and patched. Failures are left for the next visit to retry.
         for (const item of items ?? [])
         {
-            const complete = item.game && item.element && item.versions;
+            const complete =
+                item.game && item.element && item.versions && item.giant !== undefined;
 
             if (complete || !item.url || repaired.current.has(item.id))
                 continue;
@@ -116,6 +117,7 @@ export function Collection({ db }: { db: Db })
                         game: details.game || item.game,
                         element: details.element || item.element,
                         versions: details.versions,
+                        giant: details.giant,
                     }),
                 )
                 .catch(() => undefined);
@@ -128,15 +130,24 @@ export function Collection({ db }: { db: Db })
         [items],
     );
 
-    /** Only the elements someone owns get a chip, with how many of each. */
+    /**
+     * Only the elements someone owns get a chip, with how many of each, and Giants a chip after
+     * them once there is one.
+     */
     const counts = useMemo(() =>
     {
         const tally = new Map<string, number>();
 
         for (const item of items ?? [])
+        {
             tally.set(item.element, (tally.get(item.element) ?? 0) + 1);
 
-        return elements
+            if (item.giant)
+                tally.set(giant.name, (tally.get(giant.name) ?? 0) + 1);
+
+        }
+
+        return [...elements, giant]
             .filter((element) => tally.has(element.name))
             .map((element) => ({ element, count: tally.get(element.name) ?? 0 }));
     }, [items]);
@@ -144,7 +155,12 @@ export function Collection({ db }: { db: Db })
     // A filter whose last figure was just removed falls back to showing everything.
     const activeFilter = counts.some(({ element }) => element.name === filter) ? filter : null;
     const shown = useMemo(
-        () => items?.filter((item) => !activeFilter || item.element === activeFilter) ?? [],
+        () =>
+            items?.filter(
+                (item) =>
+                    !activeFilter ||
+                    (activeFilter === giant.name ? item.giant : item.element === activeFilter),
+            ) ?? [],
         [items, activeFilter],
     );
 
@@ -309,7 +325,7 @@ export function Collection({ db }: { db: Db })
                                 </div>
                             )}
                         </div>
-                        <div className="sky-filters" role="group" aria-label="Filter by element">
+                        <div className="sky-filters" role="group" aria-label="Filter by element or Giants">
                             <button
                                 type="button"
                                 className="sky-chip"

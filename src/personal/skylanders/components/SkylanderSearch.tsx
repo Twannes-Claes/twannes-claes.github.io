@@ -1,22 +1,45 @@
-import { faCheck } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useCallback, useEffect, useId, useMemo, useState, type KeyboardEvent } from 'react';
+import {
+    useCallback,
+    useEffect,
+    useId,
+    useMemo,
+    useState,
+    type CSSProperties,
+    type KeyboardEvent,
+} from 'react';
 
 import type { CatalogEntry } from '../types';
 
+import { elementFor, elements, giant, type Element } from '../content/elements';
+
+/** Short enough that "fi" still means a name, long enough that "fir" can mean Fire. */
+const minTagQuery = 3;
+
+/** Whether the query is the start of the figure's element, or of Giants. */
+function matchesTag(entry: CatalogEntry, needle: string): boolean
+{
+    const tags = entry.giant ? [entry.element, giant.name] : [entry.element];
+
+    return tags.some((tag) => tag && tag.toLowerCase().startsWith(needle));
+}
+
 /**
- * Names starting with the query first, then names containing it anywhere. An empty query shows
- * the whole catalog, so the list can be browsed without knowing a name.
+ * Names starting with the query first, then names containing it anywhere, then figures whose
+ * element or Giants tag starts with it, so "fire" or "giants" lists those. An empty query shows
+ * the whole catalog, so the list can be browsed without knowing a name. `named` counts the name
+ * matches at the front.
  */
-function match(catalog: CatalogEntry[], query: string): CatalogEntry[]
+function match(catalog: CatalogEntry[], query: string): { results: CatalogEntry[]; named: number }
 {
     const needle = query.trim().toLowerCase();
 
     if (!needle)
-        return catalog;
+        return { results: catalog, named: 0 };
 
     const starts: CatalogEntry[] = [];
     const contains: CatalogEntry[] = [];
+    const tagged: CatalogEntry[] = [];
 
     for (const entry of catalog)
     {
@@ -26,9 +49,11 @@ function match(catalog: CatalogEntry[], query: string): CatalogEntry[]
             starts.push(entry);
         else if (index > 0)
             contains.push(entry);
+        else if (needle.length >= minTagQuery && matchesTag(entry, needle))
+            tagged.push(entry);
     }
 
-    return [...starts, ...contains];
+    return { results: [...starts, ...contains, ...tagged], named: starts.length + contains.length };
 }
 
 /** The name with the typed part picked out in gold. */
@@ -66,6 +91,39 @@ interface SkylanderSearchProps
     onPick: (name: string) => void;
 }
 
+interface FilterButtonProps
+{
+    element: Element;
+    pressed: boolean;
+    onToggle: (name: string) => void;
+}
+
+/**
+ * One round icon in the filter row. Skipped by Tab and pressed on mousedown, because moving focus
+ * off the input would close the list before the click lands.
+ */
+function FilterButton({ element, pressed, onToggle }: FilterButtonProps)
+{
+    return (
+        <button
+            type="button"
+            className="sky-search__icon sky-search__filter sky-tip"
+            style={{ '--el': element.color } as CSSProperties}
+            aria-pressed={pressed}
+            aria-label={element.name}
+            data-tip={element.name}
+            tabIndex={-1}
+            onMouseDown={(event) =>
+            {
+                event.preventDefault();
+                onToggle(element.name);
+            }}
+        >
+            <FontAwesomeIcon icon={element.icon} />
+        </button>
+    );
+}
+
 /**
  * A combobox with pictures. It replaces a native datalist, whose dropdown the browser draws
  * itself and cannot be styled or show images.
@@ -75,13 +133,36 @@ export function SkylanderSearch({ value, onChange, catalog, owned, onPick }: Sky
     const listId = useId();
     const [open, setOpen] = useState(false);
     const [active, setActive] = useState(-1);
+    /** The element chosen in the filter row, null for any. */
+    const [elementFilter, setElementFilter] = useState<string | null>(null);
+    const [giantsOnly, setGiantsOnly] = useState(false);
+    const filtering = elementFilter !== null || giantsOnly;
 
-    const results = useMemo(() => match(catalog, value), [catalog, value]);
-    const expanded = open && results.length > 0;
+    /** Only elements the catalog has figures for get a filter. */
+    const filterElements = useMemo(
+        () => elements.filter(({ name }) => catalog.some((entry) => entry.element === name)),
+        [catalog],
+    );
 
-    // What Enter would add: the highlighted row, or the best match once something is typed.
-    // An empty box has no best match, so Enter there does not add the first name alphabetically.
-    const target = active >= 0 ? active : value.trim() && results.length > 0 ? 0 : -1;
+    const { results, named } = useMemo(
+        () =>
+            match(
+                catalog.filter(
+                    (entry) =>
+                        (!elementFilter || entry.element === elementFilter) &&
+                        (!giantsOnly || entry.giant),
+                ),
+                value,
+            ),
+        [catalog, value, elementFilter, giantsOnly],
+    );
+    // Stays open on a filter with no matches, so it can be switched off again.
+    const expanded = open && (results.length > 0 || filtering);
+
+    // What Enter would add: the highlighted row, or the best name match once something is typed.
+    // An empty box has no best match, so Enter there does not add the first name alphabetically,
+    // and neither does typing "fire", which only matched the element.
+    const target = active >= 0 ? active : named > 0 ? 0 : -1;
 
     // Keeps the keyboard highlight in view while arrowing through the long list.
     useEffect(() =>
@@ -104,7 +185,7 @@ export function SkylanderSearch({ value, onChange, catalog, owned, onPick }: Sky
     const onKeyDown = useCallback(
         (event: KeyboardEvent<HTMLInputElement>) =>
         {
-            if (event.key === 'ArrowDown' || event.key === 'ArrowUp')
+            if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && results.length > 0)
             {
                 event.preventDefault();
                 setOpen(true);
@@ -128,6 +209,18 @@ export function SkylanderSearch({ value, onChange, catalog, owned, onPick }: Sky
         [pick, results, target],
     );
 
+    const toggleElement = useCallback((name: string) =>
+    {
+        setElementFilter((current) => (current === name ? null : name));
+        setActive(-1);
+    }, []);
+
+    const toggleGiants = useCallback(() =>
+    {
+        setGiantsOnly((current) => !current);
+        setActive(-1);
+    }, []);
+
     return (
         <div className="sky-search">
             <input
@@ -140,7 +233,7 @@ export function SkylanderSearch({ value, onChange, catalog, owned, onPick }: Sky
                 aria-activedescendant={expanded && target >= 0 ? `${listId}-${target}` : undefined}
                 autoComplete="off"
                 spellCheck={false}
-                placeholder="Add a Skylander, like Spyro"
+                placeholder="Add a Skylander, or search Fire, Giants..."
                 value={value}
                 onChange={(event) =>
                 {
@@ -156,50 +249,100 @@ export function SkylanderSearch({ value, onChange, catalog, owned, onPick }: Sky
             />
 
             {expanded && (
-                <ul className="sky-search__list" id={listId} role="listbox">
-                    {results.map((entry, index) =>
-                    {
-                        const copies = owned.get(entry.name) ?? 0;
+                <div className="sky-search__panel">
+                    <div
+                        className="sky-search__filters"
+                        role="group"
+                        aria-label="Filter suggestions by element or Giants"
+                    >
+                        {filterElements.map((element) => (
+                            <FilterButton
+                                key={element.name}
+                                element={element}
+                                pressed={elementFilter === element.name}
+                                onToggle={toggleElement}
+                            />
+                        ))}
+                        <FilterButton
+                            element={giant}
+                            pressed={giantsOnly}
+                            onToggle={toggleGiants}
+                        />
+                    </div>
 
-                        return (
-                            <li
-                                key={entry.name}
-                                id={`${listId}-${index}`}
-                                role="option"
-                                aria-selected={index === target}
-                                className={`sky-search__option${copies > 0 ? ' sky-search__option--owned' : ''}`}
-                                // mousedown rather than click, because click fires after the input
-                                // blurs and the list is already gone by then.
-                                onMouseDown={(event) =>
-                                {
-                                    event.preventDefault();
-                                    pick(entry.name);
-                                }}
-                                onMouseEnter={() => setActive(index)}
-                            >
-                                <span className="sky-search__thumb">
-                                    {entry.thumb && (
-                                        <img
-                                            src={entry.thumb}
-                                            alt=""
-                                            loading="lazy"
-                                            referrerPolicy="no-referrer"
-                                        />
-                                    )}
-                                </span>
-                                <span className="sky-search__name">
-                                    <Highlight name={entry.name} query={value} />
-                                </span>
-                                {copies > 0 && (
-                                    <span className="sky-search__owned">
-                                        <FontAwesomeIcon icon={faCheck} />
-                                        {copies > 1 ? `Owned ×${copies}` : 'Owned'}
+                    {results.length === 0 && (
+                        <p className="sky-search__none">No Skylanders match these filters.</p>
+                    )}
+
+                    <ul className="sky-search__list" id={listId} role="listbox">
+                        {results.map((entry, index) =>
+                        {
+                            const copies = owned.get(entry.name) ?? 0;
+                            const element = elementFor(entry.element);
+
+                            return (
+                                <li
+                                    key={entry.name}
+                                    id={`${listId}-${index}`}
+                                    role="option"
+                                    aria-selected={index === target}
+                                    className={`sky-search__option${copies > 0 ? ' sky-search__option--owned' : ''}`}
+                                    // mousedown rather than click, because click fires after the input
+                                    // blurs and the list is already gone by then.
+                                    onMouseDown={(event) =>
+                                    {
+                                        event.preventDefault();
+                                        pick(entry.name);
+                                    }}
+                                    onMouseEnter={() => setActive(index)}
+                                >
+                                    <span className="sky-search__thumb">
+                                        {entry.thumb && (
+                                            <img
+                                                src={entry.thumb}
+                                                alt=""
+                                                loading="lazy"
+                                                referrerPolicy="no-referrer"
+                                            />
+                                        )}
                                     </span>
-                                )}
-                            </li>
-                        );
-                    })}
-                </ul>
+                                    <span className="sky-search__name">
+                                        <Highlight name={entry.name} query={value} />
+                                    </span>
+                                    {/* Shows why a search for an element or Giants listed it. */}
+                                    <span className="sky-search__tags">
+                                        {entry.element && (
+                                            <span
+                                                className="sky-search__icon sky-tip sky-tip--left"
+                                                style={{ '--el': element.color } as CSSProperties}
+                                                data-tip={element.name}
+                                            >
+                                                <FontAwesomeIcon icon={element.icon} />
+                                            </span>
+                                        )}
+                                        {entry.giant && (
+                                            <span
+                                                className="sky-search__icon sky-tip sky-tip--left"
+                                                style={{ '--el': giant.color } as CSSProperties}
+                                                data-tip="Giant"
+                                            >
+                                                <FontAwesomeIcon icon={giant.icon} />
+                                            </span>
+                                        )}
+                                    </span>
+                                    {copies > 0 && (
+                                        <span
+                                            className="sky-search__owned"
+                                            aria-label={`Owned ×${copies}`}
+                                        >
+                                            {`×${copies}`}
+                                        </span>
+                                    )}
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </div>
             )}
         </div>
     );

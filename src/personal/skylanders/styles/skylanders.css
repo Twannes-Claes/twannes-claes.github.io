@@ -286,6 +286,8 @@
 .sky-input {
     width: 100%;
     min-width: 0;
+    /* Ends a placeholder too long for a phone in "..." rather than mid-word. */
+    text-overflow: ellipsis;
     padding: 0.8rem 1.1rem;
     border: 3px solid var(--sky-gold-mid);
     border-radius: 14px;
@@ -325,19 +327,14 @@
     min-width: 0;
 }
 
-.sky-search__list {
+/* The frame around the filter row and the list, so only the list scrolls. */
+.sky-search__panel {
     position: absolute;
     top: calc(100% + 10px);
     left: 0;
     right: 0;
     z-index: 20;
-    display: grid;
-    gap: 2px;
-    max-height: min(430px, 60vh);
-    margin: 0;
-    padding: 8px;
-    overflow-y: auto;
-    list-style: none;
+    overflow: hidden;
     border: 3px solid transparent;
     border-radius: 16px;
     background:
@@ -349,6 +346,72 @@
         0 18px 40px rgb(0 0 0 / 0.55);
     transform-origin: top center;
     animation: sky-drop 0.22s var(--sky-ease);
+}
+
+.sky-search__filters {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.4rem;
+    /* Keeps the spread off the edges, so the row reads as one group in the middle. */
+    padding: 16px clamp(12px, 7%, 72px);
+    border-bottom: 2px solid rgb(255 214 90 / 0.25);
+    /* Lifts the hover labels over the list that follows. */
+    position: relative;
+    z-index: 1;
+}
+
+/* Big circles spread over the middle of the row. They shrink rather than wrap on narrow screens,
+   and aspect-ratio keeps them round. Scoped to the row to beat .sky-search__icon further down. */
+.sky-search__filters .sky-search__filter {
+    flex: 0 1 38px;
+    min-width: 0;
+    width: auto;
+    height: auto;
+    padding: 0;
+    font: inherit;
+    font-size: 1rem;
+    cursor: pointer;
+    transition:
+        background-color 0.2s ease,
+        color 0.2s ease,
+        transform 0.2s var(--sky-ease),
+        box-shadow 0.2s ease;
+}
+
+.sky-search__filter:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--el) 60%, transparent);
+}
+
+/* Lit up like a pressed element chip. */
+.sky-search__filter[aria-pressed='true'] {
+    background: var(--el);
+    color: var(--sky-outline);
+    box-shadow:
+        0 2px 0 var(--sky-outline),
+        0 0 14px color-mix(in srgb, var(--el) 70%, transparent);
+}
+
+.sky-search__none {
+    margin: 0;
+    padding: 1rem;
+    color: var(--sky-muted);
+    font-weight: 700;
+    text-align: center;
+}
+
+.sky-search__list {
+    display: grid;
+    gap: 2px;
+    max-height: min(430px, 60vh);
+    margin: 0;
+    padding: 8px;
+    overflow-y: auto;
+    list-style: none;
+}
+
+.sky-search__list:empty {
+    display: none;
 }
 
 /* Its own scrollbar: the portfolio one in index.css borders the thumb in the
@@ -431,13 +494,91 @@
     color: var(--sky-gold);
 }
 
-/* Already in the collection: a green tick badge pushed to the right edge. */
+/* The element and Giant tag, pushed to the right edge, before the owned badge. */
+.sky-search__tags {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 0.4rem;
+    margin-inline-start: auto;
+}
+
+.sky-search__icon {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    aspect-ratio: 1;
+    border: 2px solid color-mix(in srgb, var(--el) 70%, #000);
+    border-radius: 50%;
+    background: rgb(6 14 48 / 0.55);
+    color: var(--el);
+    font-size: 0.75rem;
+}
+
+/* A hover label in the page's style instead of the browser's plain title box, bordered in the
+   element's colour. Below the icon by default, since the panel clips anything above the row. */
+.sky-tip {
+    position: relative;
+}
+
+.sky-tip::after {
+    content: attr(data-tip);
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    z-index: 2;
+    padding: 0.35rem 0.6rem;
+    /* A small copy of the element chips (.sky-chip), with an opaque fill to cover the list. */
+    border: 2px solid color-mix(in srgb, var(--el, var(--sky-gold)) 70%, #000);
+    border-radius: 999px;
+    background: #0a1440;
+    color: var(--sky-ink);
+    font-size: 0.75rem;
+    font-weight: 800;
+    line-height: 1;
+    /* The font sits its letters high in the line, so the box is trimmed to capital height and
+       baseline and the padding centres the letters themselves. */
+    text-box: trim-both cap alphabetic;
+    white-space: nowrap;
+    box-shadow: 0 3px 0 var(--sky-outline);
+    opacity: 0;
+    translate: -50% -4px;
+    pointer-events: none;
+    transition:
+        opacity 0.15s ease,
+        translate 0.15s var(--sky-ease);
+}
+
+.sky-tip:hover::after {
+    opacity: 1;
+    translate: -50% 0;
+}
+
+/* A tap leaves :hover stuck on touch screens, so the label would stay over the next row. */
+@media (hover: none) {
+    .sky-tip::after {
+        display: none;
+    }
+}
+
+/* The row icons sit at the list's right edge, which would clip a label below or beside them. */
+.sky-tip--left::after {
+    top: 50%;
+    left: auto;
+    right: calc(100% + 8px);
+    translate: 4px -50%;
+}
+
+.sky-tip--left:hover::after {
+    translate: 0 -50%;
+}
+
+/* Already in the collection: a green badge with how many, at the right edge. */
 .sky-search__owned {
     display: inline-flex;
     flex: none;
     align-items: center;
     gap: 0.35rem;
-    margin-inline-start: auto;
     padding: 0.3rem 0.6rem;
     border: 2px solid var(--sky-outline);
     border-radius: 999px;
@@ -1211,16 +1352,17 @@ a.sky-card__name:hover {
     list-style: none;
 }
 
-/* A small pill with a dot in the version's colour. */
+/* A small copy of the element chips (.sky-chip), with a dot or icon in the tag's colour. */
 .sky-tag {
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
-    padding: 0.2rem 0.5rem;
-    border: 1.5px solid var(--v);
+    gap: 0.35rem;
+    padding: 0.3rem 0.6rem;
+    border: 2px solid color-mix(in srgb, var(--v) 70%, #000);
     border-radius: 999px;
-    background: rgb(4 10 38 / 0.55);
-    font-size: 0.7rem;
+    background: rgb(6 14 48 / 0.55);
+    color: var(--sky-ink);
+    font-size: 0.75rem;
     font-weight: 800;
     line-height: 1;
     white-space: nowrap;
@@ -1232,6 +1374,15 @@ a.sky-card__name:hover {
     aspect-ratio: 1;
     border-radius: 50%;
     background: var(--v);
+}
+
+/* Element and Giant are who the figure is rather than a version, so an icon replaces the dot. */
+.sky-tag--icon::before {
+    content: none;
+}
+
+.sky-tag--icon svg {
+    color: var(--v);
 }
 
 /* Opens the versions dialog. Sits under the remove button and shows on hover
@@ -1737,6 +1888,17 @@ a.sky-card__name:hover {
     text-underline-offset: 3px;
 }
 
+/* The released version, faint under the pill, so a deploy can be confirmed here too. */
+.sky-version {
+    margin: 0.9rem 0 0;
+    color: var(--sky-muted);
+    font-family: ui-monospace, monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    text-align: center;
+    opacity: 0.5;
+}
+
 /* A small version of the chunky buttons, sized to sit inside the footer pill. */
 .sky-logout {
     display: inline-flex;
@@ -1788,6 +1950,56 @@ a.sky-card__name:hover {
     /* The keyboard takes half the screen, so the list stays above it. */
     .sky-search__list {
         max-height: min(430px, 45dvh);
+    }
+
+    /* The circles squash into ovals on one narrow row, so they wrap into centred rows of six.
+       Each takes at most a sixth of the row, so the narrowest phones shrink them instead of
+       leaving one alone on a third row. */
+    .sky-search__filters {
+        --filter-gap: 0.5rem;
+
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: var(--filter-gap);
+        padding: 12px;
+    }
+
+    .sky-search__filters .sky-search__filter {
+        flex: 0 0 min(36px, (100% - 5 * var(--filter-gap)) / 6);
+        font-size: 0.9rem;
+    }
+
+    /* A long name wraps rather than pushing the icons and badge out of the list. */
+    .sky-search__list {
+        overflow-x: hidden;
+    }
+
+    .sky-search__option {
+        gap: 0.6rem;
+    }
+
+    .sky-search__thumb {
+        width: 40px;
+    }
+
+    .sky-search__name {
+        flex: 1 1 auto;
+        min-width: 0;
+        font-size: 0.95rem;
+        overflow-wrap: anywhere;
+    }
+
+    .sky-search__tags {
+        gap: 0.25rem;
+    }
+
+    .sky-search__tags .sky-search__icon {
+        width: 22px;
+        font-size: 0.65rem;
+    }
+
+    .sky-search__owned {
+        padding: 0.3rem 0.45rem;
     }
 
     /* No wrapping, because a wrapping column sizes itself to its widest child,

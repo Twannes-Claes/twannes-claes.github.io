@@ -15,6 +15,11 @@ export interface Skylander
     image: string;
     /** Magic, Tech, Water and so on, empty when the wiki page does not say. */
     element: string;
+    /**
+     * One of the big Giants figures, from the wiki. Missing on figures saved before it was
+     * tracked, until Collection.tsx looks them up again.
+     */
+    giant?: boolean;
     /** The game the figure first appeared in. */
     game: string;
     /** Wiki page, empty when the name did not match one. */
@@ -39,4 +44,7 @@ export interface CatalogEntry
     name: string;
     /** Small wiki thumbnail, empty for the few pages without one. */
     thumb: string;
+    /** Empty when the wiki page does not say, like on Kaos. */
+    element: string;
+    giant: boolean;
 }
