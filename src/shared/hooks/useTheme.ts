@@ -31,25 +31,25 @@ function readServerTheme(): Theme
     return 'light';
 }
 
+function setTheme(next: Theme)
+{
+    document.documentElement.setAttribute('data-theme', next);
+
+    try
+    {
+        localStorage.setItem('theme', next);
+    }
+    catch
+    {
+        // Blocked storage. The theme still applies to this page.
+    }
+}
+
 export function useTheme()
 {
     const theme = useSyncExternalStore(subscribe, readTheme, readServerTheme);
 
-    const toggleTheme = useCallback(() =>
-    {
-        const next = readTheme() === 'light' ? 'dark' : 'light';
+    const toggleTheme = useCallback(() => setTheme(readTheme() === 'light' ? 'dark' : 'light'), []);
 
-        document.documentElement.setAttribute('data-theme', next);
-
-        try
-        {
-            localStorage.setItem('theme', next);
-        }
-        catch
-        {
-            // Blocked storage. The theme still applies to this page.
-        }
-    }, []);
-
-    return { theme, toggleTheme };
+    return { theme, toggleTheme, setTheme };
 }

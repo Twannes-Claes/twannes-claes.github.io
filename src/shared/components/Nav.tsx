@@ -39,7 +39,9 @@ export function Nav({ back = false }: NavProps)
     );
 
     return (
-        <nav className="container-page sticky top-0 z-2 bg-bg transition-colors duration-300">
+        // The background is the page colour index.css fades, so it is left out of the transition
+        // here, which would only lag behind it.
+        <nav className="container-page sticky top-0 z-2 bg-(--page-bg) transition-[color,border-color] duration-300 ease-[ease]">
             <div className="flex flex-wrap items-center gap-4 border-b border-fg">
                 {back && (
                     <TiltButton className="button--back" magnitude={12}>

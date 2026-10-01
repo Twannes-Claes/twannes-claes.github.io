@@ -1,0 +1,111 @@
+/* ---------------------------------------------------------------------------
+   Secret entrance
+
+   Flipping the theme five times in two seconds opens the way to the Skylanders
+   page, see useSecretEntrance.ts and secretPortal.ts. Loaded with the theme
+   toggle on every portfolio page, so everything is scoped to its own classes.
+--------------------------------------------------------------------------- */
+
+/* Wobbles and swells around its own middle, harder with every quick flip,
+   --strain being 1 to 3. On the icon, so the turn is around its centre. */
+.theme-toggle[data-strain] {
+    color: var(--c-accent);
+    filter: drop-shadow(0 0 calc(var(--strain) * 3px) var(--c-accent));
+}
+
+.theme-toggle[data-strain] svg {
+    animation: theme-strain 0.16s ease-in-out infinite alternate;
+}
+
+@keyframes theme-strain {
+    from {
+        rotate: calc(var(--strain) * -10deg);
+    }
+    to {
+        rotate: calc(var(--strain) * 10deg);
+        scale: calc(1 + var(--strain) * 0.08);
+    }
+}
+
+/* A short rumble before the portal opens. No fill mode, because a translate
+   left on #root would pin the Skylanders sky, a fixed element, to the page
+   instead of the screen. */
+.overloading #root {
+    animation: overload 0.45s ease-in-out;
+}
+
+/* Movement only. A filter here would light up the nav but not the page
+   background, which the body paints outside #root, and show as a band. */
+@keyframes overload {
+    0%,
+    100% {
+        translate: 0 0;
+    }
+    20% {
+        translate: -3px 1px;
+    }
+    40% {
+        translate: 3px -1px;
+    }
+    60% {
+        translate: -2px -1px;
+    }
+    80% {
+        translate: 2px 1px;
+    }
+}
+
+/* The inside of the portal, a circle cut out of a sheet over the page, glowing
+   portal blue in the middle and Skylands navy towards the edge. */
+.secret-portal {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: radial-gradient(circle, #5fd0ff 0, #1b6fd6 8vmax, #0a1e5c 30vmax, #060d2e 60vmax);
+    clip-path: circle(0 at 50% 50%);
+    animation: secret-portal-open 1.1s cubic-bezier(0.45, 0, 0.15, 1) 0.25s forwards;
+}
+
+@keyframes secret-portal-open {
+    to {
+        clip-path: circle(75vmax at 50% 50%);
+    }
+}
+
+/* The glowing gold rim. A separate element, because the clip would cut it off,
+   grown with the same timing so it stays on the edge. */
+.secret-portal__rim {
+    position: fixed;
+    z-index: 101;
+    left: 50%;
+    top: 50%;
+    width: 150vmax;
+    height: 150vmax;
+    translate: -50% -50%;
+    border: 0.8vmax solid #f5c542;
+    border-radius: 50%;
+    box-shadow:
+        0 0 3vmax 0.5vmax #5fd0ff,
+        inset 0 0 3vmax 0.5vmax #5fd0ff;
+    scale: 0;
+    pointer-events: none;
+    animation: secret-portal-rim 1.1s cubic-bezier(0.45, 0, 0.15, 1) 0.25s forwards;
+}
+
+@keyframes secret-portal-rim {
+    to {
+        scale: 1;
+    }
+}
+
+/* Once the Skylanders page is up behind it. */
+.secret-portal--leaving {
+    opacity: 0;
+    transition: opacity 0.6s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .theme-toggle[data-strain] svg {
+        animation: none;
+    }
+}

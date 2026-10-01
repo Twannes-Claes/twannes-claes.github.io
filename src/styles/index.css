@@ -29,6 +29,20 @@
     --c-chip-fg: var(--c-white);
 }
 
+/* The page colour mid theme switch. Faded once, here, and read by both the body
+   and the sticky nav, so they are the same colour on every frame. Fading each
+   on its own let them drift apart when the theme was flipped quickly. */
+@property --page-bg {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #1e1d1f;
+}
+
+:root {
+    --page-bg: var(--c-bg);
+    transition: --page-bg 0.3s ease;
+}
+
 @theme inline {
     --color-bg: var(--c-bg);
     --color-fg: var(--c-fg);
@@ -82,14 +96,12 @@
     }
 
     body {
-        background-color: var(--c-bg);
+        background-color: var(--page-bg);
         color: var(--c-fg);
         font-family: var(--font-sans);
         font-weight: 200;
         line-height: 1.5;
-        transition:
-            background-color 0.3s ease,
-            color 0.3s ease;
+        transition: color 0.3s ease;
         cursor:
             url('/assets/site/cursor-dark.svg') 3 1,
             auto;
