@@ -40,8 +40,8 @@ export function ProjectPage({ project }: { project: Project })
                         </div>
 
                         <div className="rich-text mb-14">
-                            {/* Fragments, not wrapper divs. .tag--label:first-child must match
-                  only the very first label, the way it did in the old markup. */}
+                            {/* Fragments, not wrapper divs, so .tag--label:first-child
+                                matches only the very first label. */}
                             {project.sections.map((section) => (
                                 <Fragment key={section.label}>
                                     <span className="tag tag--label">{section.label}</span>

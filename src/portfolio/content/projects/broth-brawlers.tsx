@@ -8,7 +8,7 @@ export const brothBrawlers: Project = {
     category: 'Game Dev',
     active: true,
     order: 13,
-    cardImage: '/assets/projects/broth-brawlers/card.png',
+    cardImage: '/assets/projects/broth-brawlers/card.webp',
     tags: ['Unity', 'C#', 'Perforce', 'Team'],
     sections:
     [
@@ -64,12 +64,12 @@ export const brothBrawlers: Project = {
     images:
     [
         {
-            src: '/assets/projects/broth-brawlers/card.png',
+            src: '/assets/projects/broth-brawlers/card.webp',
             href: 'https://youtu.be/yH7EkgAuO7k',
             icon: faYoutube,
         },
-        { src: '/assets/projects/broth-brawlers/gallery-1.gif' },
-        { src: '/assets/projects/broth-brawlers/gallery-2.png' },
-        { src: '/assets/projects/broth-brawlers/gallery-3.png' },
+        { src: '/assets/projects/broth-brawlers/gallery-1.webp' },
+        { src: '/assets/projects/broth-brawlers/gallery-2.webp' },
+        { src: '/assets/projects/broth-brawlers/gallery-3.webp' },
     ],
 };

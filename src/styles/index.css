@@ -3,10 +3,9 @@
 /* ---------------------------------------------------------------------------
    Design tokens
 
-   Ported verbatim from the previous assets/css/general.css so both themes stay
-   identical. The raw --c-* variables remain the source of truth; @theme inline
-   re-exports them to Tailwind so utilities such as bg-bg / text-fg / border-edge
-   resolve per-theme without needing a single dark: variant.
+   The raw --c-* variables are the source of truth. @theme inline re-exports
+   them to Tailwind, so utilities such as bg-bg, text-fg and border-edge resolve
+   per theme without needing a single dark: variant.
 --------------------------------------------------------------------------- */
 
 :root {
@@ -134,10 +133,9 @@
 
 @layer components {
     .container-page {
-        /* content-box, not Tailwind's global border-box: the original site used the
-       Meyer reset, which never set box-sizing, so max-width capped the content
-       and the padding sat outside it. Under border-box the same numbers shrink
-       the content by up to 280px. */
+        /* content-box, not Tailwind's global border-box, so max-width caps the
+           content and the padding sits outside it. Under border-box the same
+           numbers would shrink the content by up to 280px. */
         box-sizing: content-box;
         padding: 0 clamp(20px, 6vw, 140px);
         max-width: 1440px;
@@ -145,8 +143,8 @@
         overflow-x: hidden;
     }
 
-    /* Preflight strips list styling; project section lists want it back, with
-     accent-coloured markers. */
+    /* Preflight strips list styling, and project section lists want it back,
+       with accent-coloured markers. */
     .prose-list {
         list-style: disc;
         list-style-position: outside;
@@ -158,9 +156,7 @@
         color: var(--c-accent);
     }
 
-    /* The original copy separated paragraphs with a literal <br><br>, which at
-     16px/1.5 is exactly 24px of blank space. Real <p> elements reproduce that
-     gap without the stray line breaks. */
+    /* 24px between paragraphs, one blank line at 16px/1.5. */
     .rich-text p + p,
     .rich-text p + ul,
     .rich-text ul + p {
@@ -285,7 +281,7 @@
     }
 
     /* The inner element is an <a>, <span> or <button> depending on the use, so
-     everything below targets the single child rather than a tag name. */
+       everything below targets the single child rather than a tag name. */
     .button > :is(a, span, button) {
         background-color: var(--c-accent);
         color: var(--c-white);
@@ -297,8 +293,7 @@
         display: inline-block;
         transition: 0.3s ease transform;
         white-space: nowrap;
-        /* TiltButton sets --tilt to a random angle on hover, matching the old
-       button-tilt.js which wrote an inline transform. */
+        /* TiltButton.tsx sets --tilt to a random angle on hover. */
         transform: rotate(var(--tilt, 0deg));
     }
 
@@ -353,7 +348,7 @@
     }
 
     /* The carousel arrows have no icon child, so arrow.svg is drawn by ::after.
-     Declared after .button--icon so it wins at equal specificity. */
+       Declared after .button--icon so it wins at equal specificity. */
     .button--arrow > :is(a, span, button)::after {
         content: url('/assets/site/arrow.svg');
         display: block;
@@ -415,7 +410,7 @@
         }
     }
 
-    /* The skills panel paints its slab with ::after, matching the original. */
+    /* The skills panel's slab, tilted the other way and painted with ::after. */
     .accent-slab-after {
         position: relative;
     }
@@ -448,8 +443,8 @@
         display: block;
     }
 
-    /* Entries with an overlay icon (currently only the video thumbnail) get a
-     tinted wash and a shrink-on-hover badge. */
+    /* Entries with an overlay icon, like a video thumbnail, get a tinted wash and
+       a badge that shrinks on hover. */
     .gallery-img--video {
         transition: 0.3s ease all;
     }

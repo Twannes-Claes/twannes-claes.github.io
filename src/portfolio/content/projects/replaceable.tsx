@@ -8,7 +8,7 @@ export const replaceable: Project = {
     category: 'Professional Work',
     active: true,
     order: 2,
-    cardImage: '/assets/projects/replaceable/card.jpg',
+    cardImage: '/assets/projects/replaceable/card.webp',
     tags: ['Unity', 'C#', 'DOTS', 'CI/CD'],
     sections:
     [
@@ -60,5 +60,5 @@ export const replaceable: Project = {
             text: 'Check out on Steam',
         },
     ],
-    images: [{ src: '/assets/projects/replaceable/header.jpg' }],
+    images: [{ src: '/assets/projects/replaceable/header.webp' }],
 };

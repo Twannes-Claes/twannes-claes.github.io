@@ -27,5 +27,5 @@ export const contactLinks: ContactLink[] = [
 export const hero = {
     tag: 'Game Systems Engineer',
     heading: 'Twannes Claes',
-    image: '/assets/site/home-picture.jpg',
+    image: '/assets/site/home-picture.webp',
 } as const;

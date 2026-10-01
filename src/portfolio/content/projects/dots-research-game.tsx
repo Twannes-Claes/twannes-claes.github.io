@@ -6,7 +6,7 @@ export const dotsResearchGame: Project = {
     category: 'Game Dev',
     active: true,
     order: 12,
-    cardImage: '/assets/projects/dots-research/card.png',
+    cardImage: '/assets/projects/dots-research/card.webp',
     tags: ['Unity', 'C#', 'DOP', 'Netcode'],
     sections:
     [
@@ -59,5 +59,5 @@ export const dotsResearchGame: Project = {
             ),
         },
     ],
-    images: [{ src: '/assets/projects/dots-research/card.png' }],
+    images: [{ src: '/assets/projects/dots-research/card.webp' }],
 };

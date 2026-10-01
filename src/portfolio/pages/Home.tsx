@@ -12,10 +12,7 @@ import { aboutBlocks, introParagraphs, skillGroups } from '../content/about';
 import { contactLinks, hero } from '../content/home';
 import { CATEGORY_HEADINGS, getProjectGroups } from '../content/projects';
 
-/**
- * Vertical rhythm for the top-level sections. Values copied from the old
- * home.css so spacing and anchor offsets stay identical.
- */
+/** Vertical rhythm for the top-level sections, with the matching offset for the anchor links. */
 const SECTION_SPACING =
     'scroll-mt-[clamp(6rem,5vw+5rem,12.5rem)] my-[clamp(8rem,5vw+5rem,12.5rem)]';
 
@@ -41,6 +38,8 @@ export default function Home()
                         <img
                             src={hero.image}
                             alt=""
+                            // The largest thing on screen at load, so it goes before the rest.
+                            fetchPriority="high"
                             className="h-full w-full rotate-[-5deg] rounded-[5px] border-2 border-edge object-cover"
                         />
                     </div>
@@ -51,8 +50,8 @@ export default function Home()
                 <section id="projects" className={SECTION_SPACING}>
                     <SectionHeading icon={faFolderOpen}>Projects</SectionHeading>
 
-                    {/* Fragments, not wrapper divs: .group-heading:first-of-type only
-              zeroes the leading margin when the headings are siblings. */}
+                    {/* Fragments, not wrapper divs, because .group-heading:first-of-type only
+                        zeroes the leading margin when the headings are siblings. */}
                     {groups.map((group) => (
                         <Fragment key={group.category}>
                             <h3 className="group-heading">{CATEGORY_HEADINGS[group.category]}</h3>
@@ -66,8 +65,8 @@ export default function Home()
 
                     <div className="grid grid-cols-3 gap-8 max-[1200px]:grid-cols-2 max-[992px]:grid-cols-1 max-[992px]:gap-16">
                         <div className="col-span-2 pe-[20%] max-[1200px]:col-span-1 max-[992px]:p-0">
-                            {/* Fragments so .tag--label:first-child zeroes the leading margin
-                  on the first label only, as it did in the original markup. */}
+                            {/* Fragments, so .tag--label:first-child zeroes the leading
+                                margin on the first label only. */}
                             <div className="rich-text">
                                 {aboutBlocks.map((block) => (
                                     <Fragment key={block.label}>
@@ -96,7 +95,7 @@ export default function Home()
                 >
                     <SectionHeading icon={faEnvelope}>Contact &amp; links</SectionHeading>
 
-                    <div className="grid grid-cols-[repeat(2,max-content)] justify-center justify-items-center gap-x-[clamp(10px,0.8vw+4px,24px)] gap-y-[clamp(10px,0.8vw+4px,20px)] max-[600px]:grid-cols-1 [&>*:nth-child(odd)]:justify-self-end [&>*:nth-child(even)]:justify-self-start max-[600px]:[&>*]:justify-self-center">
+                    <div className="grid grid-cols-[repeat(2,max-content)] justify-center justify-items-center gap-x-[clamp(10px,0.8vw+4px,24px)] gap-y-[clamp(10px,0.8vw+4px,20px)] max-[600px]:grid-cols-1 min-[600px]:[&>*:nth-child(odd)]:justify-self-end min-[600px]:[&>*:nth-child(even)]:justify-self-start">
                         {contactLinks.map((link) => (
                             <TiltButton key={link.url}>
                                 <a href={link.url} target="_blank" rel="noreferrer">

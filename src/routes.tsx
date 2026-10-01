@@ -1,6 +1,5 @@
 import type { RouteRecord } from 'vite-react-ssg';
 
-import Skylanders from './personal/skylanders/pages/Skylanders';
 import { allProjects } from './portfolio/content/projects';
 import Home from './portfolio/pages/Home';
 import { ProjectPage } from './portfolio/pages/ProjectPage';
@@ -30,10 +29,14 @@ export const routes: RouteRecord[] = [
                 element: <ProjectPage project={project} />,
                 entry: 'src/portfolio/pages/ProjectPage.tsx',
             })),
-            // Private, not linked from anywhere, see the page for how it is locked.
+            // Private, not linked from anywhere, see the page for how it is locked. Lazy, so its
+            // styles, fonts and wiki code stay out of the portfolio bundle.
             {
                 path: 'skylanders',
-                element: <Skylanders />,
+                lazy: () =>
+                    import('./personal/skylanders/pages/Skylanders').then((page) => ({
+                        Component: page.default,
+                    })),
                 entry: 'src/personal/skylanders/pages/Skylanders.tsx',
             },
             // Prerendered so the build emits a real 404.html for GitHub Pages.

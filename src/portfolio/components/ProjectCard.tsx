@@ -18,6 +18,8 @@ export function ProjectCard({ project }: { project: Project })
                     <img
                         src={project.cardImage}
                         alt=""
+                        loading="lazy"
+                        decoding="async"
                         className="aspect-[330/260] w-full object-cover object-center transition-all duration-300"
                     />
                 </div>

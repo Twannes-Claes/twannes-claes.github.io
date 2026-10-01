@@ -9,7 +9,7 @@ export const physicsEngine: Project = {
     category: 'Game Dev',
     active: true,
     order: 11,
-    cardImage: '/assets/projects/physics-engine/card.png',
+    cardImage: '/assets/projects/physics-engine/card.webp',
     tags: ['C++', 'SDL'],
     sections:
     [
@@ -76,7 +76,7 @@ export const physicsEngine: Project = {
     images:
     [
         {
-            src: '/assets/projects/physics-engine/card.png',
+            src: '/assets/projects/physics-engine/card.webp',
             href: 'https://youtu.be/3wJ4ew08c00',
             icon: faYoutube,
         },

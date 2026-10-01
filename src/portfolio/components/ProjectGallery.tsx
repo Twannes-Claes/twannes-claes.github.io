@@ -1,23 +1,10 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useState } from 'react';
-import Lightbox, { type GenericSlide, type Slide } from 'yet-another-react-lightbox';
-import 'yet-another-react-lightbox/styles.css';
+import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
 
 import type { ProjectImage } from '../content/types';
+import type { Slide } from './ProjectLightbox';
 
-/** A slide that embeds a video player instead of showing an image. */
-interface SlideYouTube extends GenericSlide {
-    type: 'youtube';
-    embedUrl: string;
-}
-
-// Register the custom slide type with the lightbox's own union.
-declare module 'yet-another-react-lightbox'
-{
-    interface SlideTypes {
-        youtube: SlideYouTube;
-    }
-}
+const ProjectLightbox = lazy(() => import('./ProjectLightbox'));
 
 /**
  * Converts a YouTube watch or youtu.be URL into its embed form.
@@ -43,7 +30,7 @@ function toYouTubeEmbed(url: string): string | null
     }
     catch
     {
-        // Not a parseable URL; fall through to the image slide.
+        // Not a URL at all, so it opens as a plain image.
     }
 
     return null;
@@ -62,48 +49,46 @@ function toSlide(image: ProjectImage): Slide
 export function ProjectGallery({ images }: { images: ProjectImage[] })
 {
     const [index, setIndex] = useState(-1);
-    const slides = images.map(toSlide);
+    // Mounted from the first open on and kept, so closing still plays the lightbox's fade out.
+    const [opened, setOpened] = useState(false);
+    const slides = useMemo(() => images.map(toSlide), [images]);
+
+    const open = useCallback((position: number) =>
+    {
+        setOpened(true);
+        setIndex(position);
+    }, []);
+
+    const close = useCallback(() => setIndex(-1), []);
 
     return (
         <>
             <div className="accent-slab relative ms-[12%] flex h-fit flex-col gap-4 max-[768px]:ms-0">
-                {images.map((image, i) => (
+                {images.map((image, position) => (
                     <button
                         key={image.src}
                         type="button"
-                        onClick={() => setIndex(i)}
+                        onClick={() => open(position)}
                         aria-label={image.icon ? 'Play video' : 'Open image'}
                         className={`gallery-img ${image.icon ? 'gallery-img--video' : ''}`}
                     >
-                        <img src={image.src} alt="" />
+                        {/* The first one is in view on arrival, the rest wait for a scroll. */}
+                        <img
+                            src={image.src}
+                            alt=""
+                            loading={position === 0 ? 'eager' : 'lazy'}
+                            decoding="async"
+                        />
                         {image.icon && <FontAwesomeIcon icon={image.icon} />}
                     </button>
                 ))}
             </div>
 
-            <Lightbox
-                open={index >= 0}
-                index={index}
-                close={() => setIndex(-1)}
-                slides={slides}
-                render={{
-                    slide: ({ slide }) =>
-                    {
-                        if (slide.type !== 'youtube')
-                            return undefined;
-
-                        return (
-                            <iframe
-                                title="Project video"
-                                src={slide.embedUrl}
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                allowFullScreen
-                                className="aspect-video h-auto w-[min(90vw,1280px)] border-0"
-                            />
-                        );
-                    },
-                }}
-            />
+            {opened && (
+                <Suspense fallback={null}>
+                    <ProjectLightbox slides={slides} index={index} onClose={close} />
+                </Suspense>
+            )}
         </>
     );
 }

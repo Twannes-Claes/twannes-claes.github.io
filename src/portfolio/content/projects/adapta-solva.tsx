@@ -8,7 +8,7 @@ export const adaptaSolva: Project = {
     category: 'Game Dev',
     active: true,
     order: 10,
-    cardImage: '/assets/projects/adapta-solva/card.png',
+    cardImage: '/assets/projects/adapta-solva/card.webp',
     tags: ['Unity', 'C#', 'Perforce', 'Team'],
     sections:
     [
@@ -50,12 +50,12 @@ export const adaptaSolva: Project = {
     images:
     [
         {
-            src: '/assets/projects/adapta-solva/video-thumbnail.jpg',
+            src: '/assets/projects/adapta-solva/video-thumbnail.webp',
             href: 'https://www.youtube.com/watch?v=YdgIpqYobBI',
             icon: faYoutube,
         },
-        { src: '/assets/projects/adapta-solva/gallery-1.jpg' },
-        { src: '/assets/projects/adapta-solva/gallery-2.jpg' },
-        { src: '/assets/projects/adapta-solva/gallery-3.jpg' },
+        { src: '/assets/projects/adapta-solva/gallery-1.webp' },
+        { src: '/assets/projects/adapta-solva/gallery-2.webp' },
+        { src: '/assets/projects/adapta-solva/gallery-3.webp' },
     ],
 };

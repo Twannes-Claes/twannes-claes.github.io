@@ -61,7 +61,6 @@ interface WikiPage
     revisions?: { slots: { main: { '*': string } } }[];
 }
 
-
 /** Titles of every page in a category, for the version lists below. */
 async function members(category: string): Promise<string[]>
 {
@@ -142,14 +141,71 @@ interface CatalogPage
 
 let catalogPages: Promise<CatalogPage[]> | undefined;
 
+/** The categories fetchPages() asks about. */
+const catalogCategories = [
+    ...figureCategories,
+    ...notFigureCategories,
+    giantCategory,
+    altDecoCategory,
+    reissueCategory,
+];
+
+const cacheKey = 'skylanders-catalog';
+
 /**
- * Every page in Category:Skylanders, fetched once and shared by the search and the lookups. The
- * category holds a few hundred pages, which a single request covers. Dark and Eon's Elite repaints
- * are found through their own categories as well, since not all of them are marked Alt Deco.
+ * The pages as the last visit fetched them. Stored with the categories they were sorted by, so a
+ * change to the lists above throws an old copy away instead of using it.
  */
-function fetchPages(): Promise<CatalogPage[]>
+interface CachedCatalog
 {
-    catalogPages ??= Promise.all([
+    categories: string[];
+    pages: (Omit<CatalogPage, 'categories'> & { categories: string[] })[];
+}
+
+/** The last visit's pages, or nothing when there are none or storage is blocked. */
+function readCache(): CatalogPage[] | undefined
+{
+    try
+    {
+        const cached = JSON.parse(localStorage.getItem(cacheKey) ?? 'null') as CachedCatalog | null;
+
+        if (cached?.categories.join('|') !== catalogCategories.join('|'))
+            return undefined;
+
+        return cached.pages.map((page) => ({ ...page, categories: new Set(page.categories) }));
+    }
+    catch
+    {
+        // Storage blocked or the copy unreadable, the wiki is asked instead.
+        return undefined;
+    }
+}
+
+function writeCache(pages: CatalogPage[])
+{
+    const cached: CachedCatalog = {
+        categories: catalogCategories,
+        pages: pages.map((page) => ({ ...page, categories: [...page.categories] })),
+    };
+
+    try
+    {
+        localStorage.setItem(cacheKey, JSON.stringify(cached));
+    }
+    catch
+    {
+        // Storage blocked or full, the next visit just waits for the wiki again.
+    }
+}
+
+/**
+ * Every page in Category:Skylanders, straight from the wiki. The category holds a few hundred
+ * pages, which a single request covers. Dark and Eon's Elite repaints are found through their own
+ * categories as well, since not all of them are marked Alt Deco.
+ */
+function downloadPages(): Promise<CatalogPage[]>
+{
+    return Promise.all([
         call({
             action: 'query',
             generator: 'categorymembers',
@@ -160,13 +216,7 @@ function fetchPages(): Promise<CatalogPage[]>
             piprop: 'thumbnail',
             pithumbsize: '96',
             // Only asks about the categories used here, so each page lists at most a few.
-            clcategories: [
-                ...figureCategories,
-                ...notFigureCategories,
-                giantCategory,
-                altDecoCategory,
-                reissueCategory,
-            ].join('|'),
+            clcategories: catalogCategories.join('|'),
             cllimit: '500',
         }) as Promise<{ query: { pages: Record<string, WikiPage> } }>,
         ...repaintCategories.map(members),
@@ -214,6 +264,24 @@ function fetchPages(): Promise<CatalogPage[]>
             base: repaint && parents.get(page.title) ? original(page.title) : '',
         }));
     });
+}
+
+/**
+ * The catalog pages, shared by the search and the lookups. The last visit's copy is used straight
+ * away, so the search opens without waiting for the wiki, and a fresh copy is saved behind it for
+ * next time. The wiki changes rarely, so one visit behind is close enough.
+ */
+function fetchPages(): Promise<CatalogPage[]>
+{
+    if (catalogPages)
+        return catalogPages;
+
+    const download = downloadPages();
+    const cached = readCache();
+
+    // A failure is reported through catalogPages when there is no copy, and harmless when there is.
+    download.then(writeCache).catch(() => undefined);
+    catalogPages = cached ? Promise.resolve(cached) : download;
 
     // A failed request is asked again next time rather than kept.
     catalogPages.catch(() =>
@@ -445,11 +513,29 @@ function looksOf(
  */
 export const detailsVersion = 3;
 
+/** Lookups made this visit, by name, so cancelling a figure and picking it again is instant. */
+const lookups = new Map<string, Promise<SkylanderDetails>>();
+
 /**
  * Looks a figure up on the wiki by its page title, see CatalogEntry. Unknown names still come
  * back, just without the extras.
  */
-export async function lookup(name: string): Promise<SkylanderDetails>
+export function lookup(name: string): Promise<SkylanderDetails>
+{
+    let details = lookups.get(name);
+
+    if (!details)
+    {
+        details = fetchDetails(name);
+        lookups.set(name, details);
+        // A failed lookup is asked again next time rather than kept.
+        details.catch(() => lookups.delete(name));
+    }
+
+    return details;
+}
+
+async function fetchDetails(name: string): Promise<SkylanderDetails>
 {
     const data = (await call({
         action: 'query',

@@ -2,8 +2,8 @@
    Skylanders page
 
    A Skylanders Giants look with nothing shared with the portfolio. Everything is
-   scoped under .sky, because this file ships in the same stylesheet as the
-   portfolio pages.
+   scoped under .sky, because after a visit here this file stays loaded when the
+   router moves on to a portfolio page.
 --------------------------------------------------------------------------- */
 
 .sky {
@@ -1088,7 +1088,7 @@ html:has(.sky-dialog[open]) {
 .sky-coin--blue {
     width: 86px;
     /* The highlight stays small and up in the corner, so the white text sits on
-       deep blue rather than the near-white centre it used to wash out on. */
+       deep blue rather than washing out on a near-white centre. */
     background: radial-gradient(
         circle at 30% 22%,
         #b5e6ff 0%,

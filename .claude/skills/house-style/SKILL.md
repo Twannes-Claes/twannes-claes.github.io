@@ -34,7 +34,14 @@ if (!cameFromHome)
 }, [key, hash]);
 ```
 
-- 100 column lines. Tailwind class strings are exempt, they stay on one line.
+- Aim for 100 column lines, but keep a single expression on one line even when it
+  runs a little past: a ternary, a short call, a Tailwind class string. Only break
+  code when the formatter does it. Do not split a ternary over `?` and `:` lines or
+  put each argument on its own line just to get under 100:
+
+```ts
+const name = version ? (version.title ?? `${version.name} ${details.name}`) : details.name;
+```
 
 ## Not enforced, still expected
 
@@ -83,7 +90,7 @@ Rules of tone:
   Anything pointing at another file names that file.
 - An empty `catch` always carries a comment saying what was swallowed and why
   that is safe.
-- Comments wrap at the same 100 columns as the code.
+- Comments do wrap at 100 columns, strictly, unlike code.
 
 ## Before finishing
 

@@ -8,26 +8,6 @@ import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 
 import { ProjectCard } from './ProjectCard';
 
-/**
- * Three columns, two under 992px, a looping carousel under 768px.
- * The grid is the prerendered and no-JS fallback.
- */
-export function ProjectShowcase({ projects }: { projects: Project[] })
-{
-    const isMobile = useMediaQuery('(max-width: 767.98px)');
-
-    if (isMobile)
-        return <ProjectCarousel projects={projects} />;
-
-    return (
-        <div className="accent-slab accent-slab--cards grid grid-cols-3 gap-8 max-[992px]:grid-cols-2">
-            {projects.map((project) => (
-                <ProjectCard key={project.slug} project={project} />
-            ))}
-        </div>
-    );
-}
-
 function ProjectCarousel({ projects }: { projects: Project[] })
 {
     const [emblaRef, emblaApi] = useEmblaCarousel({
@@ -41,8 +21,8 @@ function ProjectCarousel({ projects }: { projects: Project[] })
 
     return (
         <>
-            {/* Stretched 50px past the container on each side so the neighbouring
-          cards peek in, as the old slider did. */}
+            {/* Stretched 50px past the container on each side, so the neighbouring cards
+                peek in. */}
             <div className="accent-slab accent-slab--cards -mx-[50px]">
                 <div className="overflow-hidden" ref={emblaRef}>
                     <div className="flex">
@@ -70,5 +50,25 @@ function ProjectCarousel({ projects }: { projects: Project[] })
                 </TiltButton>
             </div>
         </>
+    );
+}
+
+/**
+ * Three columns, two under 992px, a looping carousel under 768px.
+ * The grid is the prerendered and no-JS fallback.
+ */
+export function ProjectShowcase({ projects }: { projects: Project[] })
+{
+    const isMobile = useMediaQuery('(max-width: 767.98px)');
+
+    if (isMobile)
+        return <ProjectCarousel projects={projects} />;
+
+    return (
+        <div className="accent-slab accent-slab--cards grid grid-cols-3 gap-8 max-[992px]:grid-cols-2">
+            {projects.map((project) => (
+                <ProjectCard key={project.slug} project={project} />
+            ))}
+        </div>
     );
 }

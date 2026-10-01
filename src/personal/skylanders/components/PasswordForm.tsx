@@ -1,6 +1,6 @@
 import { faBolt, faEye, faEyeSlash, faKey } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useCallback, useState, type FormEvent } from 'react';
+import { useCallback, useState, type ChangeEvent, type FormEvent } from 'react';
 
 import type { Db } from '../types';
 
@@ -21,6 +21,10 @@ export function PasswordForm({ db }: { db: Db })
     const [visible, setVisible] = useState(false);
 
     const toggle = useCallback(() => setVisible((shown) => !shown), []);
+    const type = useCallback(
+        (event: ChangeEvent<HTMLInputElement>) => setPassword(event.target.value),
+        [],
+    );
 
     const enter = useCallback(
         async (secret: string) =>
@@ -71,7 +75,7 @@ export function PasswordForm({ db }: { db: Db })
                         autoComplete="current-password"
                         spellCheck={false}
                         value={password}
-                        onChange={(event) => setPassword(event.target.value)}
+                        onChange={type}
                         autoFocus
                     />
                     <button

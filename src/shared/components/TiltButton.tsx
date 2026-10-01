@@ -16,8 +16,8 @@ interface TiltButtonProps
 }
 
 /**
- * Button chrome with the random hover tilt from the old button-tilt.js.
- * The angle is written to the --tilt property and applied by index.css.
+ * Button chrome that tilts a random way on hover, so no two hovers look the same. The angle is
+ * written to the --tilt property and applied by index.css.
  */
 export function TiltButton({ children, className, magnitude = 3 }: TiltButtonProps)
 {

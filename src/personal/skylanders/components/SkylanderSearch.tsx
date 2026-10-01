@@ -7,8 +7,10 @@ import {
     useMemo,
     useRef,
     useState,
+    type ChangeEvent,
     type CSSProperties,
     type KeyboardEvent,
+    type MouseEvent,
 } from 'react';
 
 import type { CatalogEntry } from '../types';
@@ -56,6 +58,11 @@ function match(catalog: CatalogEntry[], query: string): { results: CatalogEntry[
     }
 
     return { results: [...starts, ...contains, ...tagged], named: starts.length + contains.length };
+}
+
+function keepFocus(event: MouseEvent)
+{
+    event.preventDefault();
 }
 
 /** The name with the typed part picked out in gold. */
@@ -243,7 +250,6 @@ export function SkylanderSearch({
                 pick(results[target].name);
             }
             else if (event.key === 'Escape')
-
                 setOpen(false);
 
         },
@@ -270,6 +276,26 @@ export function SkylanderSearch({
         input.current?.focus();
     }, [onChange]);
 
+    const type = useCallback(
+        (event: ChangeEvent<HTMLInputElement>) =>
+        {
+            onChange(event.target.value);
+            setOpen(true);
+            setActive(-1);
+        },
+        [onChange],
+    );
+
+    const show = useCallback(() => setOpen(true), []);
+
+    // The confirm dialog taking focus is not leaving the search, see holdOpen.
+    const leave = useCallback(() =>
+    {
+        if (!holdOpen)
+            setOpen(false);
+
+    }, [holdOpen]);
+
     return (
         <div className="sky-search">
             <input
@@ -285,22 +311,11 @@ export function SkylanderSearch({
                 spellCheck={false}
                 placeholder="Add a Skylander, or search Fire, Giants..."
                 value={value}
-                onChange={(event) =>
-                {
-                    onChange(event.target.value);
-                    setOpen(true);
-                    setActive(-1);
-                }}
-                onFocus={() => setOpen(true)}
+                onChange={type}
+                onFocus={show}
                 // Focus does not fire again after a pick, so a click reopens the list too.
-                onClick={() => setOpen(true)}
-                // The confirm dialog taking focus is not leaving the search, see holdOpen.
-                onBlur={() =>
-                {
-                    if (!holdOpen)
-                        setOpen(false);
-
-                }}
+                onClick={show}
+                onBlur={leave}
                 onKeyDown={onKeyDown}
             />
             {value && (
@@ -309,7 +324,7 @@ export function SkylanderSearch({
                     className="sky-search__clear"
                     aria-label="Clear search"
                     // Keeps the focus in the box, so the list does not close and reopen.
-                    onMouseDown={(event) => event.preventDefault()}
+                    onMouseDown={keepFocus}
                     onClick={clear}
                 >
                     <FontAwesomeIcon icon={faXmark} />
@@ -363,8 +378,8 @@ export function SkylanderSearch({
                                     role="option"
                                     aria-selected={index === target}
                                     className={`sky-search__option${copies > 0 ? ' sky-search__option--owned' : ''}`}
-                                    // mousedown rather than click, because click fires after the input
-                                    // blurs and the list is already gone by then.
+                                    // mousedown rather than click, because click fires after
+                                    // the input blurs and the list is already gone by then.
                                     onMouseDown={(event) =>
                                     {
                                         event.preventDefault();

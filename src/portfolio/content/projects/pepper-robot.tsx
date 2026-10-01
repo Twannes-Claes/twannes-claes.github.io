@@ -6,7 +6,7 @@ export const pepperRobot: Project = {
     category: 'Professional Work',
     active: true,
     order: 3,
-    cardImage: '/assets/projects/pepper-robot/card.png',
+    cardImage: '/assets/projects/pepper-robot/card.webp',
     tags: ['C++', 'Python', 'MQTT', 'VUE'],
     sections:
     [
@@ -61,7 +61,7 @@ export const pepperRobot: Project = {
     ],
     images:
     [
-        { src: '/assets/projects/pepper-robot/card.png' },
-        { src: '/assets/projects/pepper-robot/gallery-1.png' },
+        { src: '/assets/projects/pepper-robot/card.webp' },
+        { src: '/assets/projects/pepper-robot/gallery-1.webp' },
     ],
 };

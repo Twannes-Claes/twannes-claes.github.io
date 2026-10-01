@@ -20,7 +20,7 @@ export interface NavItem
     icon: IconDefinition;
 }
 
-/** Anchors on the home page; prefixed with "/" when shown on a project page. */
+/** Anchors on the home page, prefixed with "/" when shown on a project page. */
 export const navItems: NavItem[] = [
     { href: '#projects', label: 'Projects', icon: faFolderOpen },
     { href: '#about', label: 'About me', icon: faUser },

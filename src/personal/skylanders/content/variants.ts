@@ -85,7 +85,7 @@ export const variants: Variant[] = [
     // Lightcore figures glow, so an electric lime.
     { id: 'lightcore', name: 'Lightcore', color: '#c4f24a' },
     // The repaints after their paint: royal blue Legendaries, violet Darks, and a rich rose
-    // for Eon's Elite, which used to share Series 1's gold.
+    // for Eon's Elite, kept clear of Series 1's gold.
     { id: 'legendary', name: 'Legendary', color: '#4d74ff', page: 'Legendary' },
     { id: 'dark', name: 'Dark', color: '#9d6bff', page: 'Dark' },
     { id: 'eonsElite', name: "Eon's Elite", color: '#ff5c8a', page: 'Elite' },
@@ -130,9 +130,8 @@ export function wikiPage(title: string): string
 
 /**
  * The versions a figure's dialog offers: the ones the wiki knows it came in, see services/wiki.ts,
- * plus any already owned so a count is never hidden. Figures looked up
- * before versions were tracked have no list yet and get every version until the repair in
- * Collection.tsx fills it in.
+ * plus any already owned so a count is never hidden. Figures looked up before versions were
+ * tracked have no list yet and get every version until the repair in Collection.tsx fills it in.
  */
 export function offeredVariants(known: VariantId[] | undefined, counts: VariantCounts): Variant[]
 {
@@ -140,9 +139,7 @@ export function offeredVariants(known: VariantId[] | undefined, counts: VariantC
         return variants;
 
     return variants.filter(
-        (variant) =>
-            known.includes(variant.id) ||
-            (counts[variant.id] ?? 0) > 0,
+        (variant) => known.includes(variant.id) || (counts[variant.id] ?? 0) > 0,
     );
 }
 

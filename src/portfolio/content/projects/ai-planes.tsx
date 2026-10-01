@@ -8,7 +8,7 @@ export const aiPlanes: Project = {
     category: 'Game Dev',
     active: true,
     order: 14,
-    cardImage: '/assets/projects/ai-planes/card.png',
+    cardImage: '/assets/projects/ai-planes/card.webp',
     tags: ['Unity', 'C#', 'ML-Agents'],
     sections:
     [
@@ -61,7 +61,7 @@ export const aiPlanes: Project = {
     ],
     images:
     [
-        { src: '/assets/projects/ai-planes/gallery-1.gif' },
-        { src: '/assets/projects/ai-planes/gallery-2.png' },
+        { src: '/assets/projects/ai-planes/gallery-1.webp' },
+        { src: '/assets/projects/ai-planes/gallery-2.webp' },
     ],
 };

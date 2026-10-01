@@ -9,7 +9,7 @@ export const cityCrawlers: Project = {
     // Hidden from the site, kept in the repo. Flip to true to publish it again.
     active: false,
     order: 20,
-    cardImage: '/assets/projects/city-crawlers/card.png',
+    cardImage: '/assets/projects/city-crawlers/card.webp',
     tags: ['Unity', 'C#', 'GAME JAM'],
     sections:
     [
@@ -47,5 +47,5 @@ export const cityCrawlers: Project = {
             text: 'Play on itch.io',
         },
     ],
-    images: [{ src: '/assets/projects/city-crawlers/card.png' }],
+    images: [{ src: '/assets/projects/city-crawlers/card.webp' }],
 };

@@ -84,6 +84,14 @@ export function ChooseVersion({ details, onChoose, onCancel }: ChooseVersionProp
         [onChoose],
     );
 
+    // The single version's Add button.
+    const add = useCallback(() =>
+    {
+        if (details)
+            choose(details);
+
+    }, [choose, details]);
+
     // A click on the dialog element itself, rather than its contents, landed on the backdrop.
     const onBackdrop = useCallback(
         (event: MouseEvent<HTMLDialogElement>) =>
@@ -165,11 +173,7 @@ export function ChooseVersion({ details, onChoose, onCancel }: ChooseVersionProp
                             Cancel
                         </button>
                         {single && (
-                            <button
-                                type="button"
-                                className="sky-btn"
-                                onClick={() => choose(details)}
-                            >
+                            <button type="button" className="sky-btn" onClick={add}>
                                 Add
                             </button>
                         )}
