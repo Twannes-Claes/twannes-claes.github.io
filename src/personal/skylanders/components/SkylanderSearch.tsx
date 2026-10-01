@@ -84,6 +84,8 @@ interface SkylanderSearchProps
     onChange: (value: string) => void;
     /** Every figure on the wiki, owned ones included. */
     catalog: CatalogEntry[];
+    /** The catalog has not arrived yet, so an opened list says so rather than staying shut. */
+    loading: boolean;
     /**
      * How many of each figure we have, by name. Owned figures get a badge rather than being
      * hidden, so the search doubles as a "do we have this?" check in a shop.
@@ -139,6 +141,7 @@ export function SkylanderSearch({
     value,
     onChange,
     catalog,
+    loading,
     owned,
     onPick,
     holdOpen,
@@ -311,6 +314,14 @@ export function SkylanderSearch({
                 >
                     <FontAwesomeIcon icon={faXmark} />
                 </button>
+            )}
+
+            {open && loading && catalog.length === 0 && (
+                <div className="sky-search__panel">
+                    <p className="sky-search__loading" role="status">
+                        Loading Skylanders
+                    </p>
+                </div>
             )}
 
             {expanded && (

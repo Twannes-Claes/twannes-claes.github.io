@@ -456,6 +456,29 @@ html:has(.sky-dialog[open]) {
     text-align: center;
 }
 
+.sky-search__loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 1rem;
+    color: var(--sky-muted);
+    font-weight: 700;
+}
+
+/* A small version of the .sky-loading portal spinner. */
+.sky-search__loading::before {
+    content: '';
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 3px solid rgb(255 255 255 / 0.15);
+    border-top-color: var(--sky-gold);
+    border-right-color: var(--sky-portal);
+    animation: sky-spin 0.9s linear infinite;
+}
+
 .sky-search__list {
     display: grid;
     gap: 2px;

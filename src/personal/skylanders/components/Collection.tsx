@@ -51,6 +51,8 @@ export function Collection({ db }: { db: Db })
 {
     const [items, setItems] = useState<Skylander[] | null>(null);
     const [catalog, setCatalog] = useState<CatalogEntry[]>([]);
+    /** The catalog is still on its way, so the search shows a spinner instead of nothing. */
+    const [catalogLoading, setCatalogLoading] = useState(true);
     const [name, setName] = useState('');
     const [message, setMessage] = useState('');
     const [busy, setBusy] = useState(false);
@@ -96,7 +98,8 @@ export function Collection({ db }: { db: Db })
         // adding falls back to asking the wiki about each name.
         fetchCatalog()
             .then(setCatalog)
-            .catch(() => undefined);
+            .catch(() => undefined)
+            .finally(() => setCatalogLoading(false));
     }, []);
 
     // Ids already looked up again, so a figure the wiki still has no game for is asked once.
@@ -325,6 +328,7 @@ export function Collection({ db }: { db: Db })
                     value={name}
                     onChange={setName}
                     catalog={catalog}
+                    loading={catalogLoading}
                     owned={owned}
                     onPick={pick}
                     holdOpen={choosing !== null}
