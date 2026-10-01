@@ -2,9 +2,10 @@ import '@fontsource/lilita-one';
 import '@fontsource-variable/nunito';
 import '../styles/skylanders.css';
 
-import { faBookOpen, faRightFromBracket } from '@fortawesome/free-solid-svg-icons';
+import { faBookOpen, faHouse, faRightFromBracket } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Head } from 'vite-react-ssg';
 
 import type { Db } from '../types';
@@ -74,6 +75,11 @@ export default function Skylanders()
             <SkyBackdrop />
 
             <div className="sky-inner">
+                {/* The way back to the portfolio, there whether signed in or not. */}
+                <Link to="/" className="sky-home" aria-label="Back to the portfolio" title="Portfolio">
+                    <FontAwesomeIcon icon={faHouse} />
+                </Link>
+
                 <header className="sky-header">
                     <h1 className="sky-logo" data-text="Skylanders">
                         Skylanders

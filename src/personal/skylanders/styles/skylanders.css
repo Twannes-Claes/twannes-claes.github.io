@@ -69,8 +69,47 @@ html:has(.sky-dialog[open]) {
 }
 
 .sky-inner {
+    position: relative;
     max-width: 1180px;
     margin-inline: auto;
+}
+
+/* Back to the portfolio, a round version of the log out button in the top left
+   corner, clear of the logo. On a phone it gets a line of its own, see below. */
+.sky-home {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border: 2px solid var(--sky-outline);
+    border-radius: 50%;
+    background: linear-gradient(180deg, #8fd6ff 0%, #3b8cf0 45%, #1f4fb8 100%);
+    color: var(--sky-ink);
+    font-size: 1rem;
+    box-shadow:
+        0 3px 0 var(--sky-outline),
+        inset 0 2px 0 rgb(255 255 255 / 0.45);
+    transition:
+        scale 0.18s var(--sky-ease),
+        filter 0.2s ease;
+}
+
+.sky-home:hover {
+    scale: 1.06;
+    filter: brightness(1.1);
+}
+
+.sky-home:active {
+    scale: 0.95;
+}
+
+.sky-home:focus-visible {
+    outline: 3px solid var(--sky-portal);
+    outline-offset: 2px;
 }
 
 /* --- Backdrop ------------------------------------------------------------ */
@@ -2589,6 +2628,12 @@ a.sky-variant__name:focus-visible {
 
     .sky-footer__icon {
         display: none;
+    }
+
+    /* The logo fills the row on a phone, so the button sits on a line above it. */
+    .sky-home {
+        position: static;
+        margin-block-end: 0.75rem;
     }
 }
 
