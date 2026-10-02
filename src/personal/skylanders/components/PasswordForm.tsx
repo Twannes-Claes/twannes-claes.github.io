@@ -10,8 +10,15 @@ import type { Db } from '../types';
  */
 const devPassword = import.meta.env.DEV ? import.meta.env.VITE_SKYLANDERS_DEV_PASSWORD : undefined;
 
+interface PasswordFormProps
+{
+    db: Db;
+    /** Opens the sample collection, for people without the password. */
+    onDemo: () => void;
+}
+
 /** The lock screen, styled as the Portal of Power the figures stand on. */
-export function PasswordForm({ db }: { db: Db })
+export function PasswordForm({ db, onDemo }: PasswordFormProps)
 {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -93,6 +100,19 @@ export function PasswordForm({ db }: { db: Db })
                 </button>
                 {error && <p className="sky-error">{error}</p>}
             </form>
+
+            <p className="sky-login__demo">
+                No password?{' '}
+                <button type="button" onClick={onDemo}>
+                    Try the demo
+                </button>
+            </p>
+
+            {/* A nudge towards the secret way in, see entrance/useSecretEntrance.ts. */}
+            <p className="sky-login__secret">
+                Psst. On the portfolio, flick between day and night fast enough and a portal
+                opens.
+            </p>
 
             {devPassword && (
                 <button

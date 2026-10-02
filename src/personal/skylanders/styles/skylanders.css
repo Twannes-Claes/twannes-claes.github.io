@@ -823,6 +823,55 @@ html:has(.sky-dialog[open]) {
     font-size: 1rem;
 }
 
+/* --- Demo ----------------------------------------------------------------- */
+
+/* Under the lock screen, a quiet way in for people without the password. */
+.sky-login__demo {
+    margin: 0;
+    color: rgb(255 248 230 / 0.75);
+}
+
+.sky-login__demo button {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--sky-gold-hi);
+    font: inherit;
+    font-weight: 800;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+.sky-login__demo button:hover,
+.sky-login__demo button:focus-visible {
+    color: var(--sky-ink);
+}
+
+/* The hint at the secret entrance, small and faint so it reads as a whisper.
+   The negative margin tucks it closer to the demo line than the login's gap. */
+.sky-login__secret {
+    max-width: 30ch;
+    margin: -0.75rem 0 0;
+    font-size: 0.8rem;
+    font-style: italic;
+    color: rgb(255 248 230 / 0.45);
+}
+
+/* Says the collection below is a sample, so nobody mistakes it for the real one. */
+.sky-demo {
+    width: fit-content;
+    max-width: 100%;
+    margin: 0 auto 1.25rem;
+    padding: 0.5rem 1.1rem;
+    border: 2px solid rgb(255 224 120 / 0.55);
+    border-radius: 999px;
+    background: rgb(4 10 38 / 0.55);
+    color: var(--sky-ink);
+    font-size: 0.9rem;
+    text-align: center;
+}
+
 /* --- Portal of Power (sign in) ------------------------------------------ */
 
 .sky-login {

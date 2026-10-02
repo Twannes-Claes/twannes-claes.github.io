@@ -4,9 +4,9 @@ import type { Skylander, SkylanderDetails } from '../types';
 import { lookup } from './wiki';
 
 /*
- * A stand-in for services/db.ts under `npm run dev` with ?mock in the URL, see
- * pages/Skylanders.tsx. It keeps the collection in memory and never touches Firebase, so the page
- * can be tried out without the password. Reloading starts over from the samples.
+ * A stand-in for services/db.ts with ?demo in the URL, see pages/Skylanders.tsx, so the page can
+ * be shown to people without the password or the real collection. It keeps a sample collection in
+ * memory and never touches Firebase. Reloading starts over from the samples.
  */
 
 /**

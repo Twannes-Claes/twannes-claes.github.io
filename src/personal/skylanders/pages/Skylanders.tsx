@@ -5,7 +5,7 @@ import '../styles/skylanders.css';
 import { faBookOpen, faHouse, faRightFromBracket } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Head } from 'vite-react-ssg';
 
 import type { Db } from '../types';
@@ -17,12 +17,20 @@ import { SkyBackdrop } from '../components/SkyBackdrop';
 /**
  * A private page for tracking the Skylanders collection. It is left out of the nav and marked
  * noindex, so only people with the link find it, and only people with the password see the list.
+ * Anyone can try it with ?demo, which swaps in a sample collection, see services/demo.ts.
  * It deliberately shares none of the portfolio styling, see styles/skylanders.css.
  */
 export default function Skylanders()
 {
-    const [db, setDb] = useState<Db | null>(null);
-    const [signedIn, setSignedIn] = useState<boolean | null>(null);
+    const [search] = useSearchParams();
+    const navigate = useNavigate();
+    const demo = search.has('demo');
+    // Both kept with the mode they came from, so switching between the demo and the real
+    // collection never shows one with the other's module or sign in for a moment.
+    const [loaded, setLoaded] = useState<{ demo: boolean; db: Db } | null>(null);
+    const [auth, setAuth] = useState<{ demo: boolean; signedIn: boolean } | null>(null);
+    const db = loaded?.demo === demo ? loaded.db : null;
+    const signedIn = auth?.demo === demo ? auth.signedIn : null;
 
     useEffect(() =>
     {
@@ -30,21 +38,16 @@ export default function Skylanders()
         let cancelled = false;
 
         // Loaded here rather than imported, so Firebase is not in the portfolio bundle and
-        // never runs during the prerender.
-        // ?mock under npm run dev swaps in fake in-memory data, see services/mock.ts. The DEV
-        // check folds away in a production build, so the mock never ships.
-        const load =
-            import.meta.env.DEV && new URLSearchParams(location.search).has('mock')
-                ? import('../services/mock')
-                : import('../services/db');
+        // never runs during the prerender. The demo never loads Firebase at all.
+        const load = demo ? import('../services/demo') : import('../services/db');
 
         load.then((module) =>
         {
             if (cancelled)
                 return;
 
-            setDb(module);
-            unsubscribe = module.watchSignedIn(setSignedIn);
+            setLoaded({ demo, db: module });
+            unsubscribe = module.watchSignedIn((value) => setAuth({ demo, signedIn: value }));
         });
 
         return () =>
@@ -52,18 +55,30 @@ export default function Skylanders()
             cancelled = true;
             unsubscribe?.();
         };
-    }, []);
+    }, [demo]);
 
-    const signOut = useCallback(() => void db?.signOut(), [db]);
+    // A plain ?demo rather than the ?demo= setSearchParams would write, for a tidy link to share.
+    const enterDemo = useCallback(() => navigate({ search: '?demo' }), [navigate]);
+
+    // Leaving the demo goes back to the lock screen rather than signing the demo out.
+    const signOut = useCallback(() =>
+    {
+        if (demo)
+            navigate({ search: '' });
+        else
+            void db?.signOut();
+
+    }, [db, demo, navigate]);
 
     let body;
 
     if (!db || signedIn === null)
         body = <p className="sky-loading">Powering up the portal</p>;
     else if (!signedIn)
-        body = <PasswordForm db={db} />;
+        body = <PasswordForm db={db} onDemo={enterDemo} />;
     else
-        body = <Collection db={db} />;
+        // Keyed on the mode, so the demo and the real collection never share state.
+        body = <Collection key={demo ? 'demo' : 'real'} db={db} />;
 
     return (
         <div className="sky">
@@ -84,8 +99,15 @@ export default function Skylanders()
                     <h1 className="sky-logo" data-text="Skylanders">
                         Skylanders
                     </h1>
-                    <p className="sky-ribbon">Our collection</p>
+                    <p className="sky-ribbon">{demo ? 'Demo collection' : 'Our collection'}</p>
                 </header>
+
+                {demo && (
+                    <p className="sky-demo">
+                        A sample collection to try things out. Nothing is saved, a reload starts
+                        over.
+                    </p>
+                )}
 
                 <main>{body}</main>
 
@@ -102,7 +124,7 @@ export default function Skylanders()
                     {db && signedIn && (
                         <button type="button" className="sky-logout" onClick={signOut}>
                             <FontAwesomeIcon icon={faRightFromBracket} />
-                            Log out
+                            {demo ? 'Leave demo' : 'Log out'}
                         </button>
                     )}
                 </footer>
