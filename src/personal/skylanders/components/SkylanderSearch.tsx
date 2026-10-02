@@ -15,15 +15,23 @@ import {
 
 import type { CatalogEntry } from '../types';
 
-import { elementFor, elements, giant, type Element } from '../content/elements';
+import { elementFor, elements, giant, magicItem, type Element } from '../content/elements';
 
 /** Short enough that "fi" still means a name, long enough that "fir" can mean Fire. */
 const minTagQuery = 3;
 
-/** Whether the query is the start of the figure's element, or of Giants. */
+/**
+ * Whether the query is the start of the figure's element or of Giants, or for an item of "Items",
+ * "Magic Item" or "Adventure Pack".
+ */
 function matchesTag(entry: CatalogEntry, needle: string): boolean
 {
-    const tags = entry.giant ? [entry.element, giant.name] : [entry.element];
+    const tags = [
+        entry.element,
+        entry.giant ? giant.name : '',
+        entry.item ?? '',
+        entry.item ? magicItem.name : '',
+    ];
 
     return tags.some((tag) => tag && tag.toLowerCase().startsWith(needle));
 }
@@ -160,7 +168,8 @@ export function SkylanderSearch({
     /** The element chosen in the filter row, null for any. */
     const [elementFilter, setElementFilter] = useState<string | null>(null);
     const [giantsOnly, setGiantsOnly] = useState(false);
-    const filtering = elementFilter !== null || giantsOnly;
+    const [itemsOnly, setItemsOnly] = useState(false);
+    const filtering = elementFilter !== null || giantsOnly || itemsOnly;
 
     /** Only elements the catalog has figures for get a filter. */
     const filterElements = useMemo(
@@ -174,7 +183,8 @@ export function SkylanderSearch({
             catalog.filter(
                 (entry) =>
                     (!elementFilter || entry.element === elementFilter) &&
-                    (!giantsOnly || entry.giant),
+                    (!giantsOnly || entry.giant) &&
+                    (!itemsOnly || entry.item),
             ),
             value,
         );
@@ -187,7 +197,7 @@ export function SkylanderSearch({
             return found;
 
         return { results: [exact, ...found.results], named: found.named + 1 };
-    }, [catalog, value, elementFilter, giantsOnly]);
+    }, [catalog, value, elementFilter, giantsOnly, itemsOnly]);
     // Stays open on a filter with no matches, so it can be switched off again.
     const expanded = open && (results.length > 0 || filtering);
 
@@ -256,15 +266,27 @@ export function SkylanderSearch({
         [pick, results, target],
     );
 
+    // An element and Giants combine, but items have neither, so Items switches the others off
+    // and they switch Items off, rather than ending up on an empty list.
     const toggleElement = useCallback((name: string) =>
     {
         setElementFilter((current) => (current === name ? null : name));
+        setItemsOnly(false);
         setActive(-1);
     }, []);
 
     const toggleGiants = useCallback(() =>
     {
         setGiantsOnly((current) => !current);
+        setItemsOnly(false);
+        setActive(-1);
+    }, []);
+
+    const toggleItems = useCallback(() =>
+    {
+        setItemsOnly((current) => !current);
+        setElementFilter(null);
+        setGiantsOnly(false);
         setActive(-1);
     }, []);
 
@@ -302,14 +324,14 @@ export function SkylanderSearch({
                 ref={input}
                 className={`sky-input${value ? ' sky-input--clearable' : ''}`}
                 role="combobox"
-                aria-label="Skylander name"
+                aria-label="Skylander or item name"
                 aria-autocomplete="list"
                 aria-expanded={expanded}
                 aria-controls={listId}
                 aria-activedescendant={expanded && target >= 0 ? `${listId}-${target}` : undefined}
                 autoComplete="off"
                 spellCheck={false}
-                placeholder="Add a Skylander, or search Fire, Giants..."
+                placeholder="Add a Skylander or item, or search Fire, Giants..."
                 value={value}
                 onChange={type}
                 onFocus={show}
@@ -344,7 +366,7 @@ export function SkylanderSearch({
                     <div
                         className="sky-search__filters"
                         role="group"
-                        aria-label="Filter suggestions by element or Giants"
+                        aria-label="Filter suggestions by element, Giants or items"
                     >
                         {filterElements.map((element) => (
                             <FilterButton
@@ -359,17 +381,22 @@ export function SkylanderSearch({
                             pressed={giantsOnly}
                             onToggle={toggleGiants}
                         />
+                        <FilterButton
+                            element={magicItem}
+                            pressed={itemsOnly}
+                            onToggle={toggleItems}
+                        />
                     </div>
 
                     {results.length === 0 && (
-                        <p className="sky-search__none">No Skylanders match these filters.</p>
+                        <p className="sky-search__none">Nothing matches these filters.</p>
                     )}
 
                     <ul className="sky-search__list" id={listId} role="listbox">
                         {results.map((entry, index) =>
                         {
                             const copies = owned.get(entry.name) ?? 0;
-                            const element = elementFor(entry.element);
+                            const element = elementFor(entry.element, entry.item);
 
                             return (
                                 <li
@@ -422,11 +449,11 @@ export function SkylanderSearch({
                                                 <FontAwesomeIcon icon={giant.icon} />
                                             </span>
                                         )}
-                                        {entry.element && (
+                                        {element.name && (
                                             <span
                                                 className="sky-search__icon sky-tip sky-tip--left"
                                                 style={{ '--el': element.color } as CSSProperties}
-                                                data-tip={element.name}
+                                                data-tip={entry.item ?? element.name}
                                             >
                                                 <FontAwesomeIcon icon={element.icon} />
                                             </span>

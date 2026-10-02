@@ -10,8 +10,8 @@ import { lookup } from './wiki';
  */
 
 /**
- * A mix of elements, games and name lengths, with duplicates for the second coin and a few
- * special versions for the variant tags and frame.
+ * A mix of elements, games and name lengths, with duplicates for the blue coin, a few special
+ * versions for the variant tags and frame, and two items.
  */
 const samples: [name: string, count: number, variants: VariantCounts][] = [
     ['Spyro', 2, { dark: 1 }],
@@ -25,6 +25,9 @@ const samples: [name: string, count: number, variants: VariantCounts][] = [
     ['Tree Rex', 1, {}],
     ['Jet-Vac', 1, {}],
     ['Knight Light', 1, {}],
+    // A magic item and an adventure pack, for the items shelf and coin.
+    ['Ghost Pirate Swords', 1, {}],
+    ['Pirate Seas', 1, {}],
 ];
 
 const items = new Map<string, Skylander>();

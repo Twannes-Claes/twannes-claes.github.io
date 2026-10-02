@@ -13,7 +13,7 @@ import { flushSync } from 'react-dom';
 
 import type { CatalogEntry, Db, Skylander, SkylanderDetails } from '../types';
 
-import { elements, giant } from '../content/elements';
+import { elements, giant, magicItem } from '../content/elements';
 import { addedMessage } from '../content/messages';
 import { offeredVersions, type VersionId } from '../content/variants';
 import { playVoice } from '../services/voice';
@@ -112,8 +112,9 @@ export function Collection({ db }: { db: Db })
         // are left for the next visit to retry.
         for (const item of items ?? [])
         {
+            // Items have no element to find.
             const complete =
-                item.game && item.element && item.detailsVersion === detailsVersion;
+                item.game && (item.element || item.item) && item.detailsVersion === detailsVersion;
 
             if (complete || !item.url || repaired.current.has(item.id))
                 continue;
@@ -147,38 +148,51 @@ export function Collection({ db }: { db: Db })
     );
 
     /**
-     * Only the elements someone owns get a chip, with how many of each, and Giants a chip after
-     * them once there is one.
+     * Only the elements someone owns get a chip, with how many of each, and Giants and Items a
+     * chip after them once there is one.
      */
     const counts = useMemo(() =>
     {
         const tally = new Map<string, number>();
+        const count = (name: string) => tally.set(name, (tally.get(name) ?? 0) + 1);
 
         for (const item of items ?? [])
         {
-            tally.set(item.element, (tally.get(item.element) ?? 0) + 1);
+            if (item.item)
+                count(magicItem.name);
+            else
+                count(item.element);
 
             if (item.giant)
-                tally.set(giant.name, (tally.get(giant.name) ?? 0) + 1);
+                count(giant.name);
 
         }
 
-        return [...elements, giant]
+        return [...elements, giant, magicItem]
             .filter((element) => tally.has(element.name))
             .map((element) => ({ element, count: tally.get(element.name) ?? 0 }));
     }, [items]);
 
     // A filter whose last figure was just removed falls back to showing everything.
     const activeFilter = counts.some(({ element }) => element.name === filter) ? filter : null;
-    const shown = useMemo(
-        () =>
-            items?.filter(
-                (item) =>
-                    !activeFilter ||
-                    (activeFilter === giant.name ? item.giant : item.element === activeFilter),
-            ) ?? [],
-        [items, activeFilter],
-    );
+
+    /** The Skylanders and the items apart, so the items get a shelf of their own below. */
+    const [figures, things] = useMemo(() =>
+    {
+        const shown =
+            items?.filter((item) =>
+            {
+                if (activeFilter === magicItem.name)
+                    return item.item !== undefined;
+
+                if (activeFilter === giant.name)
+                    return item.giant;
+
+                return !activeFilter || item.element === activeFilter;
+            }) ?? [];
+
+        return [shown.filter((item) => !item.item), shown.filter((item) => item.item)];
+    }, [items, activeFilter]);
 
     /** Stores a looked up figure, as a plain copy or one of a special version. */
     const save = useCallback(
@@ -208,7 +222,7 @@ export function Collection({ db }: { db: Db })
             if (!typed || busy)
                 return;
 
-            const unknown = `There is no Skylander called "${typed}". Pick one from the list.`;
+            const unknown = `There is no Skylander or item called "${typed}". Pick one from the list.`;
 
             // Only real Skylanders get in. Matching here also fixes the capitals, because wiki
             // titles are case sensitive.
@@ -318,6 +332,8 @@ export function Collection({ db }: { db: Db })
     const versionsItem = items?.find((item) => item.id === versionsOf) ?? null;
 
     const total = useMemo(() => items?.reduce((sum, item) => sum + item.count, 0) ?? 0, [items]);
+    const itemCount = useMemo(() => items?.filter((item) => item.item).length ?? 0, [items]);
+    const skylanderCount = (items?.length ?? 0) - itemCount;
 
     const showAll = useCallback(() => setFilter(null), []);
 
@@ -348,14 +364,22 @@ export function Collection({ db }: { db: Db })
                     <div className="sky-stats">
                         <div className="sky-tally">
                             <div className="sky-coin">
-                                <span className="sky-coin__count">{items.length}</span>
+                                <span className="sky-coin__count">{skylanderCount}</span>
                                 <span className="sky-coin__label">
-                                    {items.length === 1 ? 'Skylander' : 'Skylanders'}
+                                    {skylanderCount === 1 ? 'Skylander' : 'Skylanders'}
                                 </span>
                             </div>
+                            {itemCount > 0 && (
+                                <div className="sky-coin sky-coin--small sky-coin--copper">
+                                    <span className="sky-coin__count">{itemCount}</span>
+                                    <span className="sky-coin__label">
+                                        {itemCount === 1 ? 'Item' : 'Items'}
+                                    </span>
+                                </div>
+                            )}
                             {/* Only says something new once there are duplicates. */}
                             {total > items.length && (
-                                <div className="sky-coin sky-coin--blue">
+                                <div className="sky-coin sky-coin--small sky-coin--blue">
                                     <span className="sky-coin__count">{total}</span>
                                     <span className="sky-coin__label">Figures</span>
                                 </div>
@@ -364,7 +388,7 @@ export function Collection({ db }: { db: Db })
                         <div
                             className="sky-filters"
                             role="group"
-                            aria-label="Filter by element or Giants"
+                            aria-label="Filter by element, Giants or items"
                             // How many chips share the line, All included, see skylanders.css.
                             style={{ '--chips': counts.length + 1 } as CSSProperties}
                         >
@@ -395,12 +419,28 @@ export function Collection({ db }: { db: Db })
                     </div>
 
                     {/* Keyed on the filter, so switching replays the card entrance. */}
-                    <SkylanderGrid
-                        key={activeFilter ?? 'all'}
-                        items={shown}
-                        onRemove={setPending}
-                        onVariants={openVersions}
-                    />
+                    {figures.length > 0 && (
+                        <SkylanderGrid
+                            key={activeFilter ?? 'all'}
+                            items={figures}
+                            onRemove={setPending}
+                            onVariants={openVersions}
+                        />
+                    )}
+                    {things.length > 0 && (
+                        <>
+                            {/* Only needed to tell the shelves apart when both are there. */}
+                            {figures.length > 0 && (
+                                <h2 className="sky-shelf">Magic items & adventure packs</h2>
+                            )}
+                            <SkylanderGrid
+                                key={`items-${activeFilter ?? 'all'}`}
+                                items={things}
+                                onRemove={setPending}
+                                onVariants={openVersions}
+                            />
+                        </>
+                    )}
                 </>
             )}
 

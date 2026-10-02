@@ -132,7 +132,7 @@ export function VariantsDialog({ item, onChange, onClose }: VariantsDialogProps)
         [onClose],
     );
 
-    const style = item ? ({ '--el': elementFor(item.element).color } as CSSProperties) : undefined;
+    const style = item ? ({ '--el': elementFor(item.element, item.item).color } as CSSProperties) : undefined;
 
     return (
         <dialog

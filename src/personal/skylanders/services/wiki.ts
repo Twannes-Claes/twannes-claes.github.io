@@ -1,4 +1,4 @@
-import type { CatalogEntry, SkylanderDetails } from '../types';
+import type { CatalogEntry, ItemKind, SkylanderDetails } from '../types';
 
 import { elements } from '../content/elements';
 import {
@@ -116,6 +116,31 @@ const altDecoCategory = 'Category:Alt Deco Skylanders';
  */
 const reissueCategory = 'Category:SuperCharger Versions of Previous Skylanders';
 
+/**
+ * Toys that are not Skylanders but go on the portal all the same: magic items like the Ghost
+ * Pirate Swords or the Dragonfire Cannon, and adventure packs like Pirate Seas. They are not in
+ * Category:Skylanders, so they are fetched from these on their own.
+ */
+const itemCategories: { category: string; kind: ItemKind }[] = [
+    { category: 'Category:Magic Items', kind: 'Magic Item' },
+    { category: 'Category:Adventure Packs', kind: 'Adventure Pack' },
+];
+
+/** Pages in those categories about the toys in general rather than one toy. */
+const notItems = new Set([
+    'Magic Item',
+    'Sidekicks',
+    'Trophies',
+    'Trap',
+    'Instant Vehicles',
+    'Expansion Packs',
+]);
+
+function itemOf(categories: Set<string>): ItemKind | undefined
+{
+    return itemCategories.find(({ category }) => categories.has(category))?.kind;
+}
+
 function elementOf(categories: Set<string>): string
 {
     return elements.find(({ name }) => categories.has(`Category:${name} Skylanders`))?.name ?? '';
@@ -137,6 +162,8 @@ interface CatalogPage
      * Stealth Elf.
      */
     base: string;
+    /** Set on magic items and adventure packs, see itemCategories. */
+    item?: ItemKind;
 }
 
 let catalogPages: Promise<CatalogPage[]> | undefined;
@@ -148,6 +175,9 @@ const catalogCategories = [
     giantCategory,
     altDecoCategory,
     reissueCategory,
+    // Not needed in the figure request, but listed so a copy saved before items were fetched
+    // is thrown away.
+    ...itemCategories.map(({ category }) => category),
 ];
 
 const cacheKey = 'skylanders-catalog';
@@ -198,12 +228,49 @@ function writeCache(pages: CatalogPage[])
     }
 }
 
+/** The magic items or adventure packs, with a small picture each. */
+async function itemPages({ category, kind }: (typeof itemCategories)[number]): Promise<CatalogPage[]>
+{
+    const data = (await call({
+        action: 'query',
+        generator: 'categorymembers',
+        gcmtitle: category,
+        gcmnamespace: '0',
+        gcmlimit: '500',
+        prop: 'pageimages',
+        piprop: 'thumbnail',
+        pithumbsize: '96',
+    })) as { query?: { pages: Record<string, WikiPage> } };
+
+    return Object.values(data.query?.pages ?? {})
+        .filter((page) => !notItems.has(page.title))
+        .map((page) => ({
+            title: page.title,
+            thumb: page.thumbnail?.source ?? '',
+            categories: new Set([category]),
+            figure: false,
+            unreleased: false,
+            base: '',
+            item: kind,
+        }));
+}
+
 /**
- * Every page in Category:Skylanders, straight from the wiki. The category holds a few hundred
- * pages, which a single request covers. Dark and Eon's Elite repaints are found through their own
- * categories as well, since not all of them are marked Alt Deco.
+ * Every page in Category:Skylanders, straight from the wiki, then the magic items and adventure
+ * packs. The category holds a few hundred pages, which a single request covers. Dark and Eon's
+ * Elite repaints are found through their own categories as well, since not all of them are marked
+ * Alt Deco.
  */
-function downloadPages(): Promise<CatalogPage[]>
+async function downloadPages(): Promise<CatalogPage[]>
+{
+    const [figures, ...items] = await Promise.all([downloadFigures(), ...itemCategories.map(itemPages)]);
+    const titles = new Set(figures.map((page) => page.title));
+
+    // A page in both is left a figure.
+    return [...figures, ...items.flat().filter((page) => !titles.has(page.title))];
+}
+
+function downloadFigures(): Promise<CatalogPage[]>
 {
     return Promise.all([
         call({
@@ -302,21 +369,22 @@ function displayName(title: string): string
 }
 
 /**
- * Every figure with a small thumbnail, for the search dropdown. Paint jobs of another figure are
- * left out, since they are picked as a version of that figure when adding it.
+ * Every figure and item with a small thumbnail, for the search dropdown. Paint jobs of another
+ * figure are left out, since they are picked as a version of that figure when adding it.
  */
 export async function fetchCatalog(): Promise<CatalogEntry[]>
 {
     const pages = await fetchPages();
 
     return pages
-        .filter((page) => page.figure && !page.unreleased && !page.base)
+        .filter((page) => page.item || (page.figure && !page.unreleased && !page.base))
         .map((page) => ({
             name: displayName(page.title),
             title: page.title,
             thumb: page.thumb,
             element: elementOf(page.categories),
             giant: page.categories.has(giantCategory),
+            item: page.item,
         }))
         .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -585,6 +653,7 @@ async function fetchDetails(name: string): Promise<SkylanderDetails>
         editionsOf(page.title).catch(() => []),
     ]);
     const looks = looksOf(pictures, links, image, repaints);
+    const item = itemOf(categories);
     const found = new Set([
         ...categoryVersions
             .filter(({ category }) => categories.has(category))
@@ -598,6 +667,8 @@ async function fetchDetails(name: string): Promise<SkylanderDetails>
         image,
         element: elementOf(categories),
         giant: categories.has(giantCategory),
+        // Left off Skylanders, because Firestore refuses fields set to undefined.
+        ...(item && { item }),
         // Every figure is in the plain game category, only some also in the "Characters" one.
         game:
             games.find(

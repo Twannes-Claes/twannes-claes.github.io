@@ -6,6 +6,12 @@ import type { Edition, Looks, VariantCounts, VariantId } from './content/variant
  */
 export type Db = typeof import('./services/db');
 
+/**
+ * Toys that go on the portal without being a Skylander, like the Ghost Pirate Swords or the
+ * Pirate Seas ship, sorted the way the wiki sorts them. Also the tag the card shows.
+ */
+export type ItemKind = 'Magic Item' | 'Adventure Pack';
+
 export interface Skylander
 {
     /** Firestore document id, derived from the name in services/db.ts. */
@@ -27,6 +33,8 @@ export interface Skylander
      * tracked, until Collection.tsx looks them up again.
      */
     giant?: boolean;
+    /** Set on magic items and adventure packs, missing on Skylanders. */
+    item?: ItemKind;
     /** The game the figure first appeared in. */
     game: string;
     /** Wiki page, empty when the name did not match one. */
@@ -81,4 +89,6 @@ export interface CatalogEntry
     /** Empty when the wiki page does not say, like on Kaos. */
     element: string;
     giant: boolean;
+    /** Set on magic items and adventure packs, see Skylander. */
+    item?: ItemKind;
 }

@@ -4,6 +4,7 @@ import {
     faDroplet,
     faFire,
     faGear,
+    faGem,
     faHandFist,
     faLeaf,
     faMoon,
@@ -14,6 +15,8 @@ import {
     faWandSparkles,
     faWind,
 } from '@fortawesome/free-solid-svg-icons';
+
+import type { ItemKind } from '../types';
 
 export interface Element
 {
@@ -47,7 +50,17 @@ export const unknownElement: Element = { name: '', color: '#f5c542', icon: faSta
  */
 export const giant: Element = { name: 'Giants', color: '#5ee0b0', icon: faHandFist };
 
-export function elementFor(name: string): Element
+/**
+ * Magic items and adventure packs have no element. They share one copper look instead, with a
+ * tag and a filter chip like an element's.
+ */
+export const magicItem: Element = { name: 'Items', color: '#e07b53', icon: faGem };
+
+/** The element's look, or the items' one for a magic item or adventure pack. */
+export function elementFor(name: string, item?: ItemKind): Element
 {
+    if (item)
+        return magicItem;
+
     return elements.find((element) => element.name === name) ?? unknownElement;
 }

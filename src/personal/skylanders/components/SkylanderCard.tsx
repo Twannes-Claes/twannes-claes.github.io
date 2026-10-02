@@ -177,7 +177,7 @@ export function SkylanderCard({
         },
         [item, onVariants],
     );
-    const element = elementFor(item.element);
+    const element = elementFor(item.element, item.item);
     const special = ownedVersions(item);
     // A picture of each version owned, for the carousel. Versions the wiki has no picture of are
     // left out rather than shown as the plain one.
@@ -287,7 +287,8 @@ export function SkylanderCard({
                                 style={{ '--v': element.color } as CSSProperties}
                             >
                                 <FontAwesomeIcon icon={element.icon} />
-                                {element.name}
+                                {/* "Magic Item" or "Adventure Pack" rather than "Items". */}
+                                {item.item ?? element.name}
                             </li>
                         )}
                         {item.giant && (

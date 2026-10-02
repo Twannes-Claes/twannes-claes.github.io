@@ -7,6 +7,7 @@ import {
     normal,
     normalFor,
     offeredVersions,
+    variantLink,
     versionImage,
     type VersionId,
 } from '../content/variants';
@@ -104,7 +105,7 @@ export function ChooseVersion({ details, onChoose, onCancel }: ChooseVersionProp
     );
 
     const style = details
-        ? ({ '--el': elementFor(details.element).color } as CSSProperties)
+        ? ({ '--el': elementFor(details.element, details.item).color } as CSSProperties)
         : undefined;
     const choices = details
         ? [
@@ -139,12 +140,19 @@ export function ChooseVersion({ details, onChoose, onCancel }: ChooseVersionProp
                             : 'Pick the version you are adding.'}
                     </p>
                     <ul className={`sky-choices${single ? ' sky-choices--single' : ''}`}>
+                        {/* The picture adds that version, the name opens it on the wiki, like
+                            the names in VariantsDialog.tsx. A link cannot sit inside a button,
+                            so the tile is a box holding both. */}
                         {choices.map((choice) => (
-                            <li key={choice.id}>
+                            <li
+                                key={choice.id}
+                                className="sky-choice"
+                                style={{ '--v': choice.color } as CSSProperties}
+                            >
                                 <button
                                     type="button"
-                                    className="sky-choice"
-                                    style={{ '--v': choice.color } as CSSProperties}
+                                    className="sky-choice__picture"
+                                    aria-label={`Add ${choice.name} ${details.name}`}
                                     onClick={() =>
                                         choose(
                                             details,
@@ -152,19 +160,26 @@ export function ChooseVersion({ details, onChoose, onCancel }: ChooseVersionProp
                                         )
                                     }
                                 >
-                                    <span className="sky-choice__picture">
-                                        {choice.src ? (
-                                            <img
-                                                src={choice.src}
-                                                alt=""
-                                                referrerPolicy="no-referrer"
-                                            />
-                                        ) : (
-                                            <span className="sky-card__placeholder">?</span>
-                                        )}
-                                    </span>
-                                    <span className="sky-choice__name">{choice.name}</span>
+                                    {choice.src ? (
+                                        <img src={choice.src} alt="" referrerPolicy="no-referrer" />
+                                    ) : (
+                                        <span className="sky-card__placeholder">?</span>
+                                    )}
                                 </button>
+                                <a
+                                    className="sky-choice__name"
+                                    // One version alone is just the figure, so its own page.
+                                    href={
+                                        single && details.url
+                                            ? details.url
+                                            : variantLink(details, choice)
+                                    }
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    aria-label={`See what ${choice.name} ${details.name} looks like`}
+                                >
+                                    {choice.name}
+                                </a>
                             </li>
                         ))}
                     </ul>

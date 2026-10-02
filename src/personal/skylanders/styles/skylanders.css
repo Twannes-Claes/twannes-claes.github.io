@@ -1066,7 +1066,8 @@ html:has(.sky-dialog[open]) {
     margin-block: 0 1.75rem;
 }
 
-/* The gold coin, joined by the blue one once there are duplicates. */
+/* The gold coin, joined by the copper one once there are items and the blue
+   one once there are duplicates. */
 .sky-tally {
     display: flex;
     flex: none;
@@ -1122,10 +1123,38 @@ html:has(.sky-dialog[open]) {
     text-transform: uppercase;
 }
 
-/* Every figure counted, copies included. A smaller blue-silver coin, so the
-   gold one stays the headline number. */
-.sky-coin--blue {
+/* The coins beside the gold one are smaller, so it stays the headline number. */
+.sky-coin--small {
     width: 86px;
+    color: #fff;
+    text-shadow:
+        0 2px 0 var(--sky-outline),
+        0 0 6px rgb(0 0 0 / 0.35);
+    animation: sky-pop 0.45s var(--sky-ease);
+}
+
+.sky-coin--small .sky-coin__count {
+    font-size: 1.8rem;
+}
+
+/* Magic items and adventure packs, in the copper of their chip and tag. */
+.sky-coin--copper {
+    background: radial-gradient(
+        circle at 30% 22%,
+        #ffd2b0 0%,
+        #ec8d5c 22%,
+        #c25a2c 55%,
+        #7e3412 100%
+    );
+    box-shadow:
+        0 5px 0 var(--sky-outline),
+        0 10px 22px rgb(0 0 0 / 0.4),
+        inset 0 0 0 4px rgb(255 255 255 / 0.3),
+        0 0 24px rgb(240 140 90 / 0.3);
+}
+
+/* Every figure counted, copies included, in blue-silver. */
+.sky-coin--blue {
     /* The highlight stays small and up in the corner, so the white text sits on
        deep blue rather than washing out on a near-white centre. */
     background: radial-gradient(
@@ -1135,20 +1164,11 @@ html:has(.sky-dialog[open]) {
         #2560c8 55%,
         #173d8f 100%
     );
-    color: #fff;
-    text-shadow:
-        0 2px 0 var(--sky-outline),
-        0 0 6px rgb(0 0 0 / 0.35);
     box-shadow:
         0 5px 0 var(--sky-outline),
         0 10px 22px rgb(0 0 0 / 0.4),
         inset 0 0 0 4px rgb(255 255 255 / 0.3),
         0 0 24px rgb(95 208 255 / 0.3);
-    animation: sky-pop 0.45s var(--sky-ease);
-}
-
-.sky-coin--blue .sky-coin__count {
-    font-size: 1.8rem;
 }
 
 /* Keeps every chip on one line: the text shrinks with the row's width and the
@@ -1224,6 +1244,37 @@ html:has(.sky-dialog[open]) {
     margin: 0;
     padding: 0;
     list-style: none;
+}
+
+/* Splits the magic items and adventure packs off below the Skylanders: a title
+   between two copper rules. The bottom margin makes room for the card medals
+   poking up, like .sky-stats. */
+.sky-shelf {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-block: clamp(2.5rem, 6vw, 3.5rem) 1.75rem;
+    font-family: var(--sky-display);
+    font-size: clamp(1rem, 2.6vw, 1.35rem);
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    text-align: center;
+    text-transform: uppercase;
+    color: var(--sky-ink);
+    text-shadow: 0 2px 0 var(--sky-outline);
+}
+
+.sky-shelf::before,
+.sky-shelf::after {
+    content: '';
+    flex: 1;
+    height: 3px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, transparent, #e07b53);
+}
+
+.sky-shelf::after {
+    background: linear-gradient(90deg, #e07b53, transparent);
 }
 
 .sky-card {
@@ -2139,7 +2190,7 @@ a.sky-card__name:hover {
 }
 
 /* A small card per version, framed in its colour, lifting on hover like the
-   collection cards. */
+   collection cards. The picture adds the version, the name is a wiki link. */
 .sky-choice {
     display: grid;
     gap: 0.5rem;
@@ -2149,31 +2200,35 @@ a.sky-card__name:hover {
     border-radius: 16px;
     background: rgb(4 10 38 / 0.45);
     color: var(--sky-ink);
-    font: inherit;
-    cursor: pointer;
     transition:
         transform 0.25s var(--sky-ease),
         border-color 0.25s,
         box-shadow 0.25s;
 }
 
-.sky-choice:hover,
-.sky-choice:focus-visible {
+/* Only the picture lifts the card, so pointing at the name reads as the link
+   rather than as picking this version. */
+.sky-choice:has(.sky-choice__picture:hover),
+.sky-choice:has(.sky-choice__picture:focus-visible) {
     transform: translateY(-3px);
     border-color: var(--v);
     box-shadow:
         0 6px 14px rgb(0 0 0 / 0.35),
         0 0 0 2px color-mix(in srgb, var(--v) 35%, transparent);
-    outline: none;
 }
 
 .sky-choice__picture {
     display: grid;
     place-items: center;
+    width: 100%;
     aspect-ratio: 1;
     overflow: hidden;
+    padding: 0;
+    border: 0;
     border-radius: 11px;
     background: radial-gradient(circle at 50% 42%, #fffdf4 0%, #f7edd2 60%, #efdcae 100%);
+    cursor: pointer;
+    outline: none;
 }
 
 .sky-choice__picture img {
@@ -2193,9 +2248,19 @@ a.sky-card__name:hover {
     align-items: center;
     justify-content: center;
     gap: 0.4rem;
+    justify-self: center;
     font-size: 0.85rem;
     font-weight: 800;
     line-height: 1.1;
+    color: inherit;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+/* Lights up in the version's colour, like the names in the versions dialog. */
+.sky-choice__name:hover,
+.sky-choice__name:focus-visible {
+    color: var(--v);
 }
 
 .sky-choice__name::before {

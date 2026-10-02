@@ -52,7 +52,7 @@ export function ConfirmRemove({ item, onConfirm, onCancel }: ConfirmRemoveProps)
         [onCancel],
     );
 
-    const style = item ? ({ '--el': elementFor(item.element).color } as CSSProperties) : undefined;
+    const style = item ? ({ '--el': elementFor(item.element, item.item).color } as CSSProperties) : undefined;
 
     return (
         <dialog
