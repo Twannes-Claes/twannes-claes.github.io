@@ -6,7 +6,9 @@
    router moves on to a portfolio page.
 --------------------------------------------------------------------------- */
 
-.sky {
+/* Also on the root while this page is up, for the page scrollbar further down. */
+.sky,
+html:has(.sky) {
     --sky-ink: #fff8e6;
     --sky-muted: #b9c6ec;
     --sky-outline: #2b1604;
@@ -19,7 +21,9 @@
     --sky-portal: #5fd0ff;
     --sky-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
     --sky-display: 'Lilita One', 'Trebuchet MS', sans-serif;
+}
 
+.sky {
     position: relative;
     isolation: isolate;
     min-height: 100svh;
@@ -51,9 +55,12 @@
 }
 
 /* The page behind an open dialog stays put. The scrollbar's room is kept on
-   this page, so hiding the scrollbar does not shift everything sideways. */
+   this page, so hiding the scrollbar does not shift everything sideways. The
+   root paints that room and the scrollbar track, so it takes the page's navy
+   rather than the portfolio background. */
 html:has(.sky) {
     scrollbar-gutter: stable;
+    background-color: #060d2e;
 }
 
 html:has(.sky-dialog[open]) {
@@ -532,11 +539,12 @@ html:has(.sky-dialog[open]) {
     display: none;
 }
 
-/* Its own scrollbar: the portfolio one in index.css borders the thumb in the
-   portfolio background, which reads as a cramped dark bar on the navy. The
-   transparent border floats the thumb and the track margins keep it clear of
-   the rounded corners. */
-.sky-search__list::-webkit-scrollbar {
+/* Its own scrollbar, for the list and the page: the portfolio one in index.css
+   borders the thumb in the portfolio background, which reads as a cramped dark
+   bar on the navy. The transparent border floats the thumb and the list's track
+   margins keep it clear of the rounded corners. */
+.sky-search__list::-webkit-scrollbar,
+html:has(.sky)::-webkit-scrollbar {
     width: 16px;
 }
 
@@ -545,20 +553,25 @@ html:has(.sky-dialog[open]) {
     background: transparent;
 }
 
-.sky-search__list::-webkit-scrollbar-thumb {
+.sky-search__list::-webkit-scrollbar-thumb,
+html:has(.sky)::-webkit-scrollbar-thumb {
     min-height: 48px;
     border: 5px solid transparent;
     border-radius: 999px;
     background: linear-gradient(180deg, var(--sky-gold-hi), var(--sky-gold-mid)) padding-box;
 }
 
-.sky-search__list::-webkit-scrollbar-thumb:hover {
+.sky-search__list::-webkit-scrollbar-thumb:hover,
+html:has(.sky)::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(180deg, #fffbe0, var(--sky-gold)) padding-box;
 }
 
 /* Chrome drops the rules above once scrollbar-color is set, so only Firefox gets it. */
 @supports not selector(::-webkit-scrollbar) {
-    .sky-search__list {
+    .sky-search__list,
+    .sky-choices,
+    .sky-variants,
+    html:has(.sky) {
         scrollbar-width: thin;
         scrollbar-color: var(--sky-gold-mid) transparent;
     }
@@ -2332,6 +2345,64 @@ a.sky-card__name:hover {
     list-style: none;
 }
 
+/* Long lists, like Trigger Happy's many editions, scroll inside the dialog
+   rather than running off a phone screen, so the title and buttons stay in
+   view. The dialog itself stays overflow: visible for the remove dialog's
+   portrait. The padding leaves room for a tile's hover lift and shadow. */
+.sky-choices,
+.sky-variants {
+    max-height: 55svh;
+    padding: 6px 4px;
+    overflow: hidden auto;
+    overscroll-behavior: contain;
+}
+
+/* No room needed for a hover lift here, only a gap before the scrollbar. */
+.sky-variants {
+    padding-inline: 0 6px;
+}
+
+/* A slimmer take on the search list's gold bar, which at 16px takes room a
+   phone's rows do not have. */
+.sky-choices::-webkit-scrollbar,
+.sky-variants::-webkit-scrollbar {
+    width: 10px;
+}
+
+.sky-choices::-webkit-scrollbar-track,
+.sky-variants::-webkit-scrollbar-track {
+    margin-block: 6px;
+    background: transparent;
+}
+
+.sky-choices::-webkit-scrollbar-thumb,
+.sky-variants::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: linear-gradient(180deg, var(--sky-gold-hi), var(--sky-gold-mid)) padding-box;
+}
+
+/* Rows held to the list's width, so a long name is cut short with an ellipsis
+   rather than wrapping or pushing the stepper out of sight. */
+.sky-variants {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.sky-variant__name,
+.sky-variant__label {
+    min-width: 0;
+}
+
+.sky-variant__label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sky-variant .sky-stepper {
+    flex: none;
+}
+
 /* One row per version: a coloured dot and name, then the usual stepper. */
 .sky-variant {
     display: flex;
@@ -2555,6 +2626,20 @@ a.sky-variant__name:focus-visible {
     /* The keyboard takes half the screen, so the list stays above it. */
     .sky-search__list {
         max-height: min(430px, 45dvh);
+    }
+
+    /* Room for a version name like Double Dare on one line. The dot keeps
+       its centring in the smaller picture's room. */
+    .sky-dialog__body {
+        padding-inline: 1rem;
+    }
+
+    .sky-variant__thumb {
+        width: 44px;
+    }
+
+    .sky-variant__dot {
+        margin-inline: 16px;
     }
 
     /* The circles squash into ovals on one narrow row, so they wrap into centred rows of six.

@@ -20,19 +20,15 @@ export interface Skylander
     name: string;
     /**
      * The wiki page title, which can differ from the name, like "Blaster-Tron (character)". Used
-     * for lookups and the document id. Missing on figures saved before it was tracked, where the
-     * name is still the title.
+     * for lookups and the document id.
      */
-    title?: string;
+    title: string;
     /** Thumbnail from the Skylanders wiki, empty when the wiki has none. */
     image: string;
     /** Magic, Tech, Water and so on, empty when the wiki page does not say. */
     element: string;
-    /**
-     * One of the big Giants figures, from the wiki. Missing on figures saved before it was
-     * tracked, until Collection.tsx looks them up again.
-     */
-    giant?: boolean;
+    /** One of the big Giants figures, from the wiki. */
+    giant: boolean;
     /** Set on magic items and adventure packs, missing on Skylanders. */
     item?: ItemKind;
     /** The game the figure first appeared in. */
@@ -43,35 +39,21 @@ export interface Skylander
     count: number;
     /** The special versions among those copies, see content/variants.ts. */
     variants: VariantCounts;
-    /**
-     * The special versions this figure was released in, from the wiki. Missing on figures saved
-     * before it was tracked, until Collection.tsx looks them up again.
-     */
-    versions?: VariantId[];
-    /**
-     * A picture of each version, from the wiki. Missing on figures saved before it was tracked,
-     * until Collection.tsx looks them up again.
-     */
-    looks?: Looks;
-    /**
-     * The figure's official catchphrase from the wiki, like "All Fired Up!", empty when the page
-     * has none. Missing on figures saved before it was tracked, until Collection.tsx looks them up
-     * again.
-     */
-    catchphrase?: string;
+    /** The special versions this figure was released in, from the wiki. */
+    versions: VariantId[];
+    /** A picture of each version, from the wiki. */
+    looks: Looks;
+    /** The official catchphrase from the wiki, like "All Fired Up!", empty when it has none. */
+    catchphrase: string;
     /** A recording of the catchphrase, which only some wiki pages have, empty otherwise. */
-    voice?: string;
-    /**
-     * Special paint jobs of this figure with wiki pages of their own, like Springtime Trigger
-     * Happy. Missing on figures saved before they were tracked, until Collection.tsx looks them up
-     * again.
-     */
-    editions?: Edition[];
+    voice: string;
+    /** Special paint jobs with wiki pages of their own, like Springtime Trigger Happy. */
+    editions: Edition[];
     /**
      * Which version of the wiki lookup filled these details in, see detailsVersion in
-     * services/wiki.ts. Older or missing means Collection.tsx looks the figure up again.
+     * services/wiki.ts. Older means Collection.tsx looks the figure up again.
      */
-    detailsVersion?: number;
+    detailsVersion: number;
 }
 
 /** What a wiki lookup knows about a figure, before it is stored. */

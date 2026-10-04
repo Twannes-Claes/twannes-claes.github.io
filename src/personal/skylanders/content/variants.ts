@@ -24,9 +24,9 @@ export const normal: { id: 'normal'; name: string; color: string } = {
  * figures that were released again as Series 2 or 3 it is Series 1, like the wiki's S1 tab.
  * Figures that never had a series are just Normal.
  */
-export function normalFor(versions: VariantId[] | undefined): typeof normal
+export function normalFor(versions: VariantId[]): typeof normal
 {
-    const series = versions?.some((id) => id === 'series2' || id === 'series3');
+    const series = versions.some((id) => id === 'series2' || id === 'series3');
 
     return series ? { ...normal, name: 'Series 1' } : normal;
 }
@@ -96,7 +96,7 @@ export const variants: Variant[] = [
  * version's picture, or else an image search for the toy.
  */
 export function variantLink(
-    figure: { name: string; url: string; looks?: Looks },
+    figure: { name: string; url: string; looks: Looks },
     variant: { id: Look | EditionId; name: string; page?: string; title?: string },
 ): string
 {
@@ -108,7 +108,7 @@ export function variantLink(
 
     // The file name inside a picture link, like Series_2_Eruptor_Promo.jpg in
     // .../images/f/f7/Series_2_Eruptor_Promo.jpg/revision/latest/...
-    const look = figure.looks?.[variant.id as Look] ?? '';
+    const look = figure.looks[variant.id as Look] ?? '';
     const file = /\/images\/[^/]+\/[^/]+\/([^/]+)\//.exec(look)?.[1];
 
     // ?file= makes Fandom open the page with that picture in its lightbox.
@@ -130,29 +130,31 @@ export function wikiPage(title: string): string
 
 /**
  * The versions a figure's dialog offers: the ones the wiki knows it came in, see services/wiki.ts,
- * plus any already owned so a count is never hidden. Figures looked up before versions were
- * tracked have no list yet and get every version until the repair in Collection.tsx fills it in.
+ * plus any already owned so a count is never hidden.
  */
-export function offeredVariants(known: VariantId[] | undefined, counts: VariantCounts): Variant[]
+export function offeredVariants(known: VariantId[], counts: VariantCounts): Variant[]
 {
-    if (!known)
-        return variants;
-
     return variants.filter(
         (variant) => known.includes(variant.id) || (counts[variant.id] ?? 0) > 0,
     );
 }
 
-/** The id an edition is counted under, from its name: "Power Blue" is "edition-power-blue". */
-export function editionId(name: string): EditionId
+/**
+ * Lowercased and dashed, so the same name typed twice comes out the same. Also the Firestore
+ * document id in services/db.ts, so changing it orphans saved figures.
+ */
+export function slug(text: string): string
 {
-    const slug = name
-        .normalize('NFKD')
+    return text
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '');
+}
 
-    return `edition-${slug}`;
+/** The id an edition is counted under, from its name: "Power Blue" is "edition-power-blue". */
+export function editionId(name: string): EditionId
+{
+    return `edition-${slug(name.normalize('NFKD'))}`;
 }
 
 /**
@@ -170,9 +172,9 @@ function editionColor(name: string): string
 }
 
 /** A figure's editions as versions, for the lists next to its variants. */
-export function editionVersions(editions: Edition[] | undefined): Version[]
+export function editionVersions(editions: Edition[]): Version[]
 {
-    return (editions ?? []).map((edition) => ({
+    return editions.map((edition) => ({
         id: edition.id,
         name: edition.name,
         color: editionColor(edition.name),
@@ -182,15 +184,30 @@ export function editionVersions(editions: Edition[] | undefined): Version[]
 }
 
 /** The picture of a version: an edition's own, or a variant's from the figure's looks. */
-export function versionImage(figure: { looks?: Looks }, version: Version): string
+export function versionImage(figure: { looks: Looks }, version: Version): string
 {
-    return version.image ?? figure.looks?.[version.id as Look] ?? '';
+    return version.image ?? figure.looks[version.id as Look] ?? '';
+}
+
+/**
+ * The plain version followed by the given special ones, each with its picture, for the card
+ * carousel and the add dialog.
+ */
+export function versionPictures(
+    figure: { looks: Looks; image: string; versions: VariantId[] },
+    versions: Version[],
+): (Omit<Version, 'id'> & { id: VersionId | 'normal'; src: string })[]
+{
+    return [
+        { ...normalFor(figure.versions), src: figure.looks.normal ?? figure.image },
+        ...versions.map((version) => ({ ...version, src: versionImage(figure, version) })),
+    ];
 }
 
 /** Every special version a figure offers: its variants, then its editions. */
 export function offeredVersions(item: {
-    versions?: VariantId[];
-    editions?: Edition[];
+    versions: VariantId[];
+    editions: Edition[];
     variants: VariantCounts;
 }): Version[]
 {
@@ -199,8 +216,8 @@ export function offeredVersions(item: {
 
 /** The special versions a figure has at least one copy of, in list order. */
 export function ownedVersions(item: {
-    versions?: VariantId[];
-    editions?: Edition[];
+    versions: VariantId[];
+    editions: Edition[];
     variants: VariantCounts;
 }): Version[]
 {

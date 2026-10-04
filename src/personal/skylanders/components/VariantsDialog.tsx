@@ -1,6 +1,6 @@
 import { faMinus, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useCallback, useEffect, useRef, type CSSProperties, type MouseEvent } from 'react';
+import { useCallback, type CSSProperties } from 'react';
 
 import type { Skylander } from '../types';
 
@@ -14,6 +14,8 @@ import {
     versionImage,
     type VersionId,
 } from '../content/variants';
+
+import { useModal } from './useModal';
 
 interface VariantsDialogProps
 {
@@ -51,7 +53,7 @@ function Row({ item, label, color, count, href, image, variant, onChange }: RowP
             ) : (
                 <span className="sky-variant__dot" aria-hidden="true" />
             )}
-            {label}
+            <span className="sky-variant__label">{label}</span>
         </>
     );
 
@@ -103,45 +105,16 @@ function Row({ item, label, color, count, href, image, variant, onChange }: RowP
  */
 export function VariantsDialog({ item, onChange, onClose }: VariantsDialogProps)
 {
-    const dialog = useRef<HTMLDialogElement>(null);
-
-    // Runs on every item change rather than only on open and close, so the dialog is shown again
-    // even if it was closed some way that did not reach onClose.
-    useEffect(() =>
-    {
-        const element = dialog.current;
-
-        if (!element)
-            return;
-
-        if (item && !element.open)
-            element.showModal();
-        else if (!item && element.open)
-            element.close();
-
-    }, [item]);
-
-    // A click on the dialog element itself, rather than its contents, landed on the backdrop.
-    const onBackdrop = useCallback(
-        (event: MouseEvent<HTMLDialogElement>) =>
-        {
-            if (event.target === event.currentTarget)
-                onClose();
-
-        },
-        [onClose],
-    );
-
+    const modal = useModal(item !== null, onClose);
     const style = item ? ({ '--el': elementFor(item.element, item.item).color } as CSSProperties) : undefined;
 
     return (
         <dialog
-            ref={dialog}
+            {...modal}
             className="sky-dialog"
             style={style}
             aria-labelledby="sky-variants-title"
             onClose={onClose}
-            onClick={onBackdrop}
         >
             {item && (
                 <div className="sky-dialog__body">
@@ -158,7 +131,7 @@ export function VariantsDialog({ item, onChange, onClose }: VariantsDialogProps)
                             color={normal.color}
                             count={plainCount(item.count, item.variants)}
                             href={variantLink(item, normal)}
-                            image={item.looks?.normal ?? item.image}
+                            image={item.looks.normal ?? item.image}
                             onChange={onChange}
                         />
                         {offeredVersions(item).map((version) => (

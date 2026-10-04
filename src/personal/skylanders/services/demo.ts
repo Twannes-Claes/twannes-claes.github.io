@@ -1,5 +1,6 @@
-import type { VariantCounts, VersionId } from '../content/variants';
 import type { Skylander, SkylanderDetails } from '../types';
+
+import { slug, type VariantCounts, type VersionId } from '../content/variants';
 
 import { lookup } from './wiki';
 
@@ -36,20 +37,17 @@ const watchers = new Set<(signedIn: boolean) => void>();
 let signedIn = true;
 let seeded: Promise<void> | undefined;
 
-function idFor(name: string): string
+function sorted(): Skylander[]
 {
-    return name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-|-$/g, '');
+    return [...items.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function publish()
 {
-    const sorted = [...items.values()].sort((a, b) => a.name.localeCompare(b.name));
+    const list = sorted();
 
     for (const listener of listeners)
-        listener(sorted);
+        listener(list);
 
 }
 
@@ -60,7 +58,7 @@ function seed(): Promise<void>
         samples.map(async ([name, count, variants]) =>
         {
             const details = await lookup(name);
-            const id = idFor(details.title ?? details.name);
+            const id = slug(details.title);
 
             items.set(id, { ...details, id, count, variants });
         }),
@@ -109,14 +107,14 @@ export function watchCollection(
     seed().catch(onError);
 
     if (items.size > 0)
-        callback([...items.values()].sort((a, b) => a.name.localeCompare(b.name)));
+        callback(sorted());
 
     return () => listeners.delete(callback);
 }
 
 export async function addSkylander(item: SkylanderDetails, variant?: VersionId): Promise<number>
 {
-    const id = idFor(item.title ?? item.name);
+    const id = slug(item.title);
     const existing = items.get(id);
     const count = (existing?.count ?? 0) + 1;
     const variants = { ...existing?.variants };

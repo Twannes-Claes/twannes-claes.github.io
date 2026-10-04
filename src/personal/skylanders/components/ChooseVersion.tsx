@@ -1,16 +1,17 @@
-import { useCallback, useEffect, useRef, type CSSProperties, type MouseEvent } from 'react';
+import { useCallback, useEffect, useRef, type CSSProperties } from 'react';
 
 import type { SkylanderDetails } from '../types';
 
 import { elementFor } from '../content/elements';
 import {
     normal,
-    normalFor,
     offeredVersions,
     variantLink,
-    versionImage,
+    versionPictures,
     type VersionId,
 } from '../content/variants';
+
+import { useModal } from './useModal';
 
 interface ChooseVersionProps
 {
@@ -43,33 +44,22 @@ function settleFocus(picked: boolean)
  */
 export function ChooseVersion({ details, onChoose, onCancel }: ChooseVersionProps)
 {
-    const dialog = useRef<HTMLDialogElement>(null);
+    const modal = useModal(details !== null, onCancel);
     /** Whether a version was picked, rather than the dialog cancelled, see settleFocus(). */
     const picked = useRef(false);
 
+    // After useModal's own effect, which has shown the dialog by now.
     useEffect(() =>
     {
-        const element = dialog.current;
-
-        if (!element)
+        if (!details)
             return;
 
-        if (details && !element.open)
-        {
-            picked.current = false;
-            element.showModal();
-            // showModal() focuses the first tile, which then looks picked before anything is.
-            element.focus();
-        }
-        else if (!details && element.open)
-        {
-            element.close();
-            settleFocus(picked.current);
-        }
+        picked.current = false;
+        // showModal() focuses the first tile, which then looks picked before anything is.
+        modal.ref.current?.focus();
+    }, [details, modal.ref]);
 
-    }, [details]);
-
-    // Escape closes the dialog without going through the effect above.
+    // Fires however the dialog closes, Escape and useModal's close() alike.
     const closed = useCallback(() =>
     {
         settleFocus(picked.current);
@@ -93,41 +83,23 @@ export function ChooseVersion({ details, onChoose, onCancel }: ChooseVersionProp
 
     }, [choose, details]);
 
-    // A click on the dialog element itself, rather than its contents, landed on the backdrop.
-    const onBackdrop = useCallback(
-        (event: MouseEvent<HTMLDialogElement>) =>
-        {
-            if (event.target === event.currentTarget)
-                onCancel();
-
-        },
-        [onCancel],
-    );
-
     const style = details
         ? ({ '--el': elementFor(details.element, details.item).color } as CSSProperties)
         : undefined;
     const choices = details
-        ? [
-            { ...normalFor(details.versions), src: details.looks?.normal ?? details.image },
-            ...offeredVersions({ ...details, variants: {} }).map((version) => ({
-                ...version,
-                src: versionImage(details, version),
-            })),
-        ]
+        ? versionPictures(details, offeredVersions({ ...details, variants: {} }))
         : [];
     // A figure that only came in one version shows that picture alone, to check before adding.
     const single = choices.length === 1;
 
     return (
         <dialog
-            ref={dialog}
+            {...modal}
             className="sky-dialog sky-dialog--wide"
             style={style}
             aria-labelledby="sky-choose-title"
             tabIndex={-1}
             onClose={closed}
-            onClick={onBackdrop}
         >
             {details && (
                 <div className="sky-dialog__body">

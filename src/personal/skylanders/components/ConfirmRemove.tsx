@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef, type CSSProperties, type MouseEvent } from 'react';
+import { useCallback, type CSSProperties } from 'react';
 
 import type { Skylander } from '../types';
 
 import { elementFor } from '../content/elements';
+
+import { useModal } from './useModal';
 
 interface ConfirmRemoveProps
 {
@@ -14,25 +16,11 @@ interface ConfirmRemoveProps
 
 /**
  * Asks before removing a Skylander, in place of window.confirm, which the browser draws in its
- * own style. A native <dialog> opened with showModal() handles the focus trap and Escape.
+ * own style. A native <dialog>, see useModal.ts.
  */
 export function ConfirmRemove({ item, onConfirm, onCancel }: ConfirmRemoveProps)
 {
-    const dialog = useRef<HTMLDialogElement>(null);
-
-    useEffect(() =>
-    {
-        const element = dialog.current;
-
-        if (!element)
-            return;
-
-        if (item && !element.open)
-            element.showModal();
-        else if (!item && element.open)
-            element.close();
-
-    }, [item]);
+    const modal = useModal(item !== null, onCancel);
 
     const confirm = useCallback(() =>
     {
@@ -41,27 +29,15 @@ export function ConfirmRemove({ item, onConfirm, onCancel }: ConfirmRemoveProps)
 
     }, [item, onConfirm]);
 
-    // A click on the dialog element itself, rather than its contents, landed on the backdrop.
-    const onBackdrop = useCallback(
-        (event: MouseEvent<HTMLDialogElement>) =>
-        {
-            if (event.target === event.currentTarget)
-                onCancel();
-
-        },
-        [onCancel],
-    );
-
     const style = item ? ({ '--el': elementFor(item.element, item.item).color } as CSSProperties) : undefined;
 
     return (
         <dialog
-            ref={dialog}
+            {...modal}
             className="sky-dialog"
             style={style}
             aria-labelledby="sky-dialog-title"
             onClose={onCancel}
-            onClick={onBackdrop}
         >
             {item && (
                 <div className="sky-dialog__body">

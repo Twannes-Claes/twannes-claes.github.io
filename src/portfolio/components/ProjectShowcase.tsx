@@ -1,5 +1,4 @@
-import useEmblaCarousel from 'embla-carousel-react';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 
 import type { Project } from '../content/types';
 
@@ -8,33 +7,42 @@ import { useMediaQuery } from '../../shared/hooks/useMediaQuery';
 
 import { ProjectCard } from './ProjectCard';
 
+/** Scrolls the track one card along, snapping takes care of centring it. */
+function step(track: HTMLDivElement | null, direction: number)
+{
+    const card = track?.firstElementChild;
+
+    if (card)
+        track.scrollBy({ left: direction * card.clientWidth, behavior: 'smooth' });
+
+}
+
+/** Native scroll snapping, so swiping is the browser's own. Stops at the ends rather than looping. */
 function ProjectCarousel({ projects }: { projects: Project[] })
 {
-    const [emblaRef, emblaApi] = useEmblaCarousel({
-        loop: true,
-        align: 'center',
-        containScroll: false,
-    });
+    const track = useRef<HTMLDivElement>(null);
 
-    const scrollPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
-    const scrollNext = useCallback(() => emblaApi?.scrollNext(), [emblaApi]);
+    const scrollPrev = useCallback(() => step(track.current, -1), []);
+    const scrollNext = useCallback(() => step(track.current, 1), []);
 
     return (
         <>
             {/* Stretched 50px past the container on each side, so the neighbouring cards
                 peek in. */}
             <div className="accent-slab accent-slab--cards -mx-[50px]">
-                <div className="overflow-hidden" ref={emblaRef}>
-                    <div className="flex">
-                        {projects.map((project) => (
-                            <div
-                                key={project.slug}
-                                className="flex min-w-0 shrink-0 grow-0 basis-[85%] flex-col"
-                            >
-                                <ProjectCard project={project} />
-                            </div>
-                        ))}
-                    </div>
+                {/* Padded by half the leftover width, so the first and last card can centre. */}
+                <div
+                    ref={track}
+                    className="flex snap-x snap-mandatory overflow-x-auto px-[7.5%] [scrollbar-width:none]"
+                >
+                    {projects.map((project) => (
+                        <div
+                            key={project.slug}
+                            className="flex min-w-0 shrink-0 grow-0 basis-[85%] snap-center flex-col"
+                        >
+                            <ProjectCard project={project} />
+                        </div>
+                    ))}
                 </div>
             </div>
 
@@ -54,7 +62,7 @@ function ProjectCarousel({ projects }: { projects: Project[] })
 }
 
 /**
- * Three columns, two under 992px, a looping carousel under 768px.
+ * Three columns, two under 992px, a swipeable carousel under 768px.
  * The grid is the prerendered and no-JS fallback.
  */
 export function ProjectShowcase({ projects }: { projects: Project[] })

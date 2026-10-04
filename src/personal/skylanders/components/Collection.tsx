@@ -120,21 +120,12 @@ export function Collection({ db }: { db: Db })
                 continue;
 
             repaired.current.add(item.id);
-            lookup(item.title ?? item.name)
+            lookup(item.title)
                 .then((details) =>
                     db.updateDetails(item.id, {
-                        // Figures saved with the wiki's "(character)" get the cleaner name.
-                        name: details.name,
-                        title: details.title,
+                        ...details,
                         game: details.game || item.game,
                         element: details.element || item.element,
-                        versions: details.versions,
-                        giant: details.giant,
-                        looks: details.looks,
-                        catchphrase: details.catchphrase,
-                        voice: details.voice,
-                        editions: details.editions,
-                        detailsVersion: details.detailsVersion,
                     }),
                 )
                 .catch(() => undefined);
@@ -276,7 +267,7 @@ export function Collection({ db }: { db: Db })
             setChoosing(null);
             // Straight away, while the click still counts as the reason for the sound, rather
             // than after saving, which browsers could treat as a page playing on its own.
-            playVoice(details.voice ?? '');
+            playVoice(details.voice);
             save(details, variant).catch((error: Error) => setMessage(error.message));
         },
         [save],

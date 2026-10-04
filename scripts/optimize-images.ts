@@ -28,18 +28,12 @@ const maxWidths: [RegExp, number][] = [
     [/\/home-picture\.\w+$/, 800],
 ];
 
-function* files(dir: string): Generator<string>
+/** Every file under a folder, at any depth. */
+function files(dir: string): string[]
 {
-    for (const name of readdirSync(dir))
-    {
-        const path = join(dir, name);
-
-        if (statSync(path).isDirectory())
-            yield* files(path);
-        else
-            yield path;
-
-    }
+    return readdirSync(dir, { recursive: true, encoding: 'utf8' })
+        .map((name) => join(dir, name))
+        .filter((path) => statSync(path).isFile());
 }
 
 /** The URL the site serves a file under public/ at, with forward slashes. */
@@ -67,7 +61,7 @@ async function toWebp(path: string): Promise<Buffer>
 function sourceFiles(): string[]
 {
     return sources.flatMap((source) =>
-        statSync(source).isDirectory() ? [...files(source)] : [source],
+        statSync(source).isDirectory() ? files(source) : [source],
     );
 }
 

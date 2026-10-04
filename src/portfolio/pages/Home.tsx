@@ -9,8 +9,8 @@ import { ProjectShowcase } from '../components/ProjectShowcase';
 import { SectionHeading } from '../components/SectionHeading';
 import { SiteFooter } from '../components/SiteFooter';
 import { aboutBlocks, introParagraphs, skillGroups } from '../content/about';
-import { contactLinks, hero } from '../content/home';
-import { CATEGORY_HEADINGS, getProjectGroups } from '../content/projects';
+import { contactLinks } from '../content/home';
+import { getProjectGroups } from '../content/projects';
 
 /** Vertical rhythm for the top-level sections, with the matching offset for the anchor links. */
 const SECTION_SPACING =
@@ -28,15 +28,15 @@ export default function Home()
             <header className="container-page">
                 <div className="my-[clamp(4rem,2.5vw+2.5rem,6.25rem)] grid grid-cols-3 items-center gap-8 max-[668px]:grid-cols-1 max-[668px]:place-items-center max-[668px]:gap-16">
                     <div className="col-span-2 pe-[20%] max-[992px]:pe-[5%] max-[668px]:col-span-1 max-[668px]:p-0">
-                        <div className="tag tag--big max-[1200px]:mb-2">{hero.tag}</div>
+                        <div className="tag tag--big max-[1200px]:mb-2">Game Systems Engineer</div>
                         <h1 className="mb-4 font-mono text-[clamp(1.75rem,2.25vw+1.25rem,3.75rem)] font-light">
-                            {hero.heading}
+                            Twannes Claes
                         </h1>
                         <div className="rich-text mb-6">{introParagraphs}</div>
                     </div>
                     <div className="aspect-square max-h-80 bg-accent">
                         <img
-                            src={hero.image}
+                            src="/assets/site/home-picture.webp"
                             alt=""
                             // The largest thing on screen at load, so it goes before the rest.
                             fetchPriority="high"
@@ -54,7 +54,7 @@ export default function Home()
                         zeroes the leading margin when the headings are siblings. */}
                     {groups.map((group) => (
                         <Fragment key={group.category}>
-                            <h3 className="group-heading">{CATEGORY_HEADINGS[group.category]}</h3>
+                            <h3 className="group-heading">{group.category}</h3>
                             <ProjectShowcase projects={group.projects} />
                         </Fragment>
                     ))}

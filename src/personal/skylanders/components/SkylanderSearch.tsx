@@ -234,12 +234,6 @@ export function SkylanderSearch({
 
     }, [active, listId]);
 
-    const pick = useCallback(
-        // Leaves the list open, see holdOpen.
-        (name: string) => onPick(name),
-        [onPick],
-    );
-
     const onKeyDown = useCallback(
         (event: KeyboardEvent<HTMLInputElement>) =>
         {
@@ -257,13 +251,14 @@ export function SkylanderSearch({
                 // Takes the suggestion instead of submitting the typed text. With no match the
                 // form submits, and Collection.tsx explains the name is not a Skylander.
                 event.preventDefault();
-                pick(results[target].name);
+                // Leaves the list open, see holdOpen.
+                onPick(results[target].name);
             }
             else if (event.key === 'Escape')
                 setOpen(false);
 
         },
-        [pick, results, target],
+        [onPick, results, target],
     );
 
     // An element and Giants combine, but items have neither, so Items switches the others off
@@ -410,7 +405,7 @@ export function SkylanderSearch({
                                     onMouseDown={(event) =>
                                     {
                                         event.preventDefault();
-                                        pick(entry.name);
+                                        onPick(entry.name);
                                     }}
                                     onMouseEnter={() => setActive(index)}
                                 >

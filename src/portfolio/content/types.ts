@@ -1,7 +1,7 @@
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import type { ReactNode } from 'react';
 
-export type ProjectCategory = 'Professional Work' | 'Game Dev' | 'Game Jam';
+export type ProjectCategory = 'Professional Work' | 'Game Dev' | 'Game Jams';
 
 export interface ProjectSection
 {

@@ -17,10 +17,10 @@ import {
 import type { Skylander } from '../types';
 
 import { elementFor, giant } from '../content/elements';
-import { normalFor, ownedVersions, plainCount, versionImage } from '../content/variants';
+import { normal, ownedVersions, plainCount, versionPictures } from '../content/variants';
 import { playVoice, stopVoice, watchVoice } from '../services/voice';
 
-import { PortraitCarousel, type Slide } from './PortraitCarousel';
+import { PortraitCarousel } from './PortraitCarousel';
 
 interface SkylanderCardProps
 {
@@ -179,14 +179,12 @@ export function SkylanderCard({
     );
     const element = elementFor(item.element, item.item);
     const special = ownedVersions(item);
+    const plain = plainCount(item.count, item.variants) > 0;
     // A picture of each version owned, for the carousel. Versions the wiki has no picture of are
     // left out rather than shown as the plain one.
-    const slides: Slide[] = [
-        ...(plainCount(item.count, item.variants) > 0
-            ? [{ ...normalFor(item.versions), src: item.looks?.normal ?? item.image }]
-            : []),
-        ...special.map((version) => ({ ...version, src: versionImage(item, version) })),
-    ].filter((slide) => slide.src);
+    const slides = versionPictures(item, special).filter(
+        (slide) => slide.src && (plain || slide.id !== normal.id),
+    );
     // One version, like a figure owned only as a Legendary, shows that picture on its own.
     const portrait = slides[0]?.src ?? item.image;
     // The holographic frame is for the rarer ones. A Series 2 or 3 is just another release.
@@ -234,7 +232,7 @@ export function SkylanderCard({
                 <VoiceButton
                     name={item.name}
                     voice={item.voice}
-                    catchphrase={item.catchphrase ?? ''}
+                    catchphrase={item.catchphrase}
                 />
             ) : (
                 item.catchphrase && (

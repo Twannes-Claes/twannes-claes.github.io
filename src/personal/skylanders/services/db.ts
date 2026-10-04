@@ -19,8 +19,9 @@ import {
     updateDoc,
 } from 'firebase/firestore';
 
-import type { VersionId } from '../content/variants';
 import type { Skylander, SkylanderDetails } from '../types';
+
+import { slug, type VersionId } from '../content/variants';
 
 import { accountEmail, firebaseConfig } from './config';
 
@@ -33,15 +34,6 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const skylanders = collection(db, 'skylanders');
-
-/** Lowercased and dashed, so the same figure typed twice lands on the same document. */
-function idFor(name: string): string
-{
-    return name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-|-$/g, '');
-}
 
 export function watchSignedIn(callback: (signedIn: boolean) => void): () => void
 {
@@ -66,21 +58,7 @@ export function watchCollection(
     return onSnapshot(
         query(skylanders, orderBy('name')),
         (snapshot) =>
-            callback(
-                snapshot.docs.map((entry) =>
-                {
-                    const data = entry.data();
-
-                    // Entries saved before counts or variants existed have neither, and mean one
-                    // plain figure.
-                    return {
-                        ...data,
-                        id: entry.id,
-                        count: data.count ?? 1,
-                        variants: data.variants ?? {},
-                    } as Skylander;
-                }),
-            ),
+            callback(snapshot.docs.map((entry) => ({ ...entry.data(), id: entry.id }) as Skylander)),
         onError,
     );
 }
@@ -93,7 +71,7 @@ export async function addSkylander(item: SkylanderDetails, variant?: VersionId):
 {
     // From the wiki title rather than the shown name, which drops "(character)", so a figure
     // saved before names were cleaned up still matches its document.
-    const ref = doc(skylanders, idFor(item.title ?? item.name));
+    const ref = doc(skylanders, slug(item.title));
 
     // A transaction, so two people adding the same figure at once both get counted.
     return runTransaction(db, async (transaction) =>
@@ -102,7 +80,7 @@ export async function addSkylander(item: SkylanderDetails, variant?: VersionId):
 
         if (existing.exists())
         {
-            const count = ((existing.data().count as number | undefined) ?? 1) + 1;
+            const count = (existing.data().count as number) + 1;
 
             transaction.update(
                 ref,

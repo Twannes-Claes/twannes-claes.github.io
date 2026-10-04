@@ -11,15 +11,8 @@ import { physicsEngine } from './physics-engine';
 import { replaceable } from './replaceable';
 import { vintecc } from './vintecc';
 
-/** Category order on the home page. */
-const CATEGORY_ORDER: ProjectCategory[] = ['Professional Work', 'Game Dev', 'Game Jam'];
-
-/** Heading above each group. Only 'Game Jam' differs from its category name. */
-export const CATEGORY_HEADINGS: Record<ProjectCategory, string> = {
-    'Professional Work': 'Professional Work',
-    'Game Dev': 'Game Dev',
-    'Game Jam': 'Game Jams',
-};
+/** Category order on the home page. Each name doubles as its group's heading. */
+const CATEGORY_ORDER: ProjectCategory[] = ['Professional Work', 'Game Dev', 'Game Jams'];
 
 /** Every project, including inactive ones. Add new projects here. */
 export const allProjects: Project[] = [

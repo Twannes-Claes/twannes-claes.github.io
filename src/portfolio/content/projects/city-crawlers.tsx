@@ -5,7 +5,7 @@ import type { Project } from '../types';
 export const cityCrawlers: Project = {
     slug: 'city-crawlers',
     title: 'City Crawlers',
-    category: 'Game Jam',
+    category: 'Game Jams',
     // Hidden from the site, kept in the repo. Flip to true to publish it again.
     active: false,
     order: 20,
