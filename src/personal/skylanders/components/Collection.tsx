@@ -1,6 +1,6 @@
 import { faStar } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
+import { useEffect, useRef, useState, useTransition, type CSSProperties } from 'react';
 import { flushSync } from 'react-dom';
 
 import type { CatalogEntry, Db, Skylander, SkylanderDetails } from '../types';
@@ -47,7 +47,7 @@ export function Collection({ db }: { db: Db })
     const [catalogLoading, setCatalogLoading] = useState(true);
     const [name, setName] = useState('');
     const [message, setMessage] = useState('');
-    const [busy, setBusy] = useState(false);
+    const [busy, startAdding] = useTransition();
     const [filter, setFilter] = useState<string | null>(null);
     /** The Skylander the remove dialog is asking about. */
     const [pending, setPending] = useState<Skylander | null>(null);
@@ -184,7 +184,7 @@ export function Collection({ db }: { db: Db })
         setName('');
     };
 
-    const addByName = async (input: string) =>
+    const addByName = (input: string) =>
     {
         const typed = input.trim();
 
@@ -211,23 +211,22 @@ export function Collection({ db }: { db: Db })
             return;
         }
 
-        setBusy(true);
         setMessage('');
-
-        const details = await lookup(known ?? typed).catch((error: unknown) =>
+        startAdding(async () =>
         {
-            setMessage(error instanceof Error ? error.message : 'Adding failed.');
+            const details = await lookup(known ?? typed).catch((error: unknown) =>
+            {
+                setMessage(error instanceof Error ? error.message : 'Adding failed.');
+            });
+
+            // Shows the figure first, to check the picture and pick a version, see save below.
+            // Without the catalog the wiki itself is the check: no page, no Skylander.
+            if (details?.url)
+                setChoosing(details);
+            else if (details)
+                setMessage(unknown);
+
         });
-
-        setBusy(false);
-
-        // Shows the figure first, to check the picture and pick a version, see save below.
-        // Without the catalog the wiki itself is the check: no page, no Skylander.
-        if (details?.url)
-            setChoosing(details);
-        else if (details)
-            setMessage(unknown);
-
     };
 
     const choose = (details: SkylanderDetails, variant?: VersionId) =>
@@ -243,14 +242,10 @@ export function Collection({ db }: { db: Db })
     // SkylanderSearch.tsx.
     const cancelChoosing = () => setChoosing(null);
 
-    const submit = (event: FormEvent) =>
-    {
-        event.preventDefault();
-        void addByName(name);
-    };
+    const submit = () => addByName(name);
 
     // Leaves the typed text alone, so the list behind the dialog keeps its place for a cancel.
-    const pick = (picked: string) => void addByName(picked);
+    const pick = (picked: string) => addByName(picked);
 
     const confirmRemove = (item: Skylander) =>
     {
@@ -287,7 +282,7 @@ export function Collection({ db }: { db: Db })
 
     return (
         <>
-            <form onSubmit={submit} className="sky-panel sky-toolbar">
+            <form action={submit} className="sky-panel sky-toolbar">
                 <SkylanderSearch
                     value={name}
                     onChange={setName}

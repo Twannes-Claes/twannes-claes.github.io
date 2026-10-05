@@ -1,6 +1,6 @@
 import { faBolt, faEye, faEyeSlash, faKey } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useState, type ChangeEvent, type FormEvent } from 'react';
+import { startTransition, useActionState, useState, type ChangeEvent } from 'react';
 
 import type { Db } from '../types';
 
@@ -21,39 +21,30 @@ interface PasswordFormProps
 export function PasswordForm({ db, onDemo }: PasswordFormProps)
 {
     const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
-    const [busy, setBusy] = useState(false);
     // Bumped on every failed try, so the portal remounts and shakes again.
     const [attempt, setAttempt] = useState(0);
     const [visible, setVisible] = useState(false);
 
-    const toggle = () => setVisible((shown) => !shown);
-    const type = (event: ChangeEvent<HTMLInputElement>) => setPassword(event.target.value);
-
-    const enter = async (secret: string) =>
+    const [error, enter, busy] = useActionState(async (_previous: string, secret: string) =>
     {
-        setBusy(true);
-        setError('');
-
         try
         {
             await db.signIn(secret);
+
+            return '';
         }
         catch
         {
-            setError('The portal does not recognise that password.');
             setAttempt((count) => count + 1);
-            setBusy(false);
+
+            return 'The portal does not recognise that password.';
         }
-    };
+    }, '');
 
-    const submit = (event: FormEvent) =>
-    {
-        event.preventDefault();
-        void enter(password);
-    };
-
-    const devEnter = () => void enter(devPassword ?? '');
+    const toggle = () => setVisible((shown) => !shown);
+    const type = (event: ChangeEvent<HTMLInputElement>) => setPassword(event.target.value);
+    const submit = () => enter(password);
+    const devEnter = () => startTransition(() => enter(devPassword ?? ''));
 
     return (
         <div className="sky-login">
@@ -63,7 +54,7 @@ export function PasswordForm({ db, onDemo }: PasswordFormProps)
 
             <p className="sky-login__hint">Place your password on the Portal of Power</p>
 
-            <form onSubmit={submit} className="sky-panel sky-login__form">
+            <form action={submit} className="sky-panel sky-login__form">
                 <div className="sky-password">
                     <input
                         type={visible ? 'text' : 'password'}
