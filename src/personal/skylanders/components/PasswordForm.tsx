@@ -1,6 +1,6 @@
 import { faBolt, faEye, faEyeSlash, faKey } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useCallback, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useState, type ChangeEvent, type FormEvent } from 'react';
 
 import type { Db } from '../types';
 
@@ -27,42 +27,33 @@ export function PasswordForm({ db, onDemo }: PasswordFormProps)
     const [attempt, setAttempt] = useState(0);
     const [visible, setVisible] = useState(false);
 
-    const toggle = useCallback(() => setVisible((shown) => !shown), []);
-    const type = useCallback(
-        (event: ChangeEvent<HTMLInputElement>) => setPassword(event.target.value),
-        [],
-    );
+    const toggle = () => setVisible((shown) => !shown);
+    const type = (event: ChangeEvent<HTMLInputElement>) => setPassword(event.target.value);
 
-    const enter = useCallback(
-        async (secret: string) =>
+    const enter = async (secret: string) =>
+    {
+        setBusy(true);
+        setError('');
+
+        try
         {
-            setBusy(true);
-            setError('');
-
-            try
-            {
-                await db.signIn(secret);
-            }
-            catch
-            {
-                setError('The portal does not recognise that password.');
-                setAttempt((count) => count + 1);
-                setBusy(false);
-            }
-        },
-        [db],
-    );
-
-    const submit = useCallback(
-        (event: FormEvent) =>
+            await db.signIn(secret);
+        }
+        catch
         {
-            event.preventDefault();
-            void enter(password);
-        },
-        [enter, password],
-    );
+            setError('The portal does not recognise that password.');
+            setAttempt((count) => count + 1);
+            setBusy(false);
+        }
+    };
 
-    const devEnter = useCallback(() => void enter(devPassword ?? ''), [enter]);
+    const submit = (event: FormEvent) =>
+    {
+        event.preventDefault();
+        void enter(password);
+    };
+
+    const devEnter = () => void enter(devPassword ?? '');
 
     return (
         <div className="sky-login">

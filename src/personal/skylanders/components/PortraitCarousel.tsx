@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 
 export interface Slide
 {
@@ -53,8 +53,8 @@ export function PortraitCarousel({ slides, figure, index }: PortraitCarouselProp
         return () => window.clearTimeout(timer);
     }, [shown, paused, slides.length, index]);
 
-    const pause = useCallback(() => setPaused(true), []);
-    const resume = useCallback(() => setPaused(false), []);
+    const pause = () => setPaused(true);
+    const resume = () => setPaused(false);
 
     return (
         <div className="sky-carousel" onPointerEnter={pause} onPointerLeave={resume}>

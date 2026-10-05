@@ -1,6 +1,6 @@
 import { faHouse } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useCallback, type MouseEvent } from 'react';
+import type { MouseEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { navItems } from '../site';
@@ -24,19 +24,16 @@ export function Nav({ back = false }: NavProps)
     // the home page is still sitting behind this one in the history.
     const cameFromHome = key !== 'default';
 
-    const goHome = useCallback(
-        (event: MouseEvent) =>
-        {
-            if (!cameFromHome)
-                return;
+    const goHome = (event: MouseEvent) =>
+    {
+        if (!cameFromHome)
+            return;
 
-            // Stepping back rather than pushing a new entry, so the home page
-            // returns with the offset it was left at.
-            event.preventDefault();
-            navigate(-1);
-        },
-        [cameFromHome, navigate],
-    );
+        // Stepping back rather than pushing a new entry, so the home page
+        // returns with the offset it was left at.
+        event.preventDefault();
+        navigate(-1);
+    };
 
     return (
         // The background is the page colour index.css fades, so it is left out of the transition

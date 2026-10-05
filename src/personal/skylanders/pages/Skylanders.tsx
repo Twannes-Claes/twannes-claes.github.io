@@ -4,7 +4,7 @@ import '../styles/skylanders.css';
 
 import { faBookOpen, faHouse, faRightFromBracket } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Head } from 'vite-react-ssg';
 
@@ -13,6 +13,15 @@ import type { Db } from '../types';
 import { Collection } from '../components/Collection';
 import { PasswordForm } from '../components/PasswordForm';
 import { SkyBackdrop } from '../components/SkyBackdrop';
+
+/**
+ * Loaded on demand rather than imported, so Firebase is not in the portfolio bundle and never
+ * runs during the prerender. The demo never loads Firebase at all.
+ */
+function loadDb(demo: boolean)
+{
+    return demo ? import('../services/demo') : import('../services/db');
+}
 
 /**
  * A private page for tracking the Skylanders collection. It is left out of the nav and marked
@@ -37,11 +46,7 @@ export default function Skylanders()
         let unsubscribe: (() => void) | undefined;
         let cancelled = false;
 
-        // Loaded here rather than imported, so Firebase is not in the portfolio bundle and
-        // never runs during the prerender. The demo never loads Firebase at all.
-        const load = demo ? import('../services/demo') : import('../services/db');
-
-        load.then((module) =>
+        loadDb(demo).then((module) =>
         {
             if (cancelled)
                 return;
@@ -58,17 +63,17 @@ export default function Skylanders()
     }, [demo]);
 
     // A plain ?demo rather than the ?demo= setSearchParams would write, for a tidy link to share.
-    const enterDemo = useCallback(() => navigate({ search: '?demo' }), [navigate]);
+    const enterDemo = () => navigate({ search: '?demo' });
 
     // Leaving the demo goes back to the lock screen rather than signing the demo out.
-    const signOut = useCallback(() =>
+    const signOut = () =>
     {
         if (demo)
             navigate({ search: '' });
         else
             void db?.signOut();
 
-    }, [db, demo, navigate]);
+    };
 
     let body;
 

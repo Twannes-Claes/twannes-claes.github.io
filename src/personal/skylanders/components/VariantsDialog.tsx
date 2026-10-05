@@ -1,6 +1,6 @@
 import { faMinus, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useCallback, type CSSProperties } from 'react';
+import type { CSSProperties } from 'react';
 
 import type { Skylander } from '../types';
 
@@ -42,8 +42,8 @@ interface RowProps
 
 function Row({ item, label, color, count, href, image, variant, onChange }: RowProps)
 {
-    const increase = useCallback(() => onChange(item, 1, variant), [item, variant, onChange]);
-    const decrease = useCallback(() => onChange(item, -1, variant), [item, variant, onChange]);
+    const increase = () => onChange(item, 1, variant);
+    const decrease = () => onChange(item, -1, variant);
     const name = (
         <>
             {image ? (

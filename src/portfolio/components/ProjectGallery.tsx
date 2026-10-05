@@ -1,5 +1,5 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 
 import type { ProjectImage } from '../content/types';
 import type { Slide } from './ProjectLightbox';
@@ -51,15 +51,15 @@ export function ProjectGallery({ images }: { images: ProjectImage[] })
     const [index, setIndex] = useState(-1);
     // Mounted from the first open on and kept, so closing still plays the lightbox's fade out.
     const [opened, setOpened] = useState(false);
-    const slides = useMemo(() => images.map(toSlide), [images]);
+    const slides = images.map(toSlide);
 
-    const open = useCallback((position: number) =>
+    const open = (position: number) =>
     {
         setOpened(true);
         setIndex(position);
-    }, []);
+    };
 
-    const close = useCallback(() => setIndex(-1), []);
+    const close = () => setIndex(-1);
 
     return (
         <>

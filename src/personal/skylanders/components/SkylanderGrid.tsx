@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { useState } from 'react';
 
 import type { Skylander } from '../types';
 
@@ -15,10 +15,10 @@ interface SkylanderGridProps
  * The card grid. Cards present when it mounts play the staggered entrance, cards added later
  * are left to the view transition in Collection.tsx, because the entrance starts invisible and
  * the transition would capture that empty frame. Collection.tsx keys this on the filter, so a
- * new filter mounts it fresh and replays the entrance. Memoised, so typing in the search, which
- * re-renders Collection.tsx on every key, leaves the cards alone.
+ * new filter mounts it fresh and replays the entrance. The React Compiler memoises it, so typing
+ * in the search, which re-renders Collection.tsx on every key, leaves the cards alone.
  */
-export const SkylanderGrid = memo(function SkylanderGrid({
+export function SkylanderGrid({
     items,
     onRemove,
     onVariants,
@@ -40,4 +40,4 @@ export const SkylanderGrid = memo(function SkylanderGrid({
             ))}
         </ul>
     );
-});
+}

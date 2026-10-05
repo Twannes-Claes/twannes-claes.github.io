@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useRef } from 'react';
 
 import type { Project } from '../content/types';
 
@@ -22,8 +22,8 @@ function ProjectCarousel({ projects }: { projects: Project[] })
 {
     const track = useRef<HTMLDivElement>(null);
 
-    const scrollPrev = useCallback(() => step(track.current, -1), []);
-    const scrollNext = useCallback(() => step(track.current, 1), []);
+    const scrollPrev = () => step(track.current, -1);
+    const scrollNext = () => step(track.current, 1);
 
     return (
         <>

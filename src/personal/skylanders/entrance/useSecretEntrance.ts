@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useTheme, type Theme } from '../../../shared/hooks/useTheme';
@@ -48,13 +48,13 @@ export function useSecretEntrance(): { strain: number; flipped: () => void }
         return () => window.clearTimeout(timer);
     }, [strain]);
 
-    const enter = useCallback(() =>
+    const enter = () =>
     {
         setTheme(before.current);
         navigate('/skylanders');
-    }, [setTheme, navigate]);
+    };
 
-    const flipped = useCallback(() =>
+    const flipped = () =>
     {
         if (opening.current)
             return;
@@ -89,7 +89,7 @@ export function useSecretEntrance(): { strain: number; flipped: () => void }
         else
             openSecretPortal(enter);
 
-    }, [theme, enter]);
+    };
 
     return { strain, flipped };
 }

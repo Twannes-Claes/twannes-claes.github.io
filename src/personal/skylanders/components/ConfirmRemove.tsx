@@ -1,4 +1,4 @@
-import { useCallback, type CSSProperties } from 'react';
+import type { CSSProperties } from 'react';
 
 import type { Skylander } from '../types';
 
@@ -22,12 +22,12 @@ export function ConfirmRemove({ item, onConfirm, onCancel }: ConfirmRemoveProps)
 {
     const modal = useModal(item !== null, onCancel);
 
-    const confirm = useCallback(() =>
+    const confirm = () =>
     {
         if (item)
             onConfirm(item);
 
-    }, [item, onConfirm]);
+    };
 
     const style = item ? ({ '--el': elementFor(item.element, item.item).color } as CSSProperties) : undefined;
 

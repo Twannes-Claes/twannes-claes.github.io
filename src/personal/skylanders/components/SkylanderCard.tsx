@@ -5,14 +5,7 @@ import {
     faXmark,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-    useCallback,
-    useEffect,
-    useState,
-    type CSSProperties,
-    type MouseEvent,
-    type PointerEvent,
-} from 'react';
+import { useEffect, useState, type CSSProperties, type MouseEvent, type PointerEvent } from 'react';
 
 import type { Skylander } from '../types';
 
@@ -120,14 +113,14 @@ function VoiceButton({ name, voice, catchphrase }: VoiceButtonProps)
 
     useEffect(() => watchVoice((current) => setPlaying(current === voice)), [voice]);
 
-    const toggle = useCallback(() =>
+    const toggle = () =>
     {
         if (playing)
             stopVoice();
         else
             playVoice(voice);
 
-    }, [playing, voice]);
+    };
 
     const label = catchphrase ? `${name} says "${catchphrase}"` : `Hear ${name}`;
 
@@ -161,22 +154,18 @@ export function SkylanderCard({
     onVariants,
 }: SkylanderCardProps)
 {
-    const remove = useCallback(
-        (event: MouseEvent<HTMLButtonElement>) =>
-        {
-            straightenCard(event);
-            onRemove(item);
-        },
-        [item, onRemove],
-    );
-    const versions = useCallback(
-        (event: MouseEvent<HTMLButtonElement>) =>
-        {
-            straightenCard(event);
-            onVariants(item);
-        },
-        [item, onVariants],
-    );
+    const remove = (event: MouseEvent<HTMLButtonElement>) =>
+    {
+        straightenCard(event);
+        onRemove(item);
+    };
+
+    const versions = (event: MouseEvent<HTMLButtonElement>) =>
+    {
+        straightenCard(event);
+        onVariants(item);
+    };
+
     const element = elementFor(item.element, item.item);
     const special = ownedVersions(item);
     const plain = plainCount(item.count, item.variants) > 0;

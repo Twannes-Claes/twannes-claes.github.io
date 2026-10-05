@@ -53,7 +53,9 @@ const name = version ? (version.title ?? `${version.name} ${details.name}`) : de
   default-export.
 - **Props** get an `interface <Name>Props` above the component when there is more
   than one, otherwise they are typed inline.
-- **Handlers** inside components are wrapped in `useCallback`.
+- **No manual memoisation.** The React Compiler memoises every component, so handlers
+  are plain arrow functions and derived values plain `const`s. No `useCallback`,
+  `useMemo` or `memo`.
 - Helper functions sit above the component that uses them.
 
 ## Commenting

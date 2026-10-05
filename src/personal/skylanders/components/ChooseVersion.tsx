@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type CSSProperties } from 'react';
+import { useEffect, useRef, type CSSProperties } from 'react';
 
 import type { SkylanderDetails } from '../types';
 
@@ -60,28 +60,25 @@ export function ChooseVersion({ details, onChoose, onCancel }: ChooseVersionProp
     }, [details, modal.ref]);
 
     // Fires however the dialog closes, Escape and useModal's close() alike.
-    const closed = useCallback(() =>
+    const closed = () =>
     {
         settleFocus(picked.current);
         onCancel();
-    }, [onCancel]);
+    };
 
-    const choose = useCallback(
-        (chosen: SkylanderDetails, variant?: VersionId) =>
-        {
-            picked.current = true;
-            onChoose(chosen, variant);
-        },
-        [onChoose],
-    );
+    const choose = (chosen: SkylanderDetails, variant?: VersionId) =>
+    {
+        picked.current = true;
+        onChoose(chosen, variant);
+    };
 
     // The single version's Add button.
-    const add = useCallback(() =>
+    const add = () =>
     {
         if (details)
             choose(details);
 
-    }, [choose, details]);
+    };
 
     const style = details
         ? ({ '--el': elementFor(details.element, details.item).color } as CSSProperties)

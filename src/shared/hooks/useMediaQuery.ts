@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from 'react';
 
 /**
  * Tracks a media query. Returns false during prerender and until the first
@@ -6,26 +6,20 @@ import { useCallback, useMemo, useSyncExternalStore } from 'react';
  */
 export function useMediaQuery(query: string): boolean
 {
-    const list = useMemo(
-        () => (typeof window === 'undefined' ? null : window.matchMedia(query)),
-        [query],
-    );
+    const list = typeof window === 'undefined' ? null : window.matchMedia(query);
 
-    const subscribe = useCallback(
-        (onChange: () => void) =>
-        {
-            if (!list)
-                return () => {};
+    const subscribe = (onChange: () => void) =>
+    {
+        if (!list)
+            return () => {};
 
-            list.addEventListener('change', onChange);
+        list.addEventListener('change', onChange);
 
-            return () => list.removeEventListener('change', onChange);
-        },
-        [list],
-    );
+        return () => list.removeEventListener('change', onChange);
+    };
 
-    const read = useCallback(() => list?.matches ?? false, [list]);
-    const readServer = useCallback(() => false, []);
+    const read = () => list?.matches ?? false;
+    const readServer = () => false;
 
     return useSyncExternalStore(subscribe, read, readServer);
 }

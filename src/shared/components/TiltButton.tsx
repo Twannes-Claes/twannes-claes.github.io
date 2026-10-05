@@ -1,4 +1,4 @@
-import { useCallback, useState, type CSSProperties, type ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 
 /** Picks -magnitude or +magnitude. */
 function randomDeg(magnitude: number): number
@@ -23,8 +23,8 @@ export function TiltButton({ children, className, magnitude = 3 }: TiltButtonPro
 {
     const [tilt, setTilt] = useState<number | null>(null);
 
-    const onEnter = useCallback(() => setTilt(randomDeg(magnitude)), [magnitude]);
-    const onLeave = useCallback(() => setTilt(null), []);
+    const onEnter = () => setTilt(randomDeg(magnitude));
+    const onLeave = () => setTilt(null);
 
     const style = tilt === null ? undefined : ({ '--tilt': `${tilt}deg` } as CSSProperties);
 

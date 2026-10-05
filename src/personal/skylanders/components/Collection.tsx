@@ -1,14 +1,6 @@
 import { faStar } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-    type CSSProperties,
-    type FormEvent,
-} from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { flushSync } from 'react-dom';
 
 import type { CatalogEntry, Db, Skylander, SkylanderDetails } from '../types';
@@ -133,200 +125,165 @@ export function Collection({ db }: { db: Db })
     }, [items, db]);
 
     /** How many of each figure we have, by name, so the search can say "owned". */
-    const owned = useMemo(
-        () => new Map(items?.map((item) => [item.name, item.count])),
-        [items],
-    );
+    const owned = new Map(items?.map((item) => [item.name, item.count]));
 
     /**
      * Only the elements someone owns get a chip, with how many of each, and Giants and Items a
      * chip after them once there is one.
      */
-    const counts = useMemo(() =>
+    const tally = new Map<string, number>();
+    const bump = (name: string) => tally.set(name, (tally.get(name) ?? 0) + 1);
+
+    for (const item of items ?? [])
     {
-        const tally = new Map<string, number>();
-        const count = (name: string) => tally.set(name, (tally.get(name) ?? 0) + 1);
+        if (item.item)
+            bump(magicItem.name);
+        else
+            bump(item.element);
 
-        for (const item of items ?? [])
-        {
-            if (item.item)
-                count(magicItem.name);
-            else
-                count(item.element);
+        if (item.giant)
+            bump(giant.name);
 
-            if (item.giant)
-                count(giant.name);
+    }
 
-        }
-
-        return [...elements, giant, magicItem]
-            .filter((element) => tally.has(element.name))
-            .map((element) => ({ element, count: tally.get(element.name) ?? 0 }));
-    }, [items]);
+    const counts = [...elements, giant, magicItem]
+        .filter((element) => tally.has(element.name))
+        .map((element) => ({ element, count: tally.get(element.name) ?? 0 }));
 
     // A filter whose last figure was just removed falls back to showing everything.
     const activeFilter = counts.some(({ element }) => element.name === filter) ? filter : null;
 
+    const shown =
+        items?.filter((item) =>
+        {
+            if (activeFilter === magicItem.name)
+                return item.item !== undefined;
+
+            if (activeFilter === giant.name)
+                return item.giant;
+
+            return !activeFilter || item.element === activeFilter;
+        }) ?? [];
+
     /** The Skylanders and the items apart, so the items get a shelf of their own below. */
-    const [figures, things] = useMemo(() =>
-    {
-        const shown =
-            items?.filter((item) =>
-            {
-                if (activeFilter === magicItem.name)
-                    return item.item !== undefined;
-
-                if (activeFilter === giant.name)
-                    return item.giant;
-
-                return !activeFilter || item.element === activeFilter;
-            }) ?? [];
-
-        return [shown.filter((item) => !item.item), shown.filter((item) => item.item)];
-    }, [items, activeFilter]);
+    const figures = shown.filter((item) => !item.item);
+    const things = shown.filter((item) => item.item);
 
     /** Stores a looked up figure, as a plain copy or one of a special version. */
-    const save = useCallback(
-        async (details: SkylanderDetails, variant?: VersionId) =>
-        {
-            const count = await db.addSkylander(details, variant);
-            const version = offeredVersions({ ...details, variants: {} }).find(
-                ({ id }) => id === variant,
-            );
+    const save = async (details: SkylanderDetails, variant?: VersionId) =>
+    {
+        const count = await db.addSkylander(details, variant);
+        const version = offeredVersions({ ...details, variants: {} }).find(
+            ({ id }) => id === variant,
+        );
             // "Series 2 Spyro", or an edition's own page name, like "Springtime Trigger Happy".
-            const name = version ? (version.title ?? `${version.name} ${details.name}`) : details.name;
+        const name = version ? (version.title ?? `${version.name} ${details.name}`) : details.name;
 
-            // A copy of one already owned is counted by the figure, whichever version it is.
-            setMessage(addedMessage(count > 1 ? details.name : name, count));
-            setName('');
-        },
-        [db],
-    );
+        // A copy of one already owned is counted by the figure, whichever version it is.
+        setMessage(addedMessage(count > 1 ? details.name : name, count));
+        setName('');
+    };
 
-    const addByName = useCallback(
-        async (input: string) =>
+    const addByName = async (input: string) =>
+    {
+        const typed = input.trim();
+
+        // With no button to disable, a second Enter mid-add is ignored here instead, so it
+        // does not count the figure twice.
+        if (!typed || busy)
+            return;
+
+        const unknown = `There is no Skylander or item called "${typed}". Pick one from the list.`;
+
+        // Only real Skylanders get in. Matching here also fixes the capitals, because wiki
+        // titles are case sensitive.
+        // Looked up by its wiki title, which can differ from the name shown, see wiki.ts.
+        const known = catalog.find(
+            (entry) =>
+                entry.name.toLowerCase() === typed.toLowerCase() ||
+                entry.title.toLowerCase() === typed.toLowerCase(),
+        )?.title;
+
+        if (catalog.length > 0 && !known)
         {
-            const typed = input.trim();
+            setMessage(unknown);
 
-            // With no button to disable, a second Enter mid-add is ignored here instead, so it
-            // does not count the figure twice.
-            if (!typed || busy)
-                return;
+            return;
+        }
 
-            const unknown = `There is no Skylander or item called "${typed}". Pick one from the list.`;
+        setBusy(true);
+        setMessage('');
 
-            // Only real Skylanders get in. Matching here also fixes the capitals, because wiki
-            // titles are case sensitive.
-            // Looked up by its wiki title, which can differ from the name shown, see wiki.ts.
-            const known = catalog.find(
-                (entry) =>
-                    entry.name.toLowerCase() === typed.toLowerCase() ||
-                    entry.title.toLowerCase() === typed.toLowerCase(),
-            )?.title;
-
-            if (catalog.length > 0 && !known)
-            {
-                setMessage(unknown);
-
-                return;
-            }
-
-            setBusy(true);
-            setMessage('');
-
-            try
-            {
-                const details = await lookup(known ?? typed);
-
-                // Without the catalog the wiki itself is the check: no page, no Skylander.
-                if (!details.url)
-                {
-                    setMessage(unknown);
-
-                    return;
-                }
-
-                // Shows the figure first, to check the picture and pick a version, see save below.
-                setChoosing(details);
-            }
-            catch (error)
-            {
-                setMessage(error instanceof Error ? error.message : 'Adding failed.');
-            }
-            finally
-            {
-                setBusy(false);
-            }
-        },
-        [busy, catalog],
-    );
-
-    const choose = useCallback(
-        (details: SkylanderDetails, variant?: VersionId) =>
+        const details = await lookup(known ?? typed).catch((error: unknown) =>
         {
-            setChoosing(null);
-            // Straight away, while the click still counts as the reason for the sound, rather
-            // than after saving, which browsers could treat as a page playing on its own.
-            playVoice(details.voice);
-            save(details, variant).catch((error: Error) => setMessage(error.message));
-        },
-        [save],
-    );
+            setMessage(error instanceof Error ? error.message : 'Adding failed.');
+        });
+
+        setBusy(false);
+
+        // Shows the figure first, to check the picture and pick a version, see save below.
+        // Without the catalog the wiki itself is the check: no page, no Skylander.
+        if (details?.url)
+            setChoosing(details);
+        else if (details)
+            setMessage(unknown);
+
+    };
+
+    const choose = (details: SkylanderDetails, variant?: VersionId) =>
+    {
+        setChoosing(null);
+        // Straight away, while the click still counts as the reason for the sound, rather
+        // than after saving, which browsers could treat as a page playing on its own.
+        playVoice(details.voice);
+        save(details, variant).catch((error: Error) => setMessage(error.message));
+    };
 
     // The search is left as it was, still open behind the dialog, see holdOpen in
     // SkylanderSearch.tsx.
-    const cancelChoosing = useCallback(() => setChoosing(null), []);
+    const cancelChoosing = () => setChoosing(null);
 
-    const submit = useCallback(
-        (event: FormEvent) =>
-        {
-            event.preventDefault();
-            void addByName(name);
-        },
-        [addByName, name],
-    );
+    const submit = (event: FormEvent) =>
+    {
+        event.preventDefault();
+        void addByName(name);
+    };
 
     // Leaves the typed text alone, so the list behind the dialog keeps its place for a cancel.
-    const pick = useCallback((picked: string) => void addByName(picked), [addByName]);
+    const pick = (picked: string) => void addByName(picked);
 
-    const confirmRemove = useCallback(
-        (item: Skylander) =>
+    const confirmRemove = (item: Skylander) =>
+    {
+        setPending(null);
+        db.removeSkylander(item.id).catch((error: Error) => setMessage(error.message));
+    };
+
+    const cancelRemove = () => setPending(null);
+
+    const changeCount = (item: Skylander, delta: number, variant?: VersionId) =>
+    {
+        // Taking away the last copy removes the figure, so that goes through the dialog.
+        if (item.count + delta < 1)
         {
-            setPending(null);
-            db.removeSkylander(item.id).catch((error: Error) => setMessage(error.message));
-        },
-        [db],
-    );
+            setPending(item);
 
-    const cancelRemove = useCallback(() => setPending(null), []);
+            return;
+        }
 
-    const changeCount = useCallback(
-        (item: Skylander, delta: number, variant?: VersionId) =>
-        {
-            // Taking away the last copy removes the figure, so that goes through the dialog.
-            if (item.count + delta < 1)
-            {
-                setPending(item);
+        db.changeCount(item.id, delta, variant).catch((error: Error) =>
+            setMessage(error.message),
+        );
+    };
 
-                return;
-            }
-
-            db.changeCount(item.id, delta, variant).catch((error: Error) =>
-                setMessage(error.message),
-            );
-        },
-        [db],
-    );
-
-    const openVersions = useCallback((item: Skylander) => setVersionsOf(item.id), []);
-    const closeVersions = useCallback(() => setVersionsOf(null), []);
+    const openVersions = (item: Skylander) => setVersionsOf(item.id);
+    const closeVersions = () => setVersionsOf(null);
     const versionsItem = items?.find((item) => item.id === versionsOf) ?? null;
 
-    const total = useMemo(() => items?.reduce((sum, item) => sum + item.count, 0) ?? 0, [items]);
-    const itemCount = useMemo(() => items?.filter((item) => item.item).length ?? 0, [items]);
+    const total = items?.reduce((sum, item) => sum + item.count, 0) ?? 0;
+    const itemCount = items?.filter((item) => item.item).length ?? 0;
     const skylanderCount = (items?.length ?? 0) - itemCount;
 
-    const showAll = useCallback(() => setFilter(null), []);
+    const showAll = () => setFilter(null);
 
     return (
         <>

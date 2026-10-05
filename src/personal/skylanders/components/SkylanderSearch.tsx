@@ -1,17 +1,6 @@
 import { faXmark } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-    useCallback,
-    useEffect,
-    useId,
-    useMemo,
-    useRef,
-    useState,
-    type ChangeEvent,
-    type CSSProperties,
-    type KeyboardEvent,
-    type MouseEvent,
-} from 'react';
+import { useEffect, useId, useRef, useState, type ChangeEvent, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react';
 
 import type { CatalogEntry } from '../types';
 
@@ -172,32 +161,23 @@ export function SkylanderSearch({
     const filtering = elementFilter !== null || giantsOnly || itemsOnly;
 
     /** Only elements the catalog has figures for get a filter. */
-    const filterElements = useMemo(
-        () => elements.filter(({ name }) => catalog.some((entry) => entry.element === name)),
-        [catalog],
+    const filterElements = elements.filter(({ name }) => catalog.some((entry) => entry.element === name));
+
+    const found = match(
+        catalog.filter(
+            (entry) =>
+                (!elementFilter || entry.element === elementFilter) &&
+                (!giantsOnly || entry.giant) &&
+                (!itemsOnly || entry.item),
+        ),
+        value,
     );
-
-    const { results, named } = useMemo(() =>
-    {
-        const found = match(
-            catalog.filter(
-                (entry) =>
-                    (!elementFilter || entry.element === elementFilter) &&
-                    (!giantsOnly || entry.giant) &&
-                    (!itemsOnly || entry.item),
-            ),
-            value,
-        );
-        // A name typed in full still comes up under a filter it falls outside, first in the
-        // list so Enter takes it.
-        const needle = value.trim().toLowerCase();
-        const exact = catalog.find((entry) => entry.name.toLowerCase() === needle);
-
-        if (!exact || found.results.includes(exact))
-            return found;
-
-        return { results: [exact, ...found.results], named: found.named + 1 };
-    }, [catalog, value, elementFilter, giantsOnly, itemsOnly]);
+    // A name typed in full still comes up under a filter it falls outside, first in the
+    // list so Enter takes it.
+    const exact = catalog.find((entry) => entry.name.toLowerCase() === value.trim().toLowerCase());
+    const { results, named } = !exact || found.results.includes(exact)
+        ? found
+        : { results: [exact, ...found.results], named: found.named + 1 };
     // Stays open on a filter with no matches, so it can be switched off again.
     const expanded = open && (results.length > 0 || filtering);
 
@@ -234,84 +214,78 @@ export function SkylanderSearch({
 
     }, [active, listId]);
 
-    const onKeyDown = useCallback(
-        (event: KeyboardEvent<HTMLInputElement>) =>
+    const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) =>
+    {
+        if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && results.length > 0)
         {
-            if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && results.length > 0)
-            {
-                event.preventDefault();
-                setOpen(true);
+            event.preventDefault();
+            setOpen(true);
 
-                const step = event.key === 'ArrowDown' ? 1 : -1;
+            const step = event.key === 'ArrowDown' ? 1 : -1;
 
-                setActive((current) => (current + step + results.length) % results.length);
-            }
-            else if (event.key === 'Enter' && target >= 0)
-            {
-                // Takes the suggestion instead of submitting the typed text. With no match the
-                // form submits, and Collection.tsx explains the name is not a Skylander.
-                event.preventDefault();
-                // Leaves the list open, see holdOpen.
-                onPick(results[target].name);
-            }
-            else if (event.key === 'Escape')
-                setOpen(false);
+            setActive((current) => (current + step + results.length) % results.length);
+        }
+        else if (event.key === 'Enter' && target >= 0)
+        {
+            // Takes the suggestion instead of submitting the typed text. With no match the
+            // form submits, and Collection.tsx explains the name is not a Skylander.
+            event.preventDefault();
+            // Leaves the list open, see holdOpen.
+            onPick(results[target].name);
+        }
+        else if (event.key === 'Escape')
+            setOpen(false);
 
-        },
-        [onPick, results, target],
-    );
+    };
 
     // An element and Giants combine, but items have neither, so Items switches the others off
     // and they switch Items off, rather than ending up on an empty list.
-    const toggleElement = useCallback((name: string) =>
+    const toggleElement = (name: string) =>
     {
         setElementFilter((current) => (current === name ? null : name));
         setItemsOnly(false);
         setActive(-1);
-    }, []);
+    };
 
-    const toggleGiants = useCallback(() =>
+    const toggleGiants = () =>
     {
         setGiantsOnly((current) => !current);
         setItemsOnly(false);
         setActive(-1);
-    }, []);
+    };
 
-    const toggleItems = useCallback(() =>
+    const toggleItems = () =>
     {
         setItemsOnly((current) => !current);
         setElementFilter(null);
         setGiantsOnly(false);
         setActive(-1);
-    }, []);
+    };
 
     // Stays in the box afterwards, ready for the next name.
-    const clear = useCallback(() =>
+    const clear = () =>
     {
         onChange('');
         setActive(-1);
         input.current?.focus();
-    }, [onChange]);
+    };
 
-    const type = useCallback(
-        (event: ChangeEvent<HTMLInputElement>) =>
-        {
-            onChange(event.target.value);
-            setOpen(true);
-            setActive(-1);
-        },
-        [onChange],
-    );
+    const type = (event: ChangeEvent<HTMLInputElement>) =>
+    {
+        onChange(event.target.value);
+        setOpen(true);
+        setActive(-1);
+    };
 
-    const show = useCallback(() => setOpen(true), []);
+    const show = () => setOpen(true);
 
     // The confirm dialog taking focus is not leaving the search, see holdOpen.
-    const leave = useCallback(() =>
+    const leave = () =>
     {
         if (!holdOpen)
             setOpen(false);
 
-    }, [holdOpen]);
+    };
 
     return (
         <div className="sky-search">

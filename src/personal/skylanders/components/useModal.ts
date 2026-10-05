@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type MouseEvent } from 'react';
+import { useEffect, useRef, type MouseEvent } from 'react';
 
 /**
  * Shows a native <dialog> as a modal while `open` is true, which handles the focus trap and
@@ -23,15 +23,12 @@ export function useModal(open: boolean, onBackdrop: () => void)
     }, [open]);
 
     // A click on the dialog element itself, rather than its contents, landed on the backdrop.
-    const onClick = useCallback(
-        (event: MouseEvent<HTMLDialogElement>) =>
-        {
-            if (event.target === event.currentTarget)
-                onBackdrop();
+    const onClick = (event: MouseEvent<HTMLDialogElement>) =>
+    {
+        if (event.target === event.currentTarget)
+            onBackdrop();
 
-        },
-        [onBackdrop],
-    );
+    };
 
     return { ref, onClick };
 }
