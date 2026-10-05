@@ -988,6 +988,13 @@ html:has(.sky)::-webkit-scrollbar-thumb:hover {
     padding-inline-end: 3.2rem;
 }
 
+/* Nunito's bullet is a speck at text size. Bigger dots, with less padding to keep the height. */
+.sky-password .sky-input[type='password']:not(:placeholder-shown) {
+    padding-block: 0.72rem;
+    font-size: 1.2rem;
+    letter-spacing: 0.08em;
+}
+
 /* Edge draws its own reveal eye, which would sit next to this one. */
 .sky-password .sky-input::-ms-reveal {
     display: none;
@@ -2109,7 +2116,7 @@ a.sky-card__name:hover {
     padding: 2.5rem 1.5rem;
     text-align: center;
     font-family: var(--sky-display);
-    font-size: 1.3rem;
+    font-size: 1.2rem;
     letter-spacing: 0.03em;
     text-shadow: 0 3px 0 var(--sky-outline);
 }

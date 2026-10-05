@@ -1,6 +1,6 @@
 import { faBolt, faEye, faEyeSlash, faKey } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { startTransition, useActionState, useState, type ChangeEvent } from 'react';
+import { startTransition, useActionState, useState } from 'react';
 
 import type { Db } from '../types';
 
@@ -20,7 +20,6 @@ interface PasswordFormProps
 /** The lock screen, styled as the Portal of Power the figures stand on. */
 export function PasswordForm({ db, onDemo }: PasswordFormProps)
 {
-    const [password, setPassword] = useState('');
     // Bumped on every failed try, so the portal remounts and shakes again.
     const [attempt, setAttempt] = useState(0);
     const [visible, setVisible] = useState(false);
@@ -42,8 +41,7 @@ export function PasswordForm({ db, onDemo }: PasswordFormProps)
     }, '');
 
     const toggle = () => setVisible((shown) => !shown);
-    const type = (event: ChangeEvent<HTMLInputElement>) => setPassword(event.target.value);
-    const submit = () => enter(password);
+    const submit = (form: FormData) => enter(String(form.get('password')));
     const devEnter = () => startTransition(() => enter(devPassword ?? ''));
 
     return (
@@ -56,15 +54,16 @@ export function PasswordForm({ db, onDemo }: PasswordFormProps)
 
             <form action={submit} className="sky-panel sky-login__form">
                 <div className="sky-password">
+                    {/* Not kept in state, so a password manager's fill is not wiped. */}
                     <input
                         type={visible ? 'text' : 'password'}
+                        name="password"
                         className="sky-input"
                         aria-label="Password"
                         placeholder="Password"
                         autoComplete="current-password"
                         spellCheck={false}
-                        value={password}
-                        onChange={type}
+                        required
                         autoFocus
                     />
                     <button
@@ -77,7 +76,7 @@ export function PasswordForm({ db, onDemo }: PasswordFormProps)
                         <FontAwesomeIcon icon={visible ? faEyeSlash : faEye} />
                     </button>
                 </div>
-                <button type="submit" className="sky-btn" disabled={busy || !password}>
+                <button type="submit" className="sky-btn" disabled={busy}>
                     {busy ? 'Entering' : 'Enter'}
                 </button>
                 {error && <p className="sky-error">{error}</p>}
