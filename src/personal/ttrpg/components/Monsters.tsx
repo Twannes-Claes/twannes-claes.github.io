@@ -1,6 +1,6 @@
-import { faEye, faEyeSlash, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faEye, faEyeSlash, faImage, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 
 import type { CreatureSize, Live, Point } from '../types';
 
@@ -9,6 +9,8 @@ import { confirmAction } from '../services/confirm';
 import { Popover } from './Popover';
 
 const sizes: CreatureSize[] = ['tiny', 'small', 'medium', 'large', 'huge', 'gargantuan'];
+
+const capital = (word: string) => word[0].toUpperCase() + word.slice(1);
 
 interface MonstersProps
 {
@@ -29,6 +31,10 @@ interface MonstersProps
 export function Monsters({ live, at, onClose, onDone, onError }: MonstersProps)
 {
     const monsters = live.tokens.filter((token) => token.kind === 'npc');
+    // Kept after each add, so a pack of goblins needs only their names.
+    const [size, setSize] = useState<CreatureSize>('medium');
+    const [hidden, setHidden] = useState(false);
+    const [pictureName, setPictureName] = useState('');
 
     // The form clears itself after each one, so a pack of goblins is quick to add.
     const [failure, add, adding] = useActionState((_: string, form: FormData) =>
@@ -37,8 +43,8 @@ export function Monsters({ live, at, onClose, onDone, onError }: MonstersProps)
         const monster = {
             name: String(form.get('name')),
             color: String(form.get('color')),
-            size: String(form.get('size')) as CreatureSize,
-            hidden: form.get('hidden') === 'on',
+            size,
+            hidden,
             picture: picture instanceof File && picture.size > 0 ? picture : null,
         };
 
@@ -47,6 +53,8 @@ export function Monsters({ live, at, onClose, onDone, onError }: MonstersProps)
             .then(() =>
             {
                 onDone(`${monster.name.trim()} is on the map${monster.hidden ? ', hidden' : ''}.`);
+                // The form empties its file field itself, so the name shown goes with it.
+                setPictureName('');
 
                 return '';
             })
@@ -69,35 +77,60 @@ export function Monsters({ live, at, onClose, onDone, onError }: MonstersProps)
 
     return (
         <Popover title="Monsters" className="ttrpg-dock-panel" onClose={onClose}>
-            <form action={add} className="ttrpg-popover__body">
-                <label className="ttrpg-field">
+            <form action={add} className="ttrpg-popover__body ttrpg-settings">
+                <label>
                     Name
                     <input name="name" maxLength={30} autoComplete="off" required />
                 </label>
-                <div className="ttrpg-monsters__row">
-                    <label className="ttrpg-field">
-                        Size
-                        <select name="size" className="ttrpg-select" defaultValue="medium">
-                            {sizes.map((size) => (
-                                <option key={size} value={size}>
-                                    {size[0].toUpperCase() + size.slice(1)}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
-                    <label className="ttrpg-field">
-                        Ring
-                        <input name="color" type="color" defaultValue="#b4443c" />
+                <div className="ttrpg-settings__group" role="group" aria-label="Size">
+                    Size
+                    <div className="ttrpg-settings__choices">
+                        {sizes.map((choice) => (
+                            <button
+                                key={choice}
+                                type="button"
+                                className="ttrpg-segment"
+                                aria-pressed={size === choice}
+                                aria-label={capital(choice)}
+                                title={capital(choice)}
+                                onClick={() => setSize(choice)}
+                            >
+                                {choice[0].toUpperCase()}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                <label>
+                    Ring
+                    <input name="color" type="color" defaultValue="#b4443c" />
+                </label>
+                <div className="ttrpg-settings__group" role="group" aria-label="Picture">
+                    Picture
+                    <label className="ttrpg-segment">
+                        <FontAwesomeIcon icon={faImage} />
+                        <span>{pictureName || 'Choose a picture'}</span>
+                        <input
+                            name="picture"
+                            type="file"
+                            accept="image/*"
+                            className="ttrpg-hidden-input"
+                            onChange={(event) => setPictureName(event.target.files?.[0]?.name ?? '')}
+                        />
                     </label>
                 </div>
-                <label className="ttrpg-field">
-                    Picture
-                    <input name="picture" type="file" accept="image/*" />
-                </label>
-                <label className="ttrpg-check">
-                    <input name="hidden" type="checkbox" />
-                    Hidden from the players
-                </label>
+                <div className="ttrpg-settings__group" role="group" aria-label="Players see it">
+                    Players
+                    <div className="ttrpg-settings__choices">
+                        <button type="button" className="ttrpg-segment" aria-pressed={!hidden} onClick={() => setHidden(false)}>
+                            <FontAwesomeIcon icon={faEye} />
+                            See it
+                        </button>
+                        <button type="button" className="ttrpg-segment" aria-pressed={hidden} onClick={() => setHidden(true)}>
+                            <FontAwesomeIcon icon={faEyeSlash} />
+                            Hidden
+                        </button>
+                    </div>
+                </div>
                 {failure && (
                     <p className="ttrpg-error" role="alert">
                         {failure}
@@ -123,7 +156,7 @@ export function Monsters({ live, at, onClose, onDone, onError }: MonstersProps)
                                     className="ttrpg-icon-button ttrpg-icon-button--small"
                                     aria-label={monster.hidden ? `Show ${monster.name}` : `Hide ${monster.name}`}
                                     aria-pressed={monster.hidden === true}
-                                    title={monster.hidden ? 'Hidden from the players: show it' : 'Shown to the players: hide it'}
+                                    title={monster.hidden ? 'Show to the players' : 'Hide from the players'}
                                     onClick={() =>
                                         live.hide(monster.id, !monster.hidden).catch((reason: Error) => onError(reason.message))}
                                 >

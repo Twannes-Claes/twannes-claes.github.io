@@ -391,29 +391,28 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         redraw();
     };
 
-    /** The path being drawn or waiting, with its feet beside its end, red past the speed. */
-    const drawPath = (current: Scenario) =>
+    /** The path being drawn or waiting, and its colour, red past the token's speed. */
+    const pathShown = (current: Scenario) =>
     {
         const shown = route
             ? { id: route.id, points: route.points, feet: routeFeet(current, route) }
             : pending;
+        const token = shown && tokens.find((candidate) => candidate.id === shown.id);
 
-        if (!shown)
-            return;
+        return shown && { ...shown, colour: token && shown.feet > token.speed ? tooFar : accent };
+    };
 
+    /** The path's labels, over the tokens: its feet beside its end, or why it cannot go on. */
+    const drawPathLabels = (shown: NonNullable<ReturnType<typeof pathShown>>) =>
+    {
         const end = shown.points[shown.points.length - 1];
 
         if (route?.unknown)
             drawUnknownStep(context, end, route.unknown, camera.zoom);
 
-        if (shown.points.length < 2)
-            return;
+        if (shown.points.length > 1)
+            drawPill(context, `${shown.feet} ft`, end, camera.zoom, shown.colour);
 
-        const token = tokens.find((candidate) => candidate.id === shown.id);
-        const colour = token && shown.feet > token.speed ? tooFar : accent;
-
-        drawRoute(context, shown.points, camera.zoom, colour);
-        drawPill(context, `${shown.feet} ft`, end, camera.zoom, colour);
     };
 
     /** Adds one frame's cost to the stats, and hands them on twice a second. */
@@ -485,6 +484,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
         const fog = fogEnabled ? layers : null;
         const background = scenario.background ? loaded(scenario.background) : null;
+        const path = pathShown(scenario);
         const scene = {
             scenario,
             background,
@@ -497,6 +497,13 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             fog,
             fogLook: { fade: !calm.matches, opacity: peek ? 0.3 : 1, settings: fogSettings },
             time,
+            // The path's line goes under the tokens, so it never covers the one walking it.
+            beneath: () =>
+            {
+                if (path)
+                    drawRoute(context, path.points, camera.zoom, path.colour);
+
+            },
         };
 
         render(context, scene, camera, viewport);
@@ -505,7 +512,10 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         const scale = viewport.dpr * camera.zoom;
 
         context.setTransform(scale, 0, 0, scale, viewport.dpr * camera.x, viewport.dpr * camera.y);
-        drawPath(scenario);
+
+        if (path)
+            drawPathLabels(path);
+
         tool?.draw(context, camera.zoom, scenario);
 
         // The smoke drifts, walking tokens move, fog changes and tokens fade, so they ask for
@@ -610,10 +620,11 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         const world = toWorld(camera, screen);
         const shown = fogEnabled ? tokens.filter(seenByPlayers) : tokens;
 
-        // Last drawn is on top. The project targets ES2022, which has no findLast.
+        // Last drawn is on top. The project targets ES2022, which has no findLast. A press reaches
+        // a bit past the token's edge, as tokens leave room in their cell and fingers are wide.
         return [...shown]
             .reverse()
-            .find((token) => distance(world, token) <= tokenRadius(current.grid, token.size));
+            .find((token) => distance(world, token) <= tokenRadius(current.grid, token.size) * 1.5);
     };
 
     const moveToken = (id: string, to: Point) =>
@@ -724,6 +735,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         free: event.altKey,
         zoom: camera.zoom,
         scenario: current,
+        seen: (point) => peek || seenGround(point),
     });
 
     /**
@@ -781,11 +793,14 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         const pressed = idle && scenario ? tokenAt(point, scenario) : undefined;
         const token = own === null || pressed?.id === own ? pressed : undefined;
 
-        // In play mode players draw a path, unless the game master froze movement. Monsters,
-        // and everything in edit mode, drag freely: that is the game master's hand.
-        if (token && fogEnabled && token.kind === 'player')
+        // In play mode a token draws a path, a player's unless the game master froze movement. A
+        // monster nobody sees drags freely, as a path could not go into the fog it stands in, and
+        // so does one with Alt held. Everything in edit mode drags: that is the game master's hand.
+        const walksPath = token?.kind === 'player' || (token !== undefined && !event.altKey && seenByPlayers(token));
+
+        if (token && fogEnabled && walksPath)
         {
-            if (frozen || walks.has(token.id))
+            if ((frozen && token.kind === 'player') || walks.has(token.id))
             {
                 pointers.set(event.pointerId, point);
 
@@ -853,6 +868,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             if (tool && scenario)
             {
                 tool.move(toolPointer(event, scenario), pressed);
+                canvas.style.cursor = tool.cursor;
                 redraw();
             }
 

@@ -44,12 +44,14 @@ export interface Scene
     fogLook: FogLook;
     /** Milliseconds, drives the drifting smoke. */
     time: number;
+    /** Drawn in world pixels just before the tokens: the path one is about to walk, under them. */
+    beneath?: () => void;
 }
 
-/** A token's radius, a little smaller than the cells it covers. */
+/** A token's radius, 60 percent across the cells it covers, so the grid shows around it. */
 export function tokenRadius(grid: Grid, size: CreatureSize = 'medium'): number
 {
-    return grid.size * 0.4 * cellsAcross(size);
+    return grid.size * 0.3 * cellsAcross(size);
 }
 
 /**
@@ -119,10 +121,19 @@ export function drawPill(
     const left = at.x + 14 / zoom;
     const top = at.y - height - 14 / zoom;
 
+    // The look of the page's tooltips and messages, see .ttrpg-tip in styles/ttrpg.css.
+    ctx.save();
     ctx.beginPath();
-    ctx.roundRect(left, top, width, height, height / 2);
+    ctx.roundRect(left, top, width, height, 8 / zoom);
+    ctx.shadowColor = 'rgb(0 0 0 / 0.5)';
+    ctx.shadowBlur = 16 / zoom;
+    ctx.shadowOffsetY = 6 / zoom;
     ctx.fillStyle = colour;
     ctx.fill();
+    ctx.restore();
+    ctx.lineWidth = 1 / zoom;
+    ctx.strokeStyle = faded(ink, 0.2);
+    ctx.stroke();
     ctx.fillStyle = ink;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -285,7 +296,7 @@ function drawSpawn(ctx: CanvasRenderingContext2D, at: Point, radius: number)
  */
 export function render(
     ctx: CanvasRenderingContext2D,
-    { scenario, background, picture, tokens, editing, own, motion, fog, fogLook, time }: Scene,
+    { scenario, background, picture, tokens, editing, own, motion, fog, fogLook, time, beneath }: Scene,
     camera: Camera,
     viewport: Viewport,
 )
@@ -385,6 +396,8 @@ export function render(
 
     if (editing)
         drawSpawn(ctx, scenario.spawn, tokenRadius(grid));
+
+    beneath?.();
 
     for (const token of tokens)
     {

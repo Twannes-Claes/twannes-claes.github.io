@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { Head } from 'vite-react-ssg';
 
 import { ConfirmHost } from './Confirm';
+import { TooltipHost } from './Tooltip';
 
 interface ShellProps
 {
@@ -17,9 +18,9 @@ interface ShellProps
 
 /**
  * The frame every TTRPG page sits in: the noindex head, the app's root class that
- * styles/ttrpg.css scopes everything under, the house button, and the dialog that asks before
- * anything is deleted. The app is not linked from the portfolio and is private, so search
- * engines are kept out.
+ * styles/ttrpg.css scopes everything under, the house button, the dialog that asks before
+ * anything is deleted, and the tooltips. The app is not linked from the portfolio and is
+ * private, so search engines are kept out.
  */
 export function Shell({ title, home = '/ttrpg', children }: ShellProps)
 {
@@ -42,6 +43,7 @@ export function Shell({ title, home = '/ttrpg', children }: ShellProps)
 
             {children}
             <ConfirmHost />
+            <TooltipHost />
         </div>
     );
 }

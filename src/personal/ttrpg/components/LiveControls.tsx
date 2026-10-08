@@ -1,4 +1,4 @@
-import { faPlay, faQrcode, faStop, faUsers } from '@fortawesome/free-solid-svg-icons';
+import { faPlay, faQrcode, faStop, faUserXmark, faUsers } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useActionState, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -38,12 +38,13 @@ export function LiveControls({ live, scenarioId, onStarted, onDone, onError }: L
     const [asking, setAsking] = useState(false);
     const [showQr, setShowQr] = useState(false);
     const [showPlayers, setShowPlayers] = useState(false);
+    const [freshFog, setFreshFog] = useState(true);
     const players = live.tokens.filter((token) => token.kind === 'player');
 
     const [failure, start, starting] = useActionState(
         (_: string, form: FormData) =>
             live
-                .start(String(form.get('password')), scenarioId, form.get('fresh') === 'on')
+                .start(String(form.get('password')), scenarioId, freshFog)
                 .then(() =>
                 {
                     setAsking(false);
@@ -93,6 +94,7 @@ export function LiveControls({ live, scenarioId, onStarted, onDone, onError }: L
                     type="button"
                     className="ttrpg-segment"
                     aria-expanded={asking}
+                    title="Go live, so players can join with a password"
                     onClick={() => setAsking((open) => !open)}
                 >
                     <FontAwesomeIcon icon={faPlay} />
@@ -101,29 +103,45 @@ export function LiveControls({ live, scenarioId, onStarted, onDone, onError }: L
 
                 {asking && (
                     <Popover title="Start the session" className="ttrpg-start" dismissOnOutside onClose={() => setAsking(false)}>
-                        <form action={start} className="ttrpg-popover__body">
-                            <label className="ttrpg-field">
-                                Password for the players
+                        <form action={start} className="ttrpg-popover__body ttrpg-settings">
+                            <label title="What the players type to join">
+                                Password
                                 <input name="password" defaultValue={live.password} autoComplete="off" required autoFocus />
                             </label>
-                            <label
-                                className="ttrpg-check"
-                                title="Forget what the party saw of every map last time. Untick to pick up where they left off."
-                            >
-                                <input name="fresh" type="checkbox" defaultChecked />
-                                Start with fresh fog
-                            </label>
+                            <div className="ttrpg-settings__group" role="group" aria-label="Fog">
+                                Fog
+                                <div className="ttrpg-settings__choices">
+                                    <button
+                                        type="button"
+                                        className="ttrpg-segment"
+                                        aria-pressed={freshFog}
+                                        title="Forget what the party saw last time"
+                                        onClick={() => setFreshFog(true)}
+                                    >
+                                        Fresh
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="ttrpg-segment"
+                                        aria-pressed={!freshFog}
+                                        title="Pick up where they left off"
+                                        onClick={() => setFreshFog(false)}
+                                    >
+                                        Keep
+                                    </button>
+                                </div>
+                            </div>
                             {failure && (
                                 <p className="ttrpg-error" role="alert">
                                     {failure}
                                 </p>
                             )}
                             <div className="ttrpg-sheet__actions">
-                                <button type="submit" className="ttrpg-button ttrpg-button--confirm" disabled={starting}>
-                                    {starting ? 'Starting' : 'Start session'}
-                                </button>
                                 <button type="button" className="ttrpg-button" onClick={() => setAsking(false)}>
                                     Cancel
+                                </button>
+                                <button type="submit" className="ttrpg-button ttrpg-button--confirm" disabled={starting}>
+                                    {starting ? 'Starting' : 'Start session'}
                                 </button>
                             </div>
                         </form>
@@ -140,6 +158,7 @@ export function LiveControls({ live, scenarioId, onStarted, onDone, onError }: L
                 className="ttrpg-segment"
                 aria-pressed={showPlayers}
                 aria-expanded={showPlayers}
+                title="Who has joined"
                 onClick={() => setShowPlayers((open) => !open)}
             >
                 <FontAwesomeIcon icon={faUsers} />
@@ -154,7 +173,7 @@ export function LiveControls({ live, scenarioId, onStarted, onDone, onError }: L
             >
                 <FontAwesomeIcon icon={faQrcode} />
             </button>
-            <button type="button" className="ttrpg-segment" onClick={end}>
+            <button type="button" className="ttrpg-segment" title="End the session for everyone" onClick={end}>
                 <FontAwesomeIcon icon={faStop} />
                 End
             </button>
@@ -177,8 +196,14 @@ export function LiveControls({ live, scenarioId, onStarted, onDone, onError }: L
                                         <span className="ttrpg-swatch" style={{ background: player.color }} />
                                         {player.name}
                                     </span>
-                                    <button type="button" className="ttrpg-segment" onClick={() => kick(player.id, player.name)}>
-                                        Remove
+                                    <button
+                                        type="button"
+                                        className="ttrpg-icon-button ttrpg-icon-button--small"
+                                        aria-label={`Remove ${player.name}`}
+                                        title="Remove from the table"
+                                        onClick={() => kick(player.id, player.name)}
+                                    >
+                                        <FontAwesomeIcon icon={faUserXmark} />
                                     </button>
                                 </li>
                             ))}

@@ -157,7 +157,7 @@ export function ScenarioList({
             <div className="ttrpg-scenarios__background">
                 <label
                     className="ttrpg-segment"
-                    title="A picture behind this map. The map takes its size; walls and props stay where they are."
+                    title="A picture behind this map"
                 >
                     <FontAwesomeIcon icon={faImage} />
                     {active.background ? 'Change background' : 'Add background'}

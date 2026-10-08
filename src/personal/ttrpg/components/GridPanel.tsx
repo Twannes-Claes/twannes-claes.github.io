@@ -1,3 +1,12 @@
+import {
+    faBorderAll,
+    faBorderNone,
+    faClockRotateLeft,
+    faEye,
+    faHexagonNodes,
+    type IconDefinition,
+} from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useRef, type ChangeEvent } from 'react';
 
 import type { Grid } from '../types';
@@ -20,6 +29,26 @@ function withKind(grid: Grid, kind: GridKind): Grid
         return { ...grid, type: 'hex', hexOrientation: kind };
 
     return { ...grid, type: kind };
+}
+
+/**
+ * The grid types as symbols, with the name as the tip. Font Awesome's free set has no plain
+ * hexagon, so both hexes use the one with dots on its corners, the flat one turned a quarter.
+ */
+const kinds: { id: GridKind; icon: IconDefinition; title: string; turned?: boolean }[] = [
+    { id: 'square', icon: faBorderAll, title: 'Square cells' },
+    { id: 'pointy', icon: faHexagonNodes, title: 'Hexes with a point on top' },
+    { id: 'flat', icon: faHexagonNodes, title: 'Hexes with a flat top', turned: true },
+    { id: 'none', icon: faBorderNone, title: 'No grid' },
+];
+
+/** The ways a diagonal step can cost, labelled with what a walk of three costs. */
+function diagonalRules(feet: number): { id: NonNullable<Grid['diagonals']>; label: string; title: string }[]
+{
+    return [
+        { id: 'alternate', label: `${feet}, ${feet * 2}, ${feet} ft`, title: 'Every second diagonal step costs double' },
+        { id: 'equal', label: `${feet} ft each`, title: 'Every diagonal step costs one cell' },
+    ];
 }
 
 /** A number field's value, or the old one while the field is empty or half typed. */
@@ -51,7 +80,7 @@ function NumberField({ label, value, step, min = -Infinity, onChange }: NumberFi
     return (
         <label>
             <span
-                className="ttrpg-properties__scrub"
+                className="ttrpg-settings__scrub"
                 // No text selection while dragging; the click that focuses the field still comes.
                 onPointerDown={(event) =>
                 {
@@ -122,72 +151,100 @@ export function GridPanel({ grid, onChange }: GridPanelProps)
     };
 
     return (
-        <section className="ttrpg-panel ttrpg-properties" aria-label="Grid">
+        <section className="ttrpg-panel ttrpg-properties ttrpg-settings" aria-label="Grid">
             <h2>Grid</h2>
 
-            <label>
+            <div className="ttrpg-settings__group" role="group" aria-label="Type">
                 Type
-                <select
-                    value={kindOf(grid)}
-                    onChange={(event) => onChange(withKind(grid, event.target.value as GridKind))}
-                >
-                    <option value="square">Square</option>
-                    <option value="pointy">Hex</option>
-                    <option value="flat">Flat hex</option>
-                    <option value="none">None</option>
-                </select>
-            </label>
+                <div className="ttrpg-settings__choices">
+                    {kinds.map((choice) => (
+                        <button
+                            key={choice.id}
+                            type="button"
+                            className="ttrpg-segment"
+                            aria-pressed={kindOf(grid) === choice.id}
+                            aria-label={choice.title}
+                            title={choice.title}
+                            // The type already on is no change, so it adds no step to undo.
+                            onClick={() => kindOf(grid) !== choice.id && onChange(withKind(grid, choice.id))}
+                        >
+                            <FontAwesomeIcon icon={choice.icon} rotation={choice.turned ? 90 : undefined} />
+                        </button>
+                    ))}
+                </div>
+            </div>
             {grid.type === 'square' && (
-                <label>
+                <div className="ttrpg-settings__group" role="group" aria-label="Diagonals">
                     Diagonals
-                    <select
-                        value={grid.diagonals ?? 'alternate'}
-                        onChange={(event) => set({ diagonals: event.target.value as Grid['diagonals'] })}
-                    >
-                        <option value="alternate">{`${grid.feetPerCell}, ${grid.feetPerCell * 2}, ${grid.feetPerCell} ft`}</option>
-                        <option value="equal">{`${grid.feetPerCell} ft each`}</option>
-                    </select>
-                </label>
+                    <div className="ttrpg-settings__choices">
+                        {diagonalRules(grid.feetPerCell).map((choice) => (
+                            <button
+                                key={choice.id}
+                                type="button"
+                                className="ttrpg-segment"
+                                aria-pressed={(grid.diagonals ?? 'alternate') === choice.id}
+                                title={choice.title}
+                                onClick={() => (grid.diagonals ?? 'alternate') !== choice.id && set({ diagonals: choice.id })}
+                            >
+                                {choice.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
             )}
             {/* Only kept above 0, so typing 7 on the way to 70 does not jump to a bigger minimum. */}
             <NumberField label="Cell size" value={grid.size} step={0.5} min={1} onChange={(size, merge) => set({ size }, merge)} />
-            <NumberField label="Offset X" value={grid.offsetX} step={0.5} onChange={(offsetX, merge) => set({ offsetX }, merge)} />
-            <NumberField label="Offset Y" value={grid.offsetY} step={0.5} onChange={(offsetY, merge) => set({ offsetY }, merge)} />
-            <label>
+            <div className="ttrpg-settings__group" role="group" aria-label="Offset">
+                Offset
+                <div className="ttrpg-settings__pair">
+                    <NumberField label="X" value={grid.offsetX} step={0.5} onChange={(offsetX, merge) => set({ offsetX }, merge)} />
+                    <NumberField label="Y" value={grid.offsetY} step={0.5} onChange={(offsetY, merge) => set({ offsetY }, merge)} />
+                </div>
+            </div>
+            <div className="ttrpg-settings__group" role="group" aria-label="Lines">
                 Lines
-                <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.05}
-                    value={grid.opacity}
-                    onChange={(event) =>
-                    {
-                        set({ opacity: numberFrom(event, grid.opacity) }, sliding.current);
-                        sliding.current = true;
-                    }}
-                    onPointerUp={letGo}
-                    onKeyUp={letGo}
-                    onBlur={letGo}
-                />
-            </label>
-            <label className="ttrpg-properties__check">
-                <input
-                    type="checkbox"
-                    checked={grid.visible}
-                    onChange={(event) => set({ visible: event.target.checked })}
-                />
-                Show the grid
-            </label>
+                <div className="ttrpg-settings__line">
+                    <input
+                        type="range"
+                        aria-label="How strong the lines are"
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        value={grid.opacity}
+                        // Hidden lines have no strength to set.
+                        disabled={!grid.visible}
+                        onChange={(event) =>
+                        {
+                            set({ opacity: numberFrom(event, grid.opacity) }, sliding.current);
+                            sliding.current = true;
+                        }}
+                        onPointerUp={letGo}
+                        onKeyUp={letGo}
+                        onBlur={letGo}
+                    />
+                    <span className="ttrpg-settings__value">{`${Math.round(grid.opacity * 100)}%`}</span>
+                    <button
+                        type="button"
+                        className="ttrpg-icon-button ttrpg-icon-button--small"
+                        aria-pressed={grid.visible}
+                        aria-label="Show the grid"
+                        title={grid.visible ? 'Hide the grid' : 'Show the grid'}
+                        onClick={() => set({ visible: !grid.visible })}
+                    >
+                        <FontAwesomeIcon icon={faEye} />
+                    </button>
+                </div>
+            </div>
             <button
                 type="button"
                 className="ttrpg-segment ttrpg-segment--block"
-                title={`A square grid of ${defaultGrid.size} px cells from the top left corner, with faint lines`}
+                title={`Square, ${defaultGrid.size} px cells, faint lines`}
                 disabled={(Object.keys(defaultGrid) as (keyof Grid)[]).every((field) => grid[field] === defaultGrid[field])}
                 // The diagonal rule is a game rule, not part of lining the grid up, so it stays.
                 onClick={() => onChange({ ...defaultGrid, diagonals: grid.diagonals })}
             >
-                Back to the default grid
+                <FontAwesomeIcon icon={faClockRotateLeft} />
+                Default grid
             </button>
         </section>
     );

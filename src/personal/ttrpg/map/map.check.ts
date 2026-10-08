@@ -330,6 +330,7 @@ const click = (x: number, y: number, free = false): ToolPointer => ({
     free,
     zoom: 1,
     scenario: edited,
+    seen: () => true,
 });
 const keep = (next: Scenario) =>
 {
@@ -353,6 +354,16 @@ assert.deepEqual(
     ],
 );
 
+// Placing freely, a click near a wall's end lands on it, and one near a wall lands on its line.
+const beforeFree = edited;
+
+wallTool.cancel?.();
+wallTool.down(click(297, 103, true));
+wallTool.down(click(296, 250, true));
+assert.deepEqual(edited.walls.map((made) => [made.x1, made.y1, made.x2, made.y2]).at(-1), [300, 100, 300, 250]);
+wallTool.cancel?.();
+edited = beforeFree;
+
 // Doors: a click on a wall makes it a closed door, the next one opens it, the one after makes it a
 // plain wall again.
 const doorTool = createTool('doors', keep);
@@ -373,6 +384,11 @@ const playTool = createTool('open-doors', keep);
 
 assert.ok(playTool);
 assert.equal(playTool.down(click(302, 250)), false);
+// A door in the fog does not react until the players see it.
+edited = { ...edited, walls: [{ ...edited.walls[0], door: { open: false } }, ...edited.walls.slice(1)] };
+assert.equal(playTool.down({ ...click(200, 103), seen: () => false }), false);
+assert.equal(playTool.down(click(200, 103)), true);
+assert.equal(edited.walls[0].door?.open, true);
 
 // Erasing takes the wall under the click.
 const eraseTool = createTool('erase', keep);
@@ -380,6 +396,10 @@ const eraseTool = createTool('erase', keep);
 assert.ok(eraseTool);
 eraseTool.down(click(302, 250));
 assert.equal(edited.walls.length, 1);
+// Away from every wall, it takes the prop under the click, turned or not.
+edited = { ...edited, props: [{ id: 'crate', src: '', x: 600, y: 600, width: 100, height: 40, rotation: Math.PI / 2 }] };
+eraseTool.down(click(610, 560));
+assert.deepEqual([edited.props.length, edited.walls.length], [0, 1]);
 
 // The spawn point lands in the middle of a cell, or exactly where clicked with Alt.
 const spawnTool = createTool('spawn', keep);

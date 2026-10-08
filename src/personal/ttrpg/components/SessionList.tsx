@@ -159,7 +159,7 @@ export function SessionList()
             <button
                 type="button"
                 className="ttrpg-segment ttrpg-segment--block"
-                title="A session with the demo map, ready to look around in and play with"
+                title="A session with the demo map"
                 disabled={addingExample}
                 onClick={addExample}
             >

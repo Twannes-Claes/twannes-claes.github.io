@@ -45,7 +45,7 @@ function SaveState({ unsaved, failed }: { unsaved: boolean; failed: boolean })
             <p
                 className="ttrpg-panel ttrpg-saved ttrpg-saved--failed"
                 role="alert"
-                title="Your changes are kept here. Saving tries again on the next change."
+                title="Kept here, saving again on your next change"
             >
                 <FontAwesomeIcon icon={faTriangleExclamation} />
                 Not saved
@@ -489,6 +489,7 @@ export function MapEditor({ initial, library: initialLibrary, store, debug, live
                     type="button"
                     className="ttrpg-segment"
                     aria-pressed={mode === 'edit'}
+                    title="Draw walls, place props and line up the grid"
                     onClick={() => switchMode('edit')}
                 >
                     <FontAwesomeIcon icon={faPen} />
@@ -500,8 +501,8 @@ export function MapEditor({ initial, library: initialLibrary, store, debug, live
                     aria-pressed={mode === 'play'}
                     title={
                         live && live.live
-                            ? 'The map as the players see it, with your GM controls. Live: moves, doors, monsters and fog reach every phone'
-                            : 'The map as the players will see it, with your GM controls and two test players. Start the session to go live'
+                            ? 'Live: what the players see, with your GM controls'
+                            : 'What the players will see, with two test players'
                     }
                     onClick={() => switchMode('play')}
                 >
@@ -592,7 +593,6 @@ export function MapEditor({ initial, library: initialLibrary, store, debug, live
                         scenarios={scenarios}
                         activeId={active.id}
                         onScenario={select}
-                        onResetFog={resetFog}
                         onPeek={setPeek}
                         hidden={idle}
                         onMonsters={liveMap ? () => togglePanel('monsters') : undefined}
@@ -609,6 +609,7 @@ export function MapEditor({ initial, library: initialLibrary, store, debug, live
                     onChange={setFogDraft}
                     onCommit={() => saveFog(fogDraft)}
                     onReset={() => saveFog(defaultFogSettings)}
+                    onResetFog={resetFog}
                     onClose={() => setPanel(null)}
                 />
             )}

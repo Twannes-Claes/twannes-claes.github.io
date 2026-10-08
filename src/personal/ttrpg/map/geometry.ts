@@ -50,17 +50,23 @@ export function distance(a: Point, b: Point): number
     return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
-/** How far a point is from the nearest spot on segment a b. */
-export function distanceToSegment(point: Point, a: Point, b: Point): number
+/** The spot on segment a b nearest to a point. */
+export function closestOnSegment(point: Point, a: Point, b: Point): Point
 {
     const length = (b.x - a.x) ** 2 + (b.y - a.y) ** 2;
 
     if (length === 0)
-        return distance(point, a);
+        return a;
 
     const along = ((point.x - a.x) * (b.x - a.x) + (point.y - a.y) * (b.y - a.y)) / length;
 
-    return distance(point, lerp(a, b, Math.min(1, Math.max(0, along))));
+    return lerp(a, b, Math.min(1, Math.max(0, along)));
+}
+
+/** How far a point is from the nearest spot on segment a b. */
+export function distanceToSegment(point: Point, a: Point, b: Point): number
+{
+    return distance(point, closestOnSegment(point, a, b));
 }
 
 /** The point a fraction t of the way from a to b. */

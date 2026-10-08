@@ -37,13 +37,18 @@ export function PropLibrary({ pictures, placing, onPick, onUpload }: PropLibrary
     };
 
     return (
-        <section className="ttrpg-panel ttrpg-properties" aria-label="Props">
+        <section className="ttrpg-panel ttrpg-properties ttrpg-settings" aria-label="Props">
             <h2>Props</h2>
-            <p className="ttrpg-properties__hint">
-                {placing
-                    ? 'Click the map to place it. Esc when you are done.'
-                    : 'Pick a picture to place it. Click a placed prop to move it, drag its corner to scale or its top handle to turn. Delete removes it, Alt places freely.'}
-            </p>
+            {placing ? (
+                <p className="ttrpg-settings__hint">
+                    Click the map to place it. <kbd>Esc</kbd> done
+                </p>
+            ) : (
+                <p className="ttrpg-settings__hint">
+                    Pick a picture to place it. Drag a placed prop to move it, its corner to scale,
+                    its top handle to turn. <kbd>Del</kbd> removes, hold <kbd>Alt</kbd>: no snap
+                </p>
+            )}
 
             {pictures.length > 0 && (
                 <ul className="ttrpg-library">
@@ -63,7 +68,7 @@ export function PropLibrary({ pictures, placing, onPick, onUpload }: PropLibrary
                 </ul>
             )}
 
-            <label className="ttrpg-segment ttrpg-library__upload">
+            <label className="ttrpg-segment">
                 <FontAwesomeIcon icon={faUpload} />
                 Upload pictures
                 <input

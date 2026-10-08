@@ -186,8 +186,9 @@ export function MapCanvas({
     return (
         <>
             <canvas ref={canvas} className="ttrpg-map" aria-label={`Battle map: ${scenario.name}`} />
-            {/* The demo's picture is free to use with attribution, so every map showing it credits
-                its maker: the demo, the example session and its copies, for the GM and players. */}
+            {/* The demo's picture is free to use with attribution, so every map showing it
+                credits its maker: the demo, the example session and its copies, for the GM and
+                players. */}
             {scenario.background === demoScenario.background && (
                 <a href={demoCredit.url} className="ttrpg-credit" target="_blank" rel="noreferrer">
                     {demoCredit.text}

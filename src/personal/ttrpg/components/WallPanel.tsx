@@ -5,13 +5,22 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 export type WallKind = 'wall' | 'change';
 
 const kinds: { id: WallKind; label: string; title: string; icon: IconDefinition }[] = [
-    { id: 'wall', label: 'Draw', title: 'Click, click, click for a chain of walls', icon: faDrawPolygon },
+    { id: 'wall', label: 'Draw', title: 'Click to chain walls', icon: faDrawPolygon },
     {
         id: 'change',
         label: 'Doors',
-        title: 'Click a wall: it becomes a closed door, then an open door, then a wall again',
+        title: 'Click a wall: closed door, open door, wall',
         icon: faDoorClosed,
     },
+];
+
+/** Snap points per cell side, short enough for five in a row, with the full name as the tip. */
+const snaps = [
+    { steps: 1, label: 'Cell', title: 'Grid corners' },
+    { steps: 2, label: '½', title: 'Half cells' },
+    { steps: 4, label: '¼', title: 'Quarter cells' },
+    { steps: 8, label: '⅛', title: 'Eighth cells' },
+    { steps: 0, label: 'Off', title: 'No snapping' },
 ];
 
 interface WallPanelProps
@@ -30,10 +39,10 @@ interface WallPanelProps
 export function WallPanel({ kind, onKind, snap, onSnap }: WallPanelProps)
 {
     return (
-        <section className="ttrpg-panel ttrpg-properties" aria-label="Walls and doors">
+        <section className="ttrpg-panel ttrpg-properties ttrpg-settings" aria-label="Walls and doors">
             <h2>Walls and doors</h2>
 
-            <div className="ttrpg-properties__choices">
+            <div className="ttrpg-settings__choices">
                 {kinds.map((choice) => (
                     <button
                         key={choice.id}
@@ -51,17 +60,27 @@ export function WallPanel({ kind, onKind, snap, onSnap }: WallPanelProps)
 
             {kind !== 'change' && (
                 <>
-                    <label>
+                    <div className="ttrpg-settings__group" role="group" aria-label="Snap">
                         Snap
-                        <select value={snap} onChange={(event) => onSnap(Number(event.target.value))}>
-                            <option value={1}>Grid corners</option>
-                            <option value={2}>Half cell</option>
-                            <option value={4}>Quarter cell</option>
-                            <option value={8}>Eighth cell</option>
-                            <option value={0}>Off</option>
-                        </select>
-                    </label>
-                    <p className="ttrpg-properties__hint">Hold Alt to place a point anywhere.</p>
+                        <div className="ttrpg-settings__choices">
+                            {snaps.map((choice) => (
+                                <button
+                                    key={choice.steps}
+                                    type="button"
+                                    className="ttrpg-segment"
+                                    aria-pressed={snap === choice.steps}
+                                    aria-label={choice.title}
+                                    title={choice.title}
+                                    onClick={() => onSnap(choice.steps)}
+                                >
+                                    {choice.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <p className="ttrpg-settings__hint">
+                        Hold <kbd>Alt</kbd>: no snap
+                    </p>
                 </>
             )}
         </section>

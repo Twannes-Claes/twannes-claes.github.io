@@ -1,10 +1,10 @@
 import type { Point, Prop, PropPicture, Scenario, Wall } from '../types';
 
 import { danger, door as doorColour, faded, ground, highlight, ink } from './colours.ts';
-import { boxOf, distance, distanceToSegment, onMap, segmentsTouch, type Area } from './geometry.ts';
+import { boxOf, closestOnSegment, distance, distanceToSegment, onMap, segmentsTouch, type Area } from './geometry.ts';
 import { cellAt, cellCenter, cellLine, snapPoint } from './grid.ts';
 import { lineFeet, pathFeet } from './path.ts';
-import { fromLocal, placedSize, propAt, propHandles, snapCenter, snapSize } from './props.ts';
+import { fromLocal, placedSize, propAt, propCorners, propHandles, snapCenter, snapSize } from './props.ts';
 import { drawPill, drawRoute } from './render.ts';
 
 import { confirmAction } from '../services/confirm.ts';
@@ -43,11 +43,17 @@ export interface ToolPointer
     /** Screen pixels per world pixel, so hit areas feel the same size at any zoom. */
     zoom: number;
     scenario: Scenario;
+    /** Whether the players see a spot or have seen it, or the GM is peeking. True without fog. */
+    seen: (point: Point) => boolean;
 }
 
 export interface MapTool
 {
-    cursor: string;
+    /**
+     * Read again after every move, so it can follow what is under the pointer. Empty leaves the
+     * stylesheet's open hand, for where a press pans, see .ttrpg-map in styles/ttrpg.css.
+     */
+    readonly cursor: string;
     /** True when the tool takes this press; otherwise it pans or drags a token. */
     down: (pointer: ToolPointer) => boolean;
     /** While pressed, and while hovering with a mouse. */
@@ -76,15 +82,50 @@ interface Drag
 }
 
 /**
- * Where a click lands: the nearest snap point, steps per cell side, see snapPoint in map/grid.ts.
- * The exact spot with Alt, with snapping off (0) or without a grid. Pulled inside the map, so no
- * wall ends beyond its edge.
+ * The end of a wall near the pointer, or, placing freely, the nearest spot on a wall, so a new
+ * wall joins the old ones exactly, with no gap for light to slip through. Snapped to the grid, a
+ * spot along a wall would pull the click off its grid point, so only the ends count there.
  */
-function cornerPoint({ world, free, scenario }: ToolPointer, steps: number): Point
+function wallJoint({ world, zoom, scenario }: ToolPointer, exact: boolean): Point | null
 {
+    let joint: Point | null = null;
+    let gap = reach / zoom;
+    const consider = (spot: Point) =>
+    {
+        if (distance(world, spot) > gap)
+            return;
+
+        joint = spot;
+        gap = distance(world, spot);
+    };
+
+    for (const wall of scenario.walls)
+    {
+        consider({ x: wall.x1, y: wall.y1 });
+        consider({ x: wall.x2, y: wall.y2 });
+    }
+
+    if (exact && !joint)
+    {
+        for (const wall of scenario.walls)
+            consider(closestOnSegment(world, { x: wall.x1, y: wall.y1 }, { x: wall.x2, y: wall.y2 }));
+
+    }
+
+    return joint;
+}
+
+/**
+ * Where a click lands: on a wall it joins, else the nearest snap point, steps per cell side, see
+ * snapPoint in map/grid.ts. The exact spot with Alt, with snapping off (0) or without a grid.
+ * Pulled inside the map, so no wall ends beyond its edge.
+ */
+function cornerPoint(pointer: ToolPointer, steps: number): Point
+{
+    const { world, free, scenario } = pointer;
     const exact = free || steps === 0 || scenario.grid.type === 'none';
 
-    return onMap(scenario, exact ? world : snapPoint(scenario.grid, world, steps));
+    return onMap(scenario, wallJoint(pointer, exact) ?? (exact ? world : snapPoint(scenario.grid, world, steps)));
 }
 
 /** The middle of the cell under the pointer, or the exact spot with Alt or without a grid. */
@@ -155,6 +196,21 @@ function strokeWall(ctx: CanvasRenderingContext2D, wall: Wall, colour: string, w
     ctx.strokeStyle = colour;
     ctx.lineWidth = width;
     ctx.lineCap = 'round';
+    ctx.stroke();
+}
+
+/** A prop's outline, turned with it, with a faint fill so a big one reads as one thing. */
+function strokeProp(ctx: CanvasRenderingContext2D, prop: Prop, colour: string, width: number)
+{
+    ctx.beginPath();
+    propCorners(prop).forEach((corner, index) =>
+        index === 0 ? ctx.moveTo(corner.x, corner.y) : ctx.lineTo(corner.x, corner.y),
+    );
+    ctx.closePath();
+    ctx.fillStyle = faded(colour, 0.2);
+    ctx.fill();
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = width;
     ctx.stroke();
 }
 
@@ -270,6 +326,19 @@ function wallTool(change: Change, snap: number): MapTool
 }
 
 /**
+ * Whether the players see a wall, or saw it. Tested just off either side of its middle, as sight
+ * stops right at a closed door, so the door itself sits on the edge of what is seen.
+ */
+function wallSeen(pointer: ToolPointer, wall: Wall): boolean
+{
+    const length = Math.hypot(wall.x2 - wall.x1, wall.y2 - wall.y1) || 1;
+    const side = { x: ((wall.y1 - wall.y2) / length) * 4, y: ((wall.x2 - wall.x1) / length) * 4 };
+    const middle = { x: (wall.x1 + wall.x2) / 2, y: (wall.y1 + wall.y2) / 2 };
+
+    return [1, -1].some((sign) => pointer.seen({ x: middle.x + side.x * sign, y: middle.y + side.y * sign }));
+}
+
+/**
  * Tools that act on the wall under the pointer and show which one that is. A press away from
  * any wall pans as usual.
  */
@@ -285,10 +354,13 @@ function wallClickTool(
     let at: Point | null = null;
 
     return {
-        cursor: 'pointer',
+        get cursor()
+        {
+            return hover ? 'pointer' : '';
+        },
         down: (pointer) =>
         {
-            const wall = wallNear(pointer, only);
+            const wall = wallNear(pointer, (other) => only(other) && wallSeen(pointer, other));
 
             if (!wall)
                 return false;
@@ -303,7 +375,8 @@ function wallClickTool(
         },
         move: (pointer) =>
         {
-            hover = wallNear(pointer, only);
+            // A door in the fog stays out of reach, or a hover would give away where it is.
+            hover = wallNear(pointer, (other) => only(other) && wallSeen(pointer, other));
             at = pointer.world;
         },
         draw: (ctx, zoom) =>
@@ -487,36 +560,61 @@ export function wallInBox(wall: Wall, { left, top, right, bottom }: Area): boole
  * touches goes when it is let go, once confirmed, as one step to undo. The walls about to go
  * show red.
  */
+/** "the wall", "3 walls", for the erase dialog. Empty for none. */
+function counted(count: number, noun: string): string
+{
+    if (count === 0)
+        return '';
+
+    return count === 1 ? `the ${noun}` : `${count} ${noun}s`;
+}
+
 function eraseTool(change: Change): MapTool
 {
-    let hover: Wall | undefined;
+    let hover: { wall?: Wall; prop?: Prop } = {};
     let drag: Drag | null = null;
 
+    // The wall near the pointer before the prop under it, as walls are thin and props are big.
+    const under = (pointer: ToolPointer) =>
+    {
+        const wall = wallNear(pointer);
+
+        return wall ? { wall } : { prop: propAt(pointer.scenario.props, pointer.world) };
+    };
+
+    /** The walls in the box, and the props with their middle in it. */
     const inBox = (scenario: Scenario) =>
     {
         if (!drag)
-            return [];
+            return { walls: [], props: [] };
 
         const box = boxOf(drag.start, drag.end);
+        const inside = ({ x, y }: Point) => x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
 
-        return scenario.walls.filter((wall) => wallInBox(wall, box));
+        return {
+            walls: scenario.walls.filter((wall) => wallInBox(wall, box)),
+            props: scenario.props.filter(inside),
+        };
     };
 
     return {
-        cursor: 'crosshair',
+        get cursor()
+        {
+            return hover.wall || hover.prop ? 'pointer' : 'crosshair';
+        },
         down: (pointer) =>
         {
-            const wall = wallNear(pointer);
+            const { scenario } = pointer;
+            const { wall, prop } = under(pointer);
+
+            hover = {};
 
             if (wall)
-            {
-                change({ ...pointer.scenario, walls: pointer.scenario.walls.filter((other) => other.id !== wall.id) });
-                hover = undefined;
-
-                return true;
-            }
-
-            drag = { start: pointer.world, end: pointer.world };
+                change({ ...scenario, walls: scenario.walls.filter((other) => other.id !== wall.id) });
+            else if (prop)
+                change(withoutProp(scenario, prop.id));
+            else
+                drag = { start: pointer.world, end: pointer.world };
 
             return true;
         },
@@ -525,24 +623,30 @@ function eraseTool(change: Change): MapTool
             if (pressed && drag)
                 drag.end = pointer.world;
 
-            hover = pressed ? undefined : wallNear(pointer);
+            hover = pressed ? {} : under(pointer);
         },
         up: (pointer) =>
         {
             const { scenario } = pointer;
-            const doomed = new Set(inBox(scenario).map((wall) => wall.id));
+            const { walls, props } = inBox(scenario);
+            const doomed = new Set([...walls, ...props].map((thing) => thing.id));
+            const what = [counted(walls.length, 'wall'), counted(props.length, 'prop')].filter(Boolean).join(' and ');
 
             drag = null;
-
-            const count = doomed.size === 1 ? 'the wall' : `${doomed.size} walls`;
 
             // The dialog is modal, so nothing else changes the scenario while it asks.
             if (doomed.size > 0)
             {
-                void confirmAction(`Erase ${count} in the box?`, 'Erase').then((yes) =>
+                void confirmAction(`Erase ${what} in the box?`, 'Erase').then((yes) =>
                 {
                     if (yes)
-                        change({ ...scenario, walls: scenario.walls.filter((wall) => !doomed.has(wall.id)) });
+                    {
+                        change({
+                            ...scenario,
+                            walls: scenario.walls.filter((wall) => !doomed.has(wall.id)),
+                            props: scenario.props.filter((prop) => !doomed.has(prop.id)),
+                        });
+                    }
                 });
             }
 
@@ -557,14 +661,22 @@ function eraseTool(change: Change): MapTool
         },
         draw: (ctx, zoom, scenario) =>
         {
-            if (hover)
-                strokeWall(ctx, hover, danger, 7 / zoom);
+            if (hover.wall)
+                strokeWall(ctx, hover.wall, danger, 7 / zoom);
+
+            if (hover.prop)
+                strokeProp(ctx, hover.prop, danger, 3 / zoom);
 
             if (!drag)
                 return;
 
-            for (const wall of inBox(scenario))
+            const { walls, props } = inBox(scenario);
+
+            for (const wall of walls)
                 strokeWall(ctx, wall, danger, 7 / zoom);
+
+            for (const prop of props)
+                strokeProp(ctx, prop, danger, 3 / zoom);
 
             drawBox(ctx, drag, zoom, danger, true);
         },
@@ -599,6 +711,8 @@ function propTool(change: Change, placing: PropPicture | null): MapTool
     /** The scenario when the drag started, to put back if it is cancelled. */
     let before: Scenario | null = null;
     let hover: Point | null = null;
+    /** The last pointer, for the cursor to say what a press there would do. */
+    let at: ToolPointer | null = null;
 
     const replace = (scenario: Scenario, prop: Prop) =>
     {
@@ -610,7 +724,29 @@ function propTool(change: Change, placing: PropPicture | null): MapTool
     };
 
     return {
-        cursor: placing ? 'copy' : 'default',
+        get cursor()
+        {
+            if (placing)
+                return 'copy';
+
+            if (drag)
+                return { move: 'move', scale: 'nwse-resize', turn: 'grabbing' }[drag.kind];
+
+            if (!at)
+                return '';
+
+            const { scenario, world, zoom } = at;
+            const current = scenario.props.find((prop) => prop.id === selected);
+            const handles = current && propHandles(current, zoom);
+
+            if (handles && distance(world, handles.turn) * zoom <= handleReach)
+                return 'grab';
+
+            if (handles && distance(world, handles.scale) * zoom <= handleReach)
+                return 'nwse-resize';
+
+            return propAt(scenario.props, world) ? 'move' : '';
+        },
         down: (pointer) =>
         {
             const { scenario, world, zoom } = pointer;
@@ -672,6 +808,7 @@ function propTool(change: Change, placing: PropPicture | null): MapTool
             const { scenario, world, free } = pointer;
 
             hover = world;
+            at = pointer;
 
             if (!pressed || !drag)
                 return;
@@ -757,14 +894,7 @@ function propTool(change: Change, placing: PropPicture | null): MapTool
 
             if (prop)
             {
-                const corners = [
-                    { x: -1, y: -1 },
-                    { x: 1, y: -1 },
-                    { x: 1, y: 1 },
-                    { x: -1, y: 1 },
-                ].map((corner) =>
-                    fromLocal(prop, { x: (corner.x * prop.width) / 2, y: (corner.y * prop.height) / 2 }),
-                );
+                const corners = propCorners(prop);
                 const handles = propHandles(prop, zoom);
                 const top = fromLocal(prop, { x: 0, y: -prop.height / 2 });
 

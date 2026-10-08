@@ -25,7 +25,6 @@ interface PlayDockProps
     onTool: (tool: PlayTool) => void;
     frozen: boolean;
     onFreeze: () => void;
-    onResetFog: () => void;
     onPeek: (peek: boolean) => void;
     /** The maps of the session, to switch between. Players follow, see PLAN.md. */
     scenarios: Scenario[];
@@ -36,14 +35,14 @@ interface PlayDockProps
     /** Opens or closes the monsters, see Monsters.tsx. Only while a saved session is live. */
     onMonsters?: () => void;
     monstersOpen?: boolean;
-    /** Opens or closes how the fog looks, see FogPanel.tsx. */
+    /** Opens or closes the fog: how it looks, and resetting it, see FogPanel.tsx. */
     onFog: () => void;
     fogOpen: boolean;
 }
 
 /**
  * The game master's controls in play mode, at the bottom: the map, the ruler, Reveal area, Peek,
- * Freeze, Reset fog and full screen. Peek works while held, the button or the space bar, so the fog
+ * Freeze, the fog and full screen. Peek works while held, the button or the space bar, so the fog
  * never stays open on the table screen by accident. Ruler and Reveal toggle, and pressing the
  * one that is on goes back to opening doors with a click.
  */
@@ -52,7 +51,6 @@ export function PlayDock({
     onTool,
     frozen,
     onFreeze,
-    onResetFog,
     onPeek,
     scenarios,
     activeId,
@@ -116,6 +114,7 @@ export function PlayDock({
                     type="button"
                     className="ttrpg-segment"
                     aria-pressed={tool === 'measure'}
+                    title="Drag to measure a distance"
                     onClick={() => pick('measure')}
                 >
                     <FontAwesomeIcon icon={faRulerHorizontal} />
@@ -134,7 +133,7 @@ export function PlayDock({
                 <button
                     type="button"
                     className="ttrpg-segment"
-                    title="Hold to see through the fog (or hold Space)"
+                    title="Hold to see through the fog (Space)"
                     onPointerDown={() => onPeek(true)}
                     onPointerUp={() => onPeek(false)}
                     onPointerLeave={() => onPeek(false)}
@@ -146,7 +145,7 @@ export function PlayDock({
             </div>
             {onMonsters && (
                 <div className="ttrpg-dock__group">
-                    <button type="button" className="ttrpg-segment" aria-pressed={monstersOpen} aria-expanded={monstersOpen} onClick={onMonsters}>
+                    <button type="button" className="ttrpg-segment" aria-pressed={monstersOpen} aria-expanded={monstersOpen} title="Add, hide or remove monsters" onClick={onMonsters}>
                         <FontAwesomeIcon icon={faDragon} />
                         Monsters
                     </button>
@@ -157,21 +156,19 @@ export function PlayDock({
                     type="button"
                     className="ttrpg-segment"
                     aria-pressed={frozen}
+                    title={frozen ? 'Let the players move again' : 'Stop the players moving their tokens'}
                     onClick={onFreeze}
                 >
                     <FontAwesomeIcon icon={faSnowflake} />
                     Freeze
-                </button>
-                <button type="button" className="ttrpg-segment" onClick={onResetFog}>
-                    Reset fog
                 </button>
                 <button
                     type="button"
                     className="ttrpg-segment"
                     aria-pressed={fogOpen}
                     aria-expanded={fogOpen}
-                    aria-label="How the fog looks"
-                    title="How the fog looks"
+                    aria-label="Fog"
+                    title="Fog: how it looks, or reset it"
                     onClick={onFog}
                 >
                     <FontAwesomeIcon icon={faCloud} />

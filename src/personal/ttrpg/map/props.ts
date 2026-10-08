@@ -40,6 +40,17 @@ export function fromLocal(prop: Prop, local: Point): Point
     return { x: prop.x + local.x * cos - local.y * sin, y: prop.y + local.x * sin + local.y * cos };
 }
 
+/** A prop's four corners in the world, turned with it, clockwise from the top left. */
+export function propCorners(prop: Prop): Point[]
+{
+    return [
+        { x: -1, y: -1 },
+        { x: 1, y: -1 },
+        { x: 1, y: 1 },
+        { x: -1, y: 1 },
+    ].map((corner) => fromLocal(prop, { x: (corner.x * prop.width) / 2, y: (corner.y * prop.height) / 2 }));
+}
+
 /** The topmost prop under a point, turned or not. */
 export function propAt(props: Prop[], point: Point): Prop | undefined
 {

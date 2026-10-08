@@ -19,7 +19,7 @@ import { typing, useKeydown } from './useKeys';
 const tools: { id: ToolId; label: string; key: string; icon: IconDefinition }[] = [
     { id: 'select', label: 'Move around', key: 'v', icon: faArrowPointer },
     { id: 'walls', label: 'Walls and doors', key: 'w', icon: faDrawPolygon },
-    { id: 'erase', label: 'Erase walls', key: 'e', icon: faEraser },
+    { id: 'erase', label: 'Erase', key: 'e', icon: faEraser },
     { id: 'props', label: 'Props', key: 'p', icon: faTree },
     { id: 'spawn', label: 'Spawn point', key: 's', icon: faLocationDot },
     { id: 'align', label: 'Grid', key: 'g', icon: faBorderAll },
