@@ -2,6 +2,7 @@ dist
 node_modules
 package-lock.json
 public
+src/personal/ttrpg/convex/_generated
 
 # TypeScript is formatted by ESLint (@stylistic) instead, because Prettier
 # cannot put braces on their own line.

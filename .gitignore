@@ -17,3 +17,8 @@ dist/
 
 # Local secrets, such as the dev auto-login password
 *.local
+
+# Convex agent skills, reinstalled with npx convex ai-files install
+.agents/
+.claude/skills/convex*/
+skills-lock.json

@@ -6,7 +6,8 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-    { ignores: ['dist', 'node_modules'] },
+    // Convex writes _generated itself, see src/personal/ttrpg/README.md.
+    { ignores: ['dist', 'node_modules', 'src/personal/ttrpg/convex/_generated'] },
     {
         extends: [js.configs.recommended, ...tseslint.configs.recommended],
         files: ['**/*.{ts,tsx}'],

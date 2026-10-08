@@ -1,0 +1,1011 @@
+/* ---------------------------------------------------------------------------
+   TTRPG pages
+
+   The portfolio's colours and fonts, re-declared as --ttrpg-* rather than read
+   from index.css, so the app keeps its own look if the portfolio's changes.
+   Dark only, it is used at a table where the map is the bright thing on screen.
+   Everything is scoped under .ttrpg, because after a visit here this file stays
+   loaded when the router moves on to a portfolio page. Onest and JetBrains Mono
+   are already loaded by main.tsx for the whole site.
+--------------------------------------------------------------------------- */
+
+/* Also on the root while a TTRPG page is up, so the area around the page and
+   the scrollbar track take the app's background. */
+.ttrpg,
+html:has(.ttrpg) {
+    --ttrpg-bg: #1e1d1f;
+    --ttrpg-ink: #fcf8ec;
+    --ttrpg-muted: color-mix(in srgb, var(--ttrpg-ink) 60%, var(--ttrpg-bg));
+    --ttrpg-accent: #683c9b;
+    --ttrpg-confirm: #1e5631;
+    --ttrpg-panel: color-mix(in srgb, var(--ttrpg-bg) 80%, transparent);
+    --ttrpg-edge: color-mix(in srgb, var(--ttrpg-ink) 12%, transparent);
+    --ttrpg-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+    --ttrpg-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+    background: var(--ttrpg-bg);
+    color-scheme: dark;
+}
+
+.ttrpg {
+    position: relative;
+    min-height: 100svh;
+    color: var(--ttrpg-ink);
+    font-family: 'Onest Variable', ui-sans-serif, system-ui, sans-serif;
+    line-height: 1.5;
+}
+
+/* A floating panel over the map, the one surface every toolbar and dialog uses. */
+.ttrpg-panel {
+    background: var(--ttrpg-panel);
+    border: 1px solid var(--ttrpg-edge);
+    border-radius: 16px;
+    box-shadow: 0 12px 32px rgb(0 0 0 / 0.35);
+    backdrop-filter: blur(12px);
+}
+
+/* The map fills the screen under everything else. touch-action: none hands
+   every touch to map/view.ts, so a pinch zooms the map and not the page. */
+.ttrpg-map {
+    position: fixed;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+    cursor: grab;
+}
+
+.ttrpg-map:active {
+    cursor: grabbing;
+}
+
+/* A row of buttons floating at the bottom, in thumb reach on a phone. */
+.ttrpg-dock {
+    position: fixed;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    left: 50%;
+    z-index: 10;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px;
+    width: max-content;
+    max-width: calc(100% - 32px);
+    padding: 4px;
+    translate: -50% 0;
+}
+
+.ttrpg-dock__group {
+    display: flex;
+    gap: 4px;
+}
+
+/* A thin line between groups that share a row. */
+.ttrpg-dock__group + .ttrpg-dock__group {
+    padding-left: 4px;
+    border-left: 1px solid var(--ttrpg-edge);
+}
+
+.ttrpg-segment {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.9rem;
+    border-radius: 12px;
+    color: var(--ttrpg-muted);
+    font-size: 0.875rem;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+        background-color 150ms var(--ttrpg-ease),
+        color 150ms var(--ttrpg-ease);
+}
+
+.ttrpg-segment:hover,
+.ttrpg-segment:focus-visible {
+    color: var(--ttrpg-ink);
+}
+
+.ttrpg-segment[aria-pressed='true'] {
+    background: var(--ttrpg-accent);
+    color: var(--ttrpg-ink);
+}
+
+/* A file input inside a segment label: the label is the button, the input stays reachable to
+   screen readers and the keyboard through it. */
+.ttrpg-hidden-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+}
+
+.ttrpg-segment:has(.ttrpg-hidden-input:focus-visible) {
+    outline: 2px solid var(--ttrpg-accent);
+    outline-offset: 2px;
+}
+
+/* A message floating under the mode switch, such as a map that would not import. */
+.ttrpg-toast {
+    position: fixed;
+    top: 72px;
+    left: 50%;
+    z-index: 10;
+    max-width: min(32rem, calc(100% - 32px));
+    padding: 0.75rem 1rem;
+    translate: -50% 0;
+    font-size: 0.875rem;
+}
+
+.ttrpg-segment:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Edit or play, at the top in the middle. */
+.ttrpg-modes {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    z-index: 10;
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    translate: -50% 0;
+}
+
+/* The edit tools, a slim column under the home button. */
+.ttrpg-rail {
+    position: fixed;
+    top: 72px;
+    left: 16px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 4px;
+}
+
+.ttrpg-rail__gap {
+    height: 1px;
+    margin: 4px 6px;
+    background: var(--ttrpg-edge);
+}
+
+.ttrpg-icon-button {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    color: var(--ttrpg-muted);
+    cursor: pointer;
+    transition:
+        background-color 150ms var(--ttrpg-ease),
+        color 150ms var(--ttrpg-ease);
+}
+
+.ttrpg-icon-button--small {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    font-size: 0.8rem;
+}
+
+.ttrpg-icon-button:hover,
+.ttrpg-icon-button:focus-visible {
+    color: var(--ttrpg-ink);
+}
+
+.ttrpg-icon-button[aria-pressed='true'] {
+    background: var(--ttrpg-accent);
+    color: var(--ttrpg-ink);
+}
+
+.ttrpg-icon-button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+/* Panel headings, small and quiet, so the map stays the loudest thing on screen. */
+.ttrpg-properties h2,
+.ttrpg-scenarios h2 {
+    margin-bottom: 0.5rem;
+    color: var(--ttrpg-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+/* Settings of the open tool, beside the rail. */
+.ttrpg-properties {
+    position: fixed;
+    top: 72px;
+    left: 80px;
+    z-index: 10;
+    display: grid;
+    gap: 0.6rem;
+    width: 15rem;
+    max-width: calc(100% - 96px);
+    padding: 1rem;
+    font-size: 0.875rem;
+}
+
+.ttrpg-properties__hint {
+    color: var(--ttrpg-muted);
+    font-size: 0.8rem;
+}
+
+.ttrpg-properties label {
+    display: grid;
+    /* minmax(0, ...): a plain 1fr will not go below the field's own width and pushed it out. */
+    grid-template-columns: 5.5rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* A row of choices in a panel, such as wall, door or change in the walls panel. */
+.ttrpg-properties__choices {
+    display: flex;
+    gap: 4px;
+}
+
+.ttrpg-properties__choices .ttrpg-segment {
+    flex: 1;
+    justify-content: center;
+    padding-inline: 0.5rem;
+}
+
+.ttrpg-properties .ttrpg-properties__check {
+    grid-template-columns: auto 1fr;
+    gap: 0.75rem;
+    cursor: pointer;
+}
+
+.ttrpg-properties input:not([type]),
+.ttrpg-properties input[type='number'],
+.ttrpg-properties select,
+.ttrpg-scenarios input,
+.ttrpg-scenarios select {
+    width: 100%;
+    min-width: 0;
+    min-height: 36px;
+    padding: 0.4rem 0.7rem;
+    border: 1px solid var(--ttrpg-edge);
+    border-radius: 10px;
+    background: rgb(0 0 0 / 0.25);
+    color: var(--ttrpg-ink);
+    font-family: var(--ttrpg-mono);
+    font-size: 0.8rem;
+}
+
+.ttrpg-properties input[type='range'] {
+    accent-color: var(--ttrpg-accent);
+}
+
+/* The prop pictures, as a grid of tiles in the props panel. */
+.ttrpg-library {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    max-height: 40svh;
+    overflow: hidden auto;
+}
+
+.ttrpg-library__item {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    aspect-ratio: 1;
+    padding: 4px;
+    border: 1px solid var(--ttrpg-edge);
+    border-radius: 10px;
+    background: rgb(0 0 0 / 0.25);
+    cursor: pointer;
+}
+
+.ttrpg-library__item img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.ttrpg-library__item:hover,
+.ttrpg-library__item:focus-visible {
+    border-color: var(--ttrpg-muted);
+}
+
+.ttrpg-library__item[aria-pressed='true'] {
+    border-color: var(--ttrpg-accent);
+    background: color-mix(in srgb, var(--ttrpg-accent) 35%, transparent);
+}
+
+/* Beats the two-column layout every other label in the panel gets. */
+.ttrpg-properties .ttrpg-library__upload {
+    display: flex;
+    justify-content: center;
+    border: 1px dashed var(--ttrpg-edge);
+}
+
+/* Play mode controls fade out once the mouse rests, so the table screen shows only the map.
+   Any movement brings them back, see useIdle in components/useScreen.ts. */
+.ttrpg-modes,
+.ttrpg-dock {
+    transition: opacity 300ms var(--ttrpg-ease);
+}
+
+.ttrpg-hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* The ?debug frame rate display, small and out of the way in the bottom right. */
+.ttrpg-stats {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 30;
+    padding: 0.35rem 0.6rem;
+    border-radius: 8px;
+    font-family: var(--ttrpg-mono);
+    font-size: 0.75rem;
+    pointer-events: none;
+}
+
+/* Move or Cancel after drawing a path, at the bottom in thumb reach. */
+.ttrpg-sheet {
+    position: fixed;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    left: 50%;
+    z-index: 20;
+    display: grid;
+    gap: 0.75rem;
+    width: min(24rem, calc(100% - 32px));
+    padding: 1rem;
+    translate: -50% 0;
+    animation: ttrpg-rise 150ms var(--ttrpg-ease);
+}
+
+.ttrpg-sheet__warning {
+    color: #f0a39e;
+}
+
+.ttrpg-sheet__actions {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 0.5rem;
+}
+
+.ttrpg-button {
+    min-height: 48px;
+    padding: 0.6rem 1rem;
+    border: 1px solid var(--ttrpg-edge);
+    border-radius: 12px;
+    color: var(--ttrpg-ink);
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter 150ms var(--ttrpg-ease);
+}
+
+.ttrpg-button:hover,
+.ttrpg-button:focus-visible {
+    filter: brightness(1.15);
+}
+
+.ttrpg-button--confirm {
+    border-color: transparent;
+    background: var(--ttrpg-confirm);
+}
+
+.ttrpg-button--danger {
+    border-color: transparent;
+    background: #8c2f2b;
+}
+
+.ttrpg-button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+@keyframes ttrpg-rise {
+    from {
+        opacity: 0;
+        translate: -50% 12px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ttrpg-sheet {
+        animation: none;
+    }
+}
+
+/*
+ * First in the top bar while a session runs: players can join and move. The dot breathes like
+ * the own token's ring.
+ */
+.ttrpg-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 0.75rem;
+    color: var(--ttrpg-ink);
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.ttrpg-live::before {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #d9534a;
+    box-shadow: 0 0 0 0 rgb(217 83 74 / 0.6);
+    animation: ttrpg-live 2s ease-out infinite;
+    content: '';
+}
+
+@keyframes ttrpg-live {
+    to {
+        box-shadow: 0 0 0 8px rgb(217 83 74 / 0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ttrpg-live::before {
+        animation: none;
+    }
+}
+
+/* The scenarios of the session, on the right. */
+.ttrpg-scenarios {
+    position: fixed;
+    top: 72px;
+    right: 16px;
+    z-index: 10;
+    display: grid;
+    gap: 0.5rem;
+    width: 15rem;
+    max-height: calc(100svh - 104px);
+    padding: 1rem;
+    overflow: hidden auto;
+    font-size: 0.875rem;
+}
+
+/* The dropdown of maps, in the app's font rather than the mono of number fields. */
+.ttrpg-scenarios select {
+    font-family: inherit;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+/*
+ * The open list in the app's look, through the browser's customisable select. Browsers without
+ * it keep their own list, with the colours below.
+ */
+.ttrpg select,
+.ttrpg select::picker(select) {
+    appearance: base-select;
+}
+
+.ttrpg select::picker-icon {
+    color: var(--ttrpg-muted);
+    transition: rotate 150ms var(--ttrpg-ease);
+}
+
+.ttrpg select:open::picker-icon {
+    rotate: 180deg;
+}
+
+.ttrpg select::picker(select) {
+    width: anchor-size(width);
+    max-height: 18rem;
+    margin-top: 4px;
+    padding: 4px;
+    border: 1px solid var(--ttrpg-edge);
+    border-radius: 12px;
+    background: var(--ttrpg-bg);
+    box-shadow: 0 16px 40px rgb(0 0 0 / 0.5);
+}
+
+.ttrpg select option {
+    display: block;
+    padding: 0.45rem 0.6rem;
+    border-radius: 8px;
+    background: var(--ttrpg-bg);
+    color: var(--ttrpg-muted);
+    font-size: 0.875rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.ttrpg select option + option {
+    margin-top: 4px;
+}
+
+.ttrpg select option::checkmark {
+    display: none;
+}
+
+.ttrpg select option:hover,
+.ttrpg select option:focus-visible {
+    background: rgb(255 255 255 / 0.06);
+    color: var(--ttrpg-ink);
+    outline: none;
+}
+
+.ttrpg select option:checked {
+    background: color-mix(in srgb, var(--ttrpg-accent) 45%, transparent);
+    color: var(--ttrpg-ink);
+}
+
+.ttrpg-scenarios__name {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.ttrpg-scenarios__name input,
+.ttrpg-scenarios__name select {
+    flex: 1;
+    min-width: 0;
+    font-family: inherit;
+    font-size: 0.875rem;
+}
+
+.ttrpg-scenarios__background {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.ttrpg-scenarios__background .ttrpg-segment {
+    flex: 1;
+    justify-content: center;
+    border: 1px dashed var(--ttrpg-edge);
+}
+
+.ttrpg-scenarios__add {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--ttrpg-edge);
+}
+
+/* The editor is made for a laptop; on a phone the scenario list would cover the map, so it
+   folds away and the rail and panels stay. */
+@media (width < 640px) {
+    .ttrpg-scenarios {
+        display: none;
+    }
+}
+
+.ttrpg-link {
+    color: var(--ttrpg-ink);
+    text-decoration: underline;
+    text-decoration-color: var(--ttrpg-accent);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
+}
+
+/* The way back to the portfolio, in the top left corner of every page. */
+.ttrpg-home {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 10;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    color: var(--ttrpg-muted);
+    transition: color 150ms var(--ttrpg-ease);
+}
+
+.ttrpg-home:hover,
+.ttrpg-home:focus-visible {
+    color: var(--ttrpg-ink);
+}
+
+/* Holds a page until its real content arrives in a later phase, see PLAN.md. */
+.ttrpg-placeholder {
+    display: grid;
+    place-content: center;
+    gap: 0.5rem;
+    min-height: 100svh;
+    padding: 16px;
+    text-align: center;
+}
+
+.ttrpg-placeholder h1 {
+    font-size: clamp(1.75rem, 3vw + 1rem, 3rem);
+    font-weight: 600;
+}
+
+.ttrpg-placeholder p {
+    color: var(--ttrpg-muted);
+}
+
+.ttrpg-placeholder code {
+    font-family: var(--ttrpg-mono);
+    color: var(--ttrpg-ink);
+}
+
+/* Whether the editor's changes are stored yet, quietly in the bottom right. */
+.ttrpg-saved {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 10;
+    padding: 0.35rem 0.75rem;
+    border-radius: 10px;
+    color: var(--ttrpg-muted);
+    font-size: 0.75rem;
+}
+
+/* The dashboard: one column of cards, centred, like a page rather than a map. */
+.ttrpg-dashboard {
+    display: grid;
+    gap: 1rem;
+    width: min(36rem, 100%);
+    margin-inline: auto;
+    padding: 96px 16px 48px;
+}
+
+.ttrpg-dashboard__header h1 {
+    font-size: clamp(1.75rem, 3vw + 1rem, 3rem);
+    font-weight: 600;
+}
+
+.ttrpg-dashboard__header p,
+.ttrpg-dashboard__note {
+    color: var(--ttrpg-muted);
+}
+
+.ttrpg-card {
+    display: grid;
+    gap: 0.75rem;
+    padding: 1.25rem;
+}
+
+.ttrpg-card h2 {
+    color: var(--ttrpg-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.ttrpg-card__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.ttrpg-card__form {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.ttrpg-card__form input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--ttrpg-edge);
+    border-radius: 12px;
+    background: rgb(0 0 0 / 0.25);
+    color: var(--ttrpg-ink);
+}
+
+/* A labelled field on its own line, in the join and start forms. */
+.ttrpg-field {
+    display: grid;
+    gap: 0.35rem;
+    color: var(--ttrpg-muted);
+    font-size: 0.875rem;
+}
+
+.ttrpg-field input,
+.ttrpg-field select {
+    min-height: 44px;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--ttrpg-edge);
+    border-radius: 12px;
+    background: rgb(0 0 0 / 0.25);
+    color: var(--ttrpg-ink);
+    font-size: 1rem;
+}
+
+.ttrpg-field input[type='color'] {
+    width: 100%;
+    padding: 4px;
+}
+
+/*
+ * A checkbox with its label beside it, in the forms of the start and monsters panels: a rounded
+ * row like the fields above it, and a rounded box of our own rather than the browser's square.
+ */
+.ttrpg-check {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 44px;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--ttrpg-edge);
+    border-radius: 12px;
+    background: rgb(0 0 0 / 0.25);
+    color: var(--ttrpg-ink);
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+.ttrpg-check input,
+.ttrpg-properties__check input {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    border: 1px solid var(--ttrpg-edge);
+    border-radius: 6px;
+    background: rgb(0 0 0 / 0.25);
+    appearance: none;
+    cursor: pointer;
+    transition:
+        background-color 150ms var(--ttrpg-ease),
+        border-color 150ms var(--ttrpg-ease);
+}
+
+/* The tick: two borders of a small box, turned. */
+.ttrpg-check input::after,
+.ttrpg-properties__check input::after {
+    width: 5px;
+    height: 10px;
+    border: solid var(--ttrpg-ink);
+    border-width: 0 2px 2px 0;
+    opacity: 0;
+    rotate: 45deg;
+    translate: 0 -1px;
+    transition: opacity 150ms var(--ttrpg-ease);
+    content: '';
+}
+
+.ttrpg-check input:checked,
+.ttrpg-properties__check input:checked {
+    border-color: transparent;
+    background: var(--ttrpg-accent);
+}
+
+.ttrpg-check input:checked::after,
+.ttrpg-properties__check input:checked::after {
+    opacity: 1;
+}
+
+.ttrpg-check input:focus-visible,
+.ttrpg-properties__check input:focus-visible {
+    outline: 2px solid var(--ttrpg-accent);
+    outline-offset: 2px;
+}
+
+/* The password asked when starting a session, under the mode switch. */
+.ttrpg-start {
+    position: fixed;
+    top: 72px;
+    left: 50%;
+    z-index: 20;
+    display: grid;
+    gap: 0.75rem;
+    width: min(22rem, calc(100% - 32px));
+    padding: 1rem;
+    /* Nearly solid, so the busy map does not show through the form. */
+    background: color-mix(in srgb, var(--ttrpg-bg) 96%, transparent);
+    translate: -50% 0;
+}
+
+/* A panel above the play dock, the monsters or the fog. Scrolls when it gets long. */
+.ttrpg-dock-panel {
+    position: fixed;
+    bottom: calc(max(16px, env(safe-area-inset-bottom)) + 72px);
+    left: 50%;
+    z-index: 20;
+    display: grid;
+    gap: 1rem;
+    width: min(22rem, calc(100% - 32px));
+    max-height: calc(100dvh - 180px);
+    padding: 1rem;
+    overflow-y: auto;
+    translate: -50% 0;
+}
+
+/* The fog panel's sliders are laid out like the grid panel's, but sit above the dock. */
+.ttrpg-properties.ttrpg-dock-panel {
+    top: auto;
+    left: 50%;
+    width: min(22rem, calc(100% - 32px));
+    max-width: none;
+    gap: 0.6rem;
+}
+
+.ttrpg-monsters__form {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.ttrpg-monsters__row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 0.5rem;
+}
+
+/* The map switcher in the play dock, a select styled like the buttons beside it. */
+.ttrpg-select {
+    max-width: 12rem;
+    background: transparent;
+}
+
+.ttrpg-select option {
+    background: var(--ttrpg-bg);
+    color: var(--ttrpg-ink);
+}
+
+/*
+ * The join link as a QR code in a panel over the blurred map, big enough to scan across a table:
+ * dark squares on a light tile with a quiet border around them, which scanners need.
+ */
+.ttrpg-qr {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background: rgb(0 0 0 / 0.6);
+    backdrop-filter: blur(6px);
+    cursor: pointer;
+}
+
+.ttrpg-qr__card {
+    display: grid;
+    justify-items: center;
+    gap: 1rem;
+    max-width: 100%;
+    padding: clamp(1.25rem, 3vmin, 2.5rem);
+    text-align: center;
+}
+
+.ttrpg-qr__card h2 {
+    color: var(--ttrpg-ink);
+    font-size: clamp(1.25rem, 2.6vmin, 2rem);
+    font-weight: 600;
+}
+
+.ttrpg-qr__code {
+    width: min(60vmin, 640px);
+    aspect-ratio: 1;
+    padding: clamp(10px, 2vmin, 24px);
+    border-radius: 16px;
+    background: #fcf8ec;
+}
+
+.ttrpg-qr__code svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.ttrpg-qr__next {
+    color: var(--ttrpg-ink);
+    font-size: clamp(1rem, 1.8vmin, 1.4rem);
+}
+
+.ttrpg-qr__password {
+    margin-top: -0.5rem;
+    color: var(--ttrpg-ink);
+    font-family: var(--ttrpg-mono);
+    font-size: clamp(1.5rem, 4vmin, 3rem);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    overflow-wrap: anywhere;
+}
+
+.ttrpg-qr__url {
+    max-width: min(60vmin, 640px);
+    color: var(--ttrpg-muted);
+    font-family: var(--ttrpg-mono);
+    font-size: clamp(0.75rem, 1.2vmin, 1rem);
+    overflow-wrap: anywhere;
+}
+
+.ttrpg-qr__close {
+    color: var(--ttrpg-muted);
+    font-size: 0.8rem;
+}
+
+.ttrpg-profile {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.5rem 0.5rem 0.75rem;
+}
+
+.ttrpg-profile p {
+    flex: 1;
+    font-weight: 500;
+}
+
+.ttrpg-profile__picture {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+}
+
+.ttrpg-rows {
+    display: grid;
+    gap: 2px;
+}
+
+.ttrpg-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.ttrpg-row__main {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+    padding: 0.5rem 0.75rem;
+    border-radius: 10px;
+}
+
+a.ttrpg-row__main:hover,
+a.ttrpg-row__main:focus-visible {
+    background: rgb(255 255 255 / 0.05);
+}
+
+.ttrpg-row__detail {
+    overflow: hidden;
+    color: var(--ttrpg-muted);
+    font-size: 0.8rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The app's own confirm, in place of the browser's. A native dialog, so Esc and focus work. */
+.ttrpg-confirm {
+    width: min(26rem, calc(100% - 32px));
+    margin: auto;
+    padding: 0;
+    border: 1px solid var(--ttrpg-edge);
+    border-radius: 16px;
+    background: var(--ttrpg-bg);
+    color: var(--ttrpg-ink);
+    box-shadow: 0 24px 64px rgb(0 0 0 / 0.5);
+}
+
+.ttrpg-confirm::backdrop {
+    background: rgb(0 0 0 / 0.6);
+    backdrop-filter: blur(6px);
+}
+
+.ttrpg-confirm__card {
+    display: grid;
+    gap: 1.25rem;
+    padding: 1.25rem;
+}
+
+.ttrpg-confirm__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}

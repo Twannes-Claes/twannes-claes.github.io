@@ -39,6 +39,33 @@ export const routes: RouteRecord[] = [
                     })),
                 entry: 'src/personal/skylanders/pages/Skylanders.tsx',
             },
+            // Battle maps for tabletop sessions, private like the Skylanders page, see
+            // src/personal/ttrpg/PLAN.md. Three lazy routes rather than one, so phones opening
+            // the join page never download the editor.
+            {
+                path: 'ttrpg',
+                lazy: () =>
+                    import('./personal/ttrpg/pages/Dashboard').then((page) => ({
+                        Component: page.default,
+                    })),
+                entry: 'src/personal/ttrpg/pages/Dashboard.tsx',
+            },
+            {
+                path: 'ttrpg/edit',
+                lazy: () =>
+                    import('./personal/ttrpg/pages/Editor').then((page) => ({
+                        Component: page.default,
+                    })),
+                entry: 'src/personal/ttrpg/pages/Editor.tsx',
+            },
+            {
+                path: 'ttrpg/join',
+                lazy: () =>
+                    import('./personal/ttrpg/pages/Join').then((page) => ({
+                        Component: page.default,
+                    })),
+                entry: 'src/personal/ttrpg/pages/Join.tsx',
+            },
             // Prerendered so the build emits a real 404.html for GitHub Pages.
             {
                 path: '404',

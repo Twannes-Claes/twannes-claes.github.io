@@ -1,0 +1,18 @@
+{
+    // Read by the Convex CLI when it type checks the functions before a deploy. The site's own
+    // tsconfig.json checks this folder too.
+    "compilerOptions": {
+        "target": "ES2022",
+        "lib": ["ES2022", "DOM"],
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "skipLibCheck": true,
+        // play.ts places tokens with map/, whose files import each other with .ts.
+        "allowImportingTsExtensions": true,
+        "isolatedModules": true,
+        "strict": true,
+        "noEmit": true
+    },
+    "include": ["./**/*"],
+    "exclude": ["./_generated"]
+}

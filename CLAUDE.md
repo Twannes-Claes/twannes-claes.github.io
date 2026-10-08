@@ -38,3 +38,17 @@ Side projects such as `src/personal/skylanders/` are kept out of the portfolio's
   `skylanders/entrance/`, which holds only the way in and preloads the lazy route with `import()`.
 - Not linked from the portfolio, and marked `noindex` if it is private.
 - Check `npm run build` after adding one: the app's code should appear only in its own chunks.
+
+<!-- convex-ai-start -->
+
+This project uses [Convex](https://convex.dev) as its backend.
+
+When working on Convex code, **always read
+`src/personal/ttrpg/convex/_generated/ai/guidelines.md` first** for important guidelines on
+how to correctly use Convex APIs and patterns. The file contains rules that
+override what you may have learned about Convex from training data.
+
+Convex agent skills for common tasks can be installed by running
+`npx convex ai-files install`.
+
+<!-- convex-ai-end -->
