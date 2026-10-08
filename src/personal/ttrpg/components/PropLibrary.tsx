@@ -1,8 +1,10 @@
 import { faUpload } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useEffect, type ChangeEvent } from 'react';
+import type { ChangeEvent } from 'react';
 
 import type { PropPicture } from '../types';
+
+import { useKeydown } from './useKeys';
 
 interface PropLibraryProps
 {
@@ -20,22 +22,12 @@ interface PropLibraryProps
  */
 export function PropLibrary({ pictures, placing, onPick, onUpload }: PropLibraryProps)
 {
-    useEffect(() =>
+    useKeydown((event) =>
     {
-        if (!placing)
-            return;
+        if (event.key === 'Escape')
+            onPick(null);
 
-        const keydown = (event: KeyboardEvent) =>
-        {
-            if (event.key === 'Escape')
-                onPick(null);
-
-        };
-
-        window.addEventListener('keydown', keydown);
-
-        return () => window.removeEventListener('keydown', keydown);
-    }, [placing, onPick]);
+    }, placing !== null);
 
     const picked = (event: ChangeEvent<HTMLInputElement>) =>
     {

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import type { Cell, Grid, Scenario, Wall } from '../types';
 
 import { toScreen, toWorld, zoomAt } from './camera.ts';
-import { createExplored, markArea, markSeen } from './fog.ts';
+import { createExplored, markArea, markSeen, wasSeen } from './fog.ts';
 import { distance } from './geometry.ts';
 import {
     cellAt,
@@ -123,6 +123,8 @@ assert.equal(pathFeet(base, diagonal(1)), 5);
 assert.equal(pathFeet(base, diagonal(2)), 15);
 assert.equal(pathFeet(base, diagonal(3)), 20);
 assert.equal(pathFeet(base, diagonal(4)), 30);
+// With equal diagonals, every diagonal is one cell.
+assert.equal(pathFeet({ ...base, diagonals: 'equal' }, diagonal(4)), 20);
 // Diagonal, straight, diagonal: the straight step does not reset the count.
 assert.equal(
     pathFeet(base, [
@@ -252,6 +254,8 @@ assert.equal(markSeen(explored, sight), true);
 assert.equal(explored.seen[10 * explored.columns + 2], 1);
 assert.equal(explored.seen[10 * explored.columns + 15], 0);
 assert.equal(markSeen(explored, sight), false);
+// Players only walk where it was seen, see extendRoute in map/view.ts.
+assert.deepEqual([{ x: 125, y: 525 }, { x: 775, y: 525 }, { x: -10, y: 525 }].map((point) => wasSeen(explored, point)), [true, false, false]);
 
 // Reveal area marks the samples whose centres the box reaches, and nothing outside it.
 const revealed = createExplored(walled);
@@ -386,15 +390,8 @@ assert.deepEqual(edited.spawn, { x: 450, y: 250 });
 spawnTool.down(click(420, 260, true));
 assert.deepEqual(edited.spawn, { x: 420, y: 260 });
 
-// A box over one drawn cell sets the grid's size and offset.
-const alignTool = createTool('align', keep);
-
-assert.ok(alignTool);
-alignTool.down(click(130, 40));
-alignTool.move(click(194, 106), true);
-alignTool.up(click(194, 106));
-assert.equal(edited.grid.size, 65);
-assert.deepEqual([edited.grid.offsetX, edited.grid.offsetY], [0, 40]);
+// The grid panel and the select tool leave the map to panning.
+assert.equal(createTool('align', keep), null);
 assert.equal(createTool('select', keep), null);
 
 // Props land one cell per 200 pixels of their longest side.
@@ -428,7 +425,7 @@ const record = (next: Scenario, final = true) =>
 
 };
 
-// Back to a 100 pixel grid at the origin, after the alignment above changed it.
+// A 100 pixel grid at the origin, with no props.
 edited = { ...edited, grid: flatGrid, props: [] };
 
 const place = createTool('props', record, { ...picture, width: 200, height: 200 });
@@ -447,15 +444,15 @@ steps = 0;
 assert.equal(edit.down(click(250, 250)), true);
 edit.move(click(300, 255), true);
 edit.move(click(330, 260), true);
-edit.up(click(330, 260));
+edit.up?.(click(330, 260));
 assert.equal(steps, 1);
 assert.deepEqual([edited.props[0].x, edited.props[0].y], [350, 250]);
 
 // A click away from every prop lets the map pan; Delete removes the selected one.
 assert.equal(edit.down(click(800, 800)), false);
 edit.down(click(350, 250));
-edit.up(click(350, 250));
-assert.equal(edit.key('Delete', edited), true);
+edit.up?.(click(350, 250));
+assert.equal(edit.key?.('Delete', edited), true);
 assert.equal(edited.props.length, 0);
 
 // Creature sizes: a Large square creature covers 2 by 2 and is centred on a grid corner.

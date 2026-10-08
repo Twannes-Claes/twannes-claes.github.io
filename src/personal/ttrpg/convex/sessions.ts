@@ -1,10 +1,12 @@
 import { ConvexError, v } from 'convex/values';
 
+import { demoOgre, demoScenario } from '../content/scenarios';
+
 import type { Id } from './_generated/dataModel';
-import { mutation, query, type QueryCtx } from './_generated/server';
+import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireHost, requireSession } from './access';
 import { scenarioValidator } from './schema';
-import { refreshSight } from './sight';
+import { refreshSight, tokensOf } from './sight';
 
 /** More maps than anyone plays in one session, and a cap on what one save can ask for. */
 const maxScenarios = 100;
@@ -23,6 +25,34 @@ function scenariosOf(ctx: QueryCtx, sessionId: Id<'sessions'>)
         .withIndex('by_sessionId_and_scenario_id', (q) => q.eq('sessionId', sessionId))
         .take(500);
 }
+
+/**
+ * A new host's first session: the demo map, so the dashboard does not start empty and there is
+ * something to look around in and play with. Its picture lives with the site, see
+ * content/scenarios.ts, so it stores nothing.
+ */
+export async function addExample(ctx: MutationCtx, ownerId: Id<'users'>): Promise<Id<'sessions'>>
+{
+    const scenario = { ...demoScenario, id: crypto.randomUUID() };
+    const sessionId = await ctx.db.insert('sessions', {
+        ownerId,
+        name: `Example: ${demoScenario.name}`,
+        order: [scenario.id],
+        updatedAt: Date.now(),
+    });
+
+    await ctx.db.insert('scenarios', { sessionId, scenario });
+    // A real monster, so the GM can drag, hide or remove it once the session runs on this map.
+    await ctx.db.insert('tokens', { sessionId, scenarioId: scenario.id, ...demoOgre(scenario.grid) });
+
+    return sessionId;
+}
+
+/** The example session again, from the dashboard, for a host who deleted theirs or never had it. */
+export const example = mutation({
+    args: {},
+    handler: async (ctx) => await addExample(ctx, await requireHost(ctx)),
+});
 
 /** The signed-in host's sessions, last edited first, for the dashboard. */
 export const list = query({
@@ -88,12 +118,7 @@ export const remove = mutation({
         for (const doc of await scenariosOf(ctx, sessionId))
             await ctx.db.delete('scenarios', doc._id);
 
-        const tokens = await ctx.db
-            .query('tokens')
-            .withIndex('by_sessionId_and_userId', (q) => q.eq('sessionId', sessionId))
-            .take(200);
-
-        for (const token of tokens)
+        for (const token of await tokensOf(ctx, sessionId))
             await ctx.db.delete('tokens', token._id);
 
         const fog = await ctx.db

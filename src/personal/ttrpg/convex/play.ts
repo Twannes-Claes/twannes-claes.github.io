@@ -11,7 +11,7 @@ import type { Doc, Id } from './_generated/dataModel';
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireSession, requireUser } from './access';
 import { fogSettingsValidator, sizeValidator } from './schema';
-import { refreshSight } from './sight';
+import { refreshSight, tokensOf } from './sight';
 import { storedPicture } from './pictures';
 
 /*
@@ -54,15 +54,6 @@ async function sessionOf(ctx: QueryCtx, sessionId: Id<'sessions'>): Promise<Doc<
     return session;
 }
 
-/** Every token of a session, a table full at most. */
-function tokensOf(ctx: QueryCtx, sessionId: Id<'sessions'>)
-{
-    return ctx.db
-        .query('tokens')
-        .withIndex('by_sessionId_and_userId', (q) => q.eq('sessionId', sessionId))
-        .take(200);
-}
-
 function ownToken(ctx: QueryCtx, sessionId: Id<'sessions'>, userId: Id<'users'>)
 {
     return ctx.db
@@ -89,6 +80,12 @@ function fogOf(ctx: QueryCtx, sessionId: Id<'sessions'>, scenarioId: string)
         .query('fog')
         .withIndex('by_sessionId_and_scenarioId', (q) => q.eq('sessionId', sessionId).eq('scenarioId', scenarioId))
         .unique();
+}
+
+/** Forgets what was seen of a map. A new epoch, so every screen forgets too, see SharedFog. */
+function forgetFog(ctx: MutationCtx, doc: Doc<'fog'>)
+{
+    return ctx.db.patch('fog', doc._id, { epoch: doc.epoch + 1, seen: new ArrayBuffer(doc.seen.byteLength) });
 }
 
 /**
@@ -451,7 +448,6 @@ export const start = mutation({
         if (session.activeScenarioId !== scenarioId)
             await respawn(ctx, session, scenarioId);
 
-        // A new epoch, like Reset fog, so every screen forgets too, see resetFog.
         const seen = freshFog
             ? await ctx.db
                 .query('fog')
@@ -460,7 +456,7 @@ export const start = mutation({
             : [];
 
         for (const doc of seen)
-            await ctx.db.patch('fog', doc._id, { epoch: doc.epoch + 1, seen: new ArrayBuffer(doc.seen.byteLength) });
+            await forgetFog(ctx, doc);
 
         return null;
     },
@@ -700,7 +696,7 @@ export const resetFog = mutation({
         const doc = session.activeScenarioId ? await fogOf(ctx, sessionId, session.activeScenarioId) : null;
 
         if (doc)
-            await ctx.db.patch('fog', doc._id, { epoch: doc.epoch + 1, seen: new ArrayBuffer(doc.seen.byteLength) });
+            await forgetFog(ctx, doc);
 
         return null;
     },

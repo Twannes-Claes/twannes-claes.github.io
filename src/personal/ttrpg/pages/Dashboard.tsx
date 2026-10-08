@@ -1,15 +1,13 @@
 import '../styles/ttrpg.css';
 
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
+import { Loading } from '../components/Feedback';
 import { Shell } from '../components/Shell';
+import { useModule } from '../components/useModule';
 import { convexUrl } from '../services/config';
 
-/**
- * Loaded on demand rather than imported, so Convex is not in the portfolio bundle and never runs
- * during the prerender.
- */
+/** Loaded on demand with Convex, see components/useModule.ts. */
 function loadAccount()
 {
     return import('../components/Account');
@@ -18,27 +16,7 @@ function loadAccount()
 /** The way in for game masters: sign in, ask to host, and the list of sessions. */
 export default function Dashboard()
 {
-    const [account, setAccount] = useState<Awaited<ReturnType<typeof loadAccount>> | null>(null);
-
-    useEffect(() =>
-    {
-        if (!convexUrl)
-            return;
-
-        let cancelled = false;
-
-        loadAccount().then((module) =>
-        {
-            if (!cancelled)
-                setAccount(module);
-
-        });
-
-        return () =>
-        {
-            cancelled = true;
-        };
-    }, []);
+    const account = useModule(loadAccount, Boolean(convexUrl));
 
     return (
         <Shell title="Sessions" home="/">
@@ -48,12 +26,10 @@ export default function Dashboard()
                     <p>Battle maps for the table.</p>
                 </header>
 
-                {account ? (
-                    <account.Account />
-                ) : (
-                    <p className="ttrpg-dashboard__note">
-                        {convexUrl ? 'Loading' : 'The backend is not set up yet, see README.md.'}
-                    </p>
+                {account && <account.Account />}
+                {!account && convexUrl && <Loading>Loading</Loading>}
+                {!convexUrl && (
+                    <p className="ttrpg-dashboard__note">The backend is not set up yet, see README.md.</p>
                 )}
 
                 <p className="ttrpg-dashboard__note">

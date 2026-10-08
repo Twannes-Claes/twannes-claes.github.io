@@ -4,6 +4,7 @@ import { v } from 'convex/values';
 import type { Id } from './_generated/dataModel';
 import { mutation, query, type QueryCtx } from './_generated/server';
 import { isHost, isOwner, requireAccount, requireOwner } from './access';
+import { addExample } from './sessions';
 
 /** Name, picture and email of a user, for the lists the owner sees. */
 async function profile(ctx: QueryCtx, userId: Id<'users'>)
@@ -101,8 +102,12 @@ export const answer = mutation({
         if (request)
             await ctx.db.delete('hostRequests', request._id);
 
+        // A new host starts with the demo map as an example session, see addExample.
         if (approve && !(await isHost(ctx, userId)))
+        {
             await ctx.db.insert('hosts', { userId, approvedAt: Date.now() });
+            await addExample(ctx, userId);
+        }
 
         return null;
     },

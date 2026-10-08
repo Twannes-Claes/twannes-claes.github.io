@@ -13,6 +13,7 @@ import { useEffect } from 'react';
 
 import type { Scenario } from '../types';
 
+import { typing } from './useKeys';
 import { useFullscreen } from './useScreen';
 
 /** What a press on the map does in play mode, besides drawing paths and dragging monsters. */
@@ -69,7 +70,7 @@ export function PlayDock({
     {
         const held = (peek: boolean) => (event: KeyboardEvent) =>
         {
-            if (event.key !== ' ' || event.repeat || event.target instanceof HTMLInputElement)
+            if (event.key !== ' ' || event.repeat || typing(event))
                 return;
 
             event.preventDefault();
@@ -145,7 +146,7 @@ export function PlayDock({
             </div>
             {onMonsters && (
                 <div className="ttrpg-dock__group">
-                    <button type="button" className="ttrpg-segment" aria-pressed={monstersOpen} onClick={onMonsters}>
+                    <button type="button" className="ttrpg-segment" aria-pressed={monstersOpen} aria-expanded={monstersOpen} onClick={onMonsters}>
                         <FontAwesomeIcon icon={faDragon} />
                         Monsters
                     </button>
@@ -168,6 +169,7 @@ export function PlayDock({
                     type="button"
                     className="ttrpg-segment"
                     aria-pressed={fogOpen}
+                    aria-expanded={fogOpen}
                     aria-label="How the fog looks"
                     title="How the fog looks"
                     onClick={onFog}

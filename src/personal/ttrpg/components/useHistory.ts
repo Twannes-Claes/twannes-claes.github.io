@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+
+import { typing, useKeydown } from './useKeys';
 
 /** How many steps back undo can go. */
 const limit = 100;
@@ -36,46 +38,38 @@ function redone<T>(history: History<T>): History<T>
 
 /**
  * A value with undo and redo, on Ctrl+Z, Ctrl+Y and Ctrl+Shift+Z too (Cmd on a Mac). commit
- * takes an updater, so two changes in a row before a render both land.
+ * takes an updater, so two changes in a row before a render both land. With merge, it folds into
+ * the last step instead of making a new one, so a drag is one step to undo.
  */
 export function useHistory<T>(initial: () => T)
 {
-    // ponytail: every commit is a step, so dragging a slider fills the history. Merge quick
-    // commits into one step if that gets in the way.
     const [history, setHistory] = useState<History<T>>(() => ({
         past: [],
         present: initial(),
         future: [],
     }));
 
-    useEffect(() =>
+    useKeydown((event) =>
     {
-        const keydown = (event: KeyboardEvent) =>
-        {
-            const key = event.key.toLowerCase();
+        const key = event.key.toLowerCase();
 
-            // A field keeps its own undo, for the text typed into it.
-            if (!(event.ctrlKey || event.metaKey) || event.target instanceof HTMLInputElement)
-                return;
+        // A field keeps its own undo, for the text typed into it.
+        if (!(event.ctrlKey || event.metaKey) || typing(event))
+            return;
 
-            if (key === 'z' && !event.shiftKey)
-                setHistory(undone);
-            else if (key === 'y' || (key === 'z' && event.shiftKey))
-                setHistory(redone);
-            else
-                return;
+        if (key === 'z' && !event.shiftKey)
+            setHistory(undone);
+        else if (key === 'y' || (key === 'z' && event.shiftKey))
+            setHistory(redone);
+        else
+            return;
 
-            event.preventDefault();
-        };
+        event.preventDefault();
+    });
 
-        window.addEventListener('keydown', keydown);
-
-        return () => window.removeEventListener('keydown', keydown);
-    }, []);
-
-    const commit = (update: (current: T) => T) =>
+    const commit = (update: (current: T) => T, merge = false) =>
         setHistory((current) => ({
-            past: [...current.past, current.present].slice(-limit),
+            past: merge ? current.past : [...current.past, current.present].slice(-limit),
             present: update(current.present),
             future: [],
         }));

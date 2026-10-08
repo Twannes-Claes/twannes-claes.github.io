@@ -1,12 +1,14 @@
 import { faDiscord } from '@fortawesome/free-brands-svg-icons';
-import { faRightFromBracket } from '@fortawesome/free-solid-svg-icons';
+import { faHourglassHalf, faRightFromBracket } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useAuthActions, useConvexAuth } from '@convex-dev/auth/react';
 import { useMutation, useQuery } from 'convex/react';
+import { useActionState, useState } from 'react';
 
 import { api } from '../convex/_generated/api';
 
 import { Backend } from './Backend';
+import { Loading, Spinner } from './Feedback';
 import { HostList } from './HostList';
 import { SessionList } from './SessionList';
 
@@ -30,7 +32,7 @@ function Home()
     const me = useQuery(api.hosts.me);
 
     if (isLoading || (isAuthenticated && me === undefined))
-        return <p className="ttrpg-dashboard__note">Loading</p>;
+        return <Loading>Checking your account</Loading>;
 
     if (!me)
         return <SignIn />;
@@ -52,9 +54,13 @@ function Home()
             {me.role === 'owner' && <HostList />}
             {me.role === 'guest' && <AskToHost />}
             {me.role === 'asked' && (
-                <p className="ttrpg-dashboard__note">
-                    You asked to host. Once the owner approves, your sessions show up here.
-                </p>
+                <section className="ttrpg-panel ttrpg-card" aria-label="Waiting to host">
+                    <h2>Request sent</h2>
+                    <p className="ttrpg-dashboard__note">
+                        <FontAwesomeIcon icon={faHourglassHalf} /> Once the owner approves, your
+                        sessions show up here.
+                    </p>
+                </section>
             )}
         </>
     );
@@ -63,9 +69,14 @@ function Home()
 function SignIn()
 {
     const { signIn } = useAuthActions();
+    const [leaving, setLeaving] = useState(false);
 
     // Discord sends the browser back here, where Backend finishes the sign in.
-    const signInWithDiscord = () => void signIn('discord', { redirectTo: '/ttrpg' });
+    const signInWithDiscord = () =>
+    {
+        setLeaving(true);
+        signIn('discord', { redirectTo: '/ttrpg' }).catch(() => setLeaving(false));
+    };
 
     return (
         <section className="ttrpg-panel ttrpg-card" aria-label="Sign in">
@@ -75,8 +86,9 @@ function SignIn()
                 they join with the QR code at the table.
             </p>
             <div className="ttrpg-card__actions">
-                <button type="button" className="ttrpg-button" onClick={signInWithDiscord}>
-                    <FontAwesomeIcon icon={faDiscord} /> Sign in with Discord
+                <button type="button" className="ttrpg-button" disabled={leaving} onClick={signInWithDiscord}>
+                    {leaving ? <Spinner /> : <FontAwesomeIcon icon={faDiscord} />}
+                    {leaving ? 'Opening Discord' : 'Sign in with Discord'}
                 </button>
             </div>
         </section>
@@ -87,16 +99,29 @@ function AskToHost()
 {
     const ask = useMutation(api.hosts.ask);
 
+    // Once asked, the role changes and the page shows the waiting card instead of this one.
+    const [failure, request, asking] = useActionState(
+        () => ask().then(() => '', () => 'The request did not go through. Try again.'),
+        '',
+    );
+
     return (
-        <section className="ttrpg-panel ttrpg-card" aria-label="Ask to host">
+        <form action={request} className="ttrpg-panel ttrpg-card" aria-label="Ask to host">
             <h2>Not a host yet</h2>
             <p className="ttrpg-dashboard__note">
                 Hosts build battle maps and run sessions. Ask, and the owner of this app lets you
                 in.
             </p>
-            <button type="button" className="ttrpg-button ttrpg-button--confirm" onClick={() => void ask()}>
-                Ask to host
-            </button>
-        </section>
+            {failure && (
+                <p className="ttrpg-error" role="alert">
+                    {failure}
+                </p>
+            )}
+            <div className="ttrpg-card__actions">
+                <button type="submit" className="ttrpg-button ttrpg-button--confirm" disabled={asking}>
+                    {asking ? 'Asking' : 'Ask to host'}
+                </button>
+            </div>
+        </form>
     );
 }

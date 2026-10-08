@@ -12,6 +12,7 @@ import { explain, sessionStore, upload } from '../services/backend';
 import { toAvatar } from '../services/images';
 
 import { Backend } from './Backend';
+import { Loading } from './Feedback';
 import { MapEditor } from './MapEditor';
 
 interface SessionEditorProps
@@ -172,23 +173,26 @@ function Session({ sessionId, debug }: SessionEditorProps)
         );
     }
 
-    let message = 'Opening the session';
+    const signedOut = !isLoading && !isAuthenticated;
 
-    if (!isLoading && !isAuthenticated)
-        message = 'Sign in to open this session.';
-    else if (error)
-        message = error;
+    if (!signedOut && !error)
+    {
+        return (
+            <main className="ttrpg-placeholder">
+                <Loading>Opening the session</Loading>
+            </main>
+        );
+    }
 
     return (
         <main className="ttrpg-placeholder">
-            <p>{message}</p>
-            {(error || (!isLoading && !isAuthenticated)) && (
-                <p>
-                    <Link to="/ttrpg" className="ttrpg-link">
-                        Back to your sessions
-                    </Link>
-                </p>
-            )}
+            <h1>{signedOut ? 'Signed out' : 'Could not open it'}</h1>
+            <p>{signedOut ? 'Sign in to open this session.' : error}</p>
+            <p>
+                <Link to="/ttrpg" className="ttrpg-link">
+                    Back to your sessions
+                </Link>
+            </p>
         </main>
     );
 }

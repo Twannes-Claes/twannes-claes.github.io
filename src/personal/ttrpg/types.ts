@@ -30,6 +30,11 @@ export interface Grid
     offsetX: number;
     offsetY: number;
     feetPerCell: number;
+    /**
+     * Square only. Alternate, also when missing, makes every second diagonal cost two cells, the
+     * 5, 10, 5 rule; equal makes every diagonal one cell.
+     */
+    diagonals?: 'alternate' | 'equal';
     color: string;
     /** 0 to 1. */
     opacity: number;
@@ -116,7 +121,7 @@ export interface StoredPicture
 }
 
 /**
- * Where the editor keeps what it makes: services/demo.ts holds it in the tab, services/backend.tsx
+ * Where the editor keeps what it makes: services/demo.ts holds it in the tab, services/backend.ts
  * in Convex.
  */
 export interface Store

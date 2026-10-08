@@ -2,6 +2,7 @@ import { useMutation, useQuery } from 'convex/react';
 
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
+import { confirmAction } from '../services/confirm';
 
 interface Person
 {
@@ -28,6 +29,12 @@ export function HostList()
     const answer = useMutation(api.hosts.answer);
     const removeHost = useMutation(api.hosts.remove);
 
+    const remove = (person: Person) =>
+    {
+        void confirmAction(`Stop ${person.name} hosting? Their sessions stay, for if they come back.`, 'Remove')
+            .then((yes) => (yes ? removeHost({ userId: person.userId }) : undefined));
+    };
+
     if (!overview)
         return null;
 
@@ -48,8 +55,7 @@ export function HostList()
                         </button>
                         <button
                             type="button"
-                            className="ttrpg-segment"
-                            aria-pressed="true"
+                            className="ttrpg-segment ttrpg-segment--confirm"
                             onClick={() => void answer({ userId: person.userId, approve: true })}
                         >
                             Approve
@@ -67,7 +73,7 @@ export function HostList()
                         <button
                             type="button"
                             className="ttrpg-segment"
-                            onClick={() => void removeHost({ userId: person.userId })}
+                            onClick={() => remove(person)}
                         >
                             Remove
                         </button>

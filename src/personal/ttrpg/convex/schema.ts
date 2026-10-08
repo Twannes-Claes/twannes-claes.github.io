@@ -37,6 +37,7 @@ export const scenarioValidator = v.object({
         offsetX: v.number(),
         offsetY: v.number(),
         feetPerCell: v.number(),
+        diagonals: v.optional(v.union(v.literal('alternate'), v.literal('equal'))),
         color: v.string(),
         opacity: v.number(),
         visible: v.boolean(),

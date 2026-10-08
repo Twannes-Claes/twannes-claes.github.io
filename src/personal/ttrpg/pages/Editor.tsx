@@ -1,18 +1,16 @@
 import '../styles/ttrpg.css';
 
-import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
+import { Loading } from '../components/Feedback';
 import { MapEditor } from '../components/MapEditor';
 import { Shell } from '../components/Shell';
+import { useModule } from '../components/useModule';
 import { demoScenario } from '../content/scenarios';
 import { convexUrl } from '../services/config';
 import { demoStore } from '../services/demo';
 
-/**
- * Loaded on demand rather than imported, so Convex is not in the portfolio bundle, never runs
- * during the prerender, and the demo never loads it.
- */
+/** Loaded on demand with Convex, see components/useModule.ts. */
 function loadSession()
 {
     return import('../components/SessionEditor');
@@ -30,27 +28,7 @@ export default function Editor()
     const session = search.get('s');
     const demo = search.has('demo');
     const debug = search.has('debug');
-    const [loaded, setLoaded] = useState<Awaited<ReturnType<typeof loadSession>> | null>(null);
-
-    useEffect(() =>
-    {
-        if (demo || !session || !convexUrl)
-            return;
-
-        let cancelled = false;
-
-        loadSession().then((module) =>
-        {
-            if (!cancelled)
-                setLoaded(module);
-
-        });
-
-        return () =>
-        {
-            cancelled = true;
-        };
-    }, [demo, session]);
+    const loaded = useModule(loadSession, !demo && Boolean(session && convexUrl));
 
     if (demo)
     {
@@ -74,7 +52,7 @@ export default function Editor()
     return (
         <Shell title="Editor">
             <main className="ttrpg-placeholder">
-                <p>{session ? 'Opening the session' : 'No session picked.'}</p>
+                {session ? <Loading>Opening the session</Loading> : <p>No session picked.</p>}
                 {!session && (
                     <p>
                         <Link to="/ttrpg" className="ttrpg-link">

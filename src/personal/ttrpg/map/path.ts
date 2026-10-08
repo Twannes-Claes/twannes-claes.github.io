@@ -38,8 +38,8 @@ export function extendPath(
 
 /**
  * Feet walked along a path of neighbouring cells. On a square grid diagonals alternate 5 and 10
- * ft, counted over the whole path, so straight steps in between do not reset the count. It is
- * the rule the common systems share, and the only one, see PLAN.md.
+ * ft, counted over the whole path, so straight steps in between do not reset the count, unless
+ * the grid's diagonals are equal, then every diagonal is 5 ft.
  */
 export function pathFeet(grid: Grid, path: Cell[]): number
 {
@@ -63,7 +63,7 @@ export function pathFeet(grid: Grid, path: Cell[]): number
         }
 
         diagonals++;
-        feet += diagonals % 2 === 0 ? step * 2 : step;
+        feet += diagonals % 2 === 0 && grid.diagonals !== 'equal' ? step * 2 : step;
     }
 
     return feet;

@@ -1,7 +1,9 @@
 import type { CreatureSize, Grid, Point, Scenario, Token } from '../types';
 
 import { toWorld, type Camera } from './camera.ts';
+import { door as doorColour, faded, ground, highlight, ink } from './colours.ts';
 import { drawFog, type FogLayers, type FogLook } from './fog.ts';
+import type { Area } from './geometry.ts';
 import { cellAt, cellCenter, cellCorners, hexRadius } from './grid.ts';
 import { cellsAcross } from './size.ts';
 
@@ -9,9 +11,6 @@ import { cellsAcross } from './size.ts';
 const outside = '#121113';
 /** The floor of a map without a picture, like the demo. */
 const floor = '#3a3530';
-const wallColour = '#fcf8ec';
-const doorColour = '#d8a657';
-const spawnColour = '#a77ee0';
 
 /** The canvas in CSS pixels, and how many device pixels each one has. */
 export interface Viewport
@@ -21,6 +20,9 @@ export interface Viewport
     dpr: number;
 }
 
+/** A token as it shows mid walk: lift is how high it is in its bob, 0 to 1, see map/walk.ts. */
+export type Lifted = Token & { lift?: number };
+
 /** Everything one frame shows. */
 export interface Scene
 {
@@ -29,11 +31,8 @@ export interface Scene
     background: CanvasImageSource | null;
     /** A prop's picture once it has loaded, null before that. */
     picture: (src: string) => CanvasImageSource | null;
-    /**
-     * lift is how high a walking token is in its bob, 0 to 1, see map/walk.ts. alpha is how far a
-     * token has faded in, 0 to 1, see fadeTokens in map/view.ts.
-     */
-    tokens: (Token & { lift?: number; alpha?: number })[];
+    /** alpha is how far a token has faded in, 0 to 1, see fadeTokens in map/view.ts. */
+    tokens: (Lifted & { alpha?: number })[];
     /** Edit mode: walls and the spawn point show. */
     editing: boolean;
     /** On a phone, the player's own token, which gets a pulsing ring. */
@@ -83,6 +82,24 @@ export function drawRoute(ctx: CanvasRenderingContext2D, points: Point[], zoom: 
     }
 }
 
+/**
+ * The step a path cannot take, from its end to the finger in ground nobody has seen: dashed and
+ * faint, with a label saying why. A straight line that ignores walls, so it gives none away.
+ */
+export function drawUnknownStep(ctx: CanvasRenderingContext2D, from: Point, to: Point, zoom: number)
+{
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.setLineDash([8 / zoom, 8 / zoom]);
+    ctx.strokeStyle = faded(ink, 0.6);
+    ctx.lineWidth = 3 / zoom;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.setLineDash([]);
+    drawPill(ctx, 'Unknown', to, zoom, ground);
+}
+
 /** A small rounded label, such as the feet a path costs, the same size at any zoom. */
 export function drawPill(
     ctx: CanvasRenderingContext2D,
@@ -106,19 +123,10 @@ export function drawPill(
     ctx.roundRect(left, top, width, height, height / 2);
     ctx.fillStyle = colour;
     ctx.fill();
-    ctx.fillStyle = '#fcf8ec';
+    ctx.fillStyle = ink;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(text, left + width / 2, top + height / 2 + 1 / zoom);
-}
-
-/** A rectangle of the world, in world pixels. */
-interface Area
-{
-    left: number;
-    top: number;
-    right: number;
-    bottom: number;
 }
 
 function drawSquareGrid(ctx: CanvasRenderingContext2D, grid: Grid, area: Area)
@@ -195,7 +203,7 @@ function drawHexGrid(ctx: CanvasRenderingContext2D, grid: Grid, area: Area)
  */
 function drawToken(
     ctx: CanvasRenderingContext2D,
-    token: Token & { lift?: number },
+    token: Lifted,
     base: number,
     avatar: CanvasImageSource | null,
 )
@@ -210,7 +218,7 @@ function drawToken(
     ctx.shadowOffsetY = radius * (0.1 + lift * 0.15);
     ctx.beginPath();
     ctx.arc(token.x, token.y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = '#1e1d1f';
+    ctx.fillStyle = ground;
     ctx.fill();
     ctx.restore();
 
@@ -229,7 +237,7 @@ function drawToken(
     if (avatar)
         return;
 
-    ctx.fillStyle = '#fcf8ec';
+    ctx.fillStyle = ink;
     ctx.font = `600 ${radius * 0.9}px 'Onest Variable', system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -260,13 +268,13 @@ function drawSpawn(ctx: CanvasRenderingContext2D, at: Point, radius: number)
     ctx.beginPath();
     ctx.arc(at.x, at.y, radius, 0, Math.PI * 2);
     ctx.setLineDash([radius * 0.35, radius * 0.25]);
-    ctx.strokeStyle = spawnColour;
+    ctx.strokeStyle = highlight;
     ctx.lineWidth = radius * 0.12;
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.beginPath();
     ctx.arc(at.x, at.y, radius * 0.18, 0, Math.PI * 2);
-    ctx.fillStyle = spawnColour;
+    ctx.fillStyle = highlight;
     ctx.fill();
 }
 
@@ -367,7 +375,7 @@ export function render(
             ctx.lineTo(wall.x2, wall.y2);
         }
 
-        ctx.strokeStyle = kind === 'wall' ? wallColour : doorColour;
+        ctx.strokeStyle = kind === 'wall' ? ink : doorColour;
         ctx.lineWidth = (kind === 'wall' ? 3 : 5) / camera.zoom;
         ctx.setLineDash(kind === 'open' ? [6 / camera.zoom, 6 / camera.zoom] : []);
         ctx.stroke();

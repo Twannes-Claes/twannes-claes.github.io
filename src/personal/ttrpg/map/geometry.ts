@@ -73,3 +73,29 @@ export function midpoint(a: Point, b: Point): Point
 {
     return lerp(a, b, 0.5);
 }
+
+/** A box of the world, in world pixels: an area dragged with a tool or the part on screen. */
+export interface Area
+{
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+}
+
+/** The box between two corners, whichever way it was dragged. */
+export function boxOf(start: Point, end: Point): Area
+{
+    return {
+        left: Math.min(start.x, end.x),
+        top: Math.min(start.y, end.y),
+        right: Math.max(start.x, end.x),
+        bottom: Math.max(start.y, end.y),
+    };
+}
+
+/** A point pulled inside a map, so nothing is walked, dragged or drawn off its edge. */
+export function onMap({ width, height }: { width: number; height: number }, { x, y }: Point): Point
+{
+    return { x: Math.min(Math.max(x, 0), width), y: Math.min(Math.max(y, 0), height) };
+}

@@ -1,17 +1,16 @@
-import { faDoorClosed, faDrawPolygon, faRotate, type IconDefinition } from '@fortawesome/free-solid-svg-icons';
+import { faDoorClosed, faDrawPolygon, type IconDefinition } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
-/** What the walls tool does: draw walls, draw closed doors, or change the wall clicked. */
-export type WallKind = 'wall' | 'door' | 'change';
+/** What the walls tool does: draw walls, or step the wall clicked through door and back. */
+export type WallKind = 'wall' | 'change';
 
 const kinds: { id: WallKind; label: string; title: string; icon: IconDefinition }[] = [
-    { id: 'wall', label: 'Wall', title: 'Click, click, click for a chain of walls', icon: faDrawPolygon },
-    { id: 'door', label: 'Door', title: 'Click, click for a closed door', icon: faDoorClosed },
+    { id: 'wall', label: 'Draw', title: 'Click, click, click for a chain of walls', icon: faDrawPolygon },
     {
         id: 'change',
-        label: 'Change',
+        label: 'Doors',
         title: 'Click a wall: it becomes a closed door, then an open door, then a wall again',
-        icon: faRotate,
+        icon: faDoorClosed,
     },
 ];
 
@@ -25,8 +24,8 @@ interface WallPanelProps
 }
 
 /**
- * The walls tool's settings: draw walls or doors, or turn a drawn wall into a door and back, and
- * how finely new walls snap to the grid. Alt still places freely.
+ * The walls tool's settings: draw walls, or turn a drawn wall into a door and back, and how
+ * finely new walls snap to the grid. Alt still places freely.
  */
 export function WallPanel({ kind, onKind, snap, onSnap }: WallPanelProps)
 {

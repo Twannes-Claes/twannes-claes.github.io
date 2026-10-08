@@ -1,4 +1,4 @@
-import { faEye, faPen, faSnowflake } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faEye, faPen, faSnowflake, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 
@@ -11,6 +11,7 @@ import { scenarioFromUvtt } from '../map/uvtt';
 import type { FrameStats, PendingMove } from '../map/view';
 import { baseName } from '../services/images';
 
+import { Spinner, Toast, Toasts } from './Feedback';
 import { FogPanel } from './FogPanel';
 import { GridPanel } from './GridPanel';
 import { LiveControls } from './LiveControls';
@@ -22,6 +23,7 @@ import { PropLibrary } from './PropLibrary';
 import { ScenarioList } from './ScenarioList';
 import { ToolRail } from './ToolRail';
 import { useHistory } from './useHistory';
+import { useMessage } from './useMessage';
 import { useIdle, useWakeLock } from './useScreen';
 import { WallPanel, type WallKind } from './WallPanel';
 
@@ -29,6 +31,35 @@ type Mode = 'edit' | 'play';
 
 /** How long the editor waits after the last change before it saves. */
 const saveDelay = 1000;
+const pictureFailed = 'That picture did not upload. Is it a PNG, WebP or JPEG?';
+
+/**
+ * Whether the editor's changes are stored, quietly in the bottom right: a spinner while they
+ * wait, a tick once saved, and a warning that stays when the last save failed.
+ */
+function SaveState({ unsaved, failed }: { unsaved: boolean; failed: boolean })
+{
+    if (failed)
+    {
+        return (
+            <p
+                className="ttrpg-panel ttrpg-saved ttrpg-saved--failed"
+                role="alert"
+                title="Your changes are kept here. Saving tries again on the next change."
+            >
+                <FontAwesomeIcon icon={faTriangleExclamation} />
+                Not saved
+            </p>
+        );
+    }
+
+    return (
+        <p className="ttrpg-panel ttrpg-saved" role="status">
+            {unsaved ? <Spinner /> : <FontAwesomeIcon icon={faCheck} />}
+            {unsaved ? 'Saving' : 'Saved'}
+        </p>
+    );
+}
 
 interface MapEditorProps
 {
@@ -60,7 +91,10 @@ export function MapEditor({ initial, library: initialLibrary, store, debug, live
     const [tool, setTool] = useState<ToolId>('select');
     const [tokens, setTokens] = useState(() => demoTokens(scenarios[0]));
     const [fogEpoch, setFogEpoch] = useState(0);
-    const [error, setError] = useState('');
+    const message = useMessage();
+    // An upload or import on its way, shown with a spinner until it lands.
+    const [busy, setBusy] = useState<string | null>(null);
+    const [saveFailed, setSaveFailed] = useState(false);
     const [library, setLibrary] = useState(initialLibrary);
     const [placing, setPlacing] = useState<PropPicture | null>(null);
     const [wallSnap, setWallSnap] = useState(1);
@@ -98,8 +132,12 @@ export function MapEditor({ initial, library: initialLibrary, store, debug, live
             const changed = scenarios.filter((scenario) => !saved.includes(scenario));
 
             save(scenarios, changed)
-                .then(() => setSaved(scenarios))
-                .catch(() => setError('Saving failed. Your changes are kept here, it tries again on the next change.'));
+                .then(() =>
+                {
+                    setSaved(scenarios);
+                    setSaveFailed(false);
+                })
+                .catch(() => setSaveFailed(true));
         }, saveDelay);
 
         return () => window.clearTimeout(timer);
@@ -125,16 +163,29 @@ export function MapEditor({ initial, library: initialLibrary, store, debug, live
         setPlacing(null);
     };
 
+    // Shows label with a spinner while the work runs.
+    function track<T>(label: string, work: Promise<T>): Promise<T>
+    {
+        setBusy(label);
+
+        return work.finally(() => setBusy(null));
+    }
+
     const upload = (files: File[]) =>
     {
-        setError('');
-        Promise.all(files.map(store.uploadProp))
+        if (files.length === 0)
+            return;
+
+        const count = files.length === 1 ? 'the picture' : `${files.length} pictures`;
+
+        track(`Uploading ${count}`, Promise.all(files.map(store.uploadProp)))
             .then((pictures) =>
             {
                 setLibrary((current) => [...current, ...pictures]);
                 setPlacing(pictures[0] ?? null);
+                message.done(`Added ${count} to your props. Click the map to place it.`);
             })
-            .catch(() => setError('One of those pictures did not upload. Is it a PNG, WebP or JPEG?'));
+            .catch(() => message.error('One of those pictures did not upload. Is it a PNG, WebP or JPEG?'));
     };
 
     // Undo can take away the open scenario, then the first one shows.
@@ -146,7 +197,7 @@ export function MapEditor({ initial, library: initialLibrary, store, debug, live
     const shown = liveMap ? liveMap.tokens : tokens;
     const isFrozen = liveMap ? liveMap.frozen : frozen;
 
-    const fail = (promise: Promise<void>) => void promise.catch((reason: Error) => setError(reason.message));
+    const fail = (promise: Promise<void>) => void promise.catch((reason: Error) => message.error(reason.message));
 
     const moveToken = (id: string, to: Point) =>
     {
@@ -227,6 +278,7 @@ export function MapEditor({ initial, library: initialLibrary, store, debug, live
     const resetFog = () =>
     {
         setFogEpoch((epoch) => epoch + 1);
+        message.done(liveMap ? 'Fog reset on every screen.' : 'Fog reset.');
 
         if (liveMap)
             fail(liveMap.resetFog());
@@ -244,10 +296,14 @@ export function MapEditor({ initial, library: initialLibrary, store, debug, live
 
     };
 
-    const changeScenario = (next: Scenario) =>
-        history.commit((current) =>
-            current.map((scenario) => (scenario.id === next.id ? next : scenario)),
+    // By id, so an upload that finishes after another map opened still lands on its own map.
+    const updateScenario = (id: string, update: (scenario: Scenario) => Scenario, merge = false) =>
+        history.commit(
+            (current) => current.map((scenario) => (scenario.id === id ? update(scenario) : scenario)),
+            merge,
         );
+
+    const changeScenario = (next: Scenario, merge = false) => updateScenario(next.id, () => next, merge);
 
     // Every player starts over at the spawn point of the scenario that opens, see PLAN.md.
     const open = (scenario: Scenario) =>
@@ -276,18 +332,17 @@ export function MapEditor({ initial, library: initialLibrary, store, debug, live
 
     };
 
-    const rename = (id: string, name: string) =>
-        history.commit((current) =>
-            current.map((scenario) => (scenario.id === id ? { ...scenario, name } : scenario)),
-        );
+    const rename = (id: string, name: string) => updateScenario(id, (scenario) => ({ ...scenario, name }));
 
     const duplicate = (id: string) =>
     {
         const original = scenarios.find((scenario) => scenario.id === id);
 
-        if (original)
-            add({ ...original, id: crypto.randomUUID(), name: `${original.name} copy` });
+        if (!original)
+            return;
 
+        add({ ...original, id: crypto.randomUUID(), name: `${original.name} copy` });
+        message.done(`Made ${original.name} copy.`);
     };
 
     const remove = (id: string) =>
@@ -307,8 +362,7 @@ export function MapEditor({ initial, library: initialLibrary, store, debug, live
     // The file's picture is stored first, so the scenario only keeps its address.
     const load = (file: File) =>
     {
-        setError('');
-        file.text()
+        const imported = file.text()
             .then((text) => scenarioFromUvtt(text, crypto.randomUUID(), baseName(file)))
             .then(async (scenario) =>
             {
@@ -319,65 +373,60 @@ export function MapEditor({ initial, library: initialLibrary, store, debug, live
                 const { src } = await store.uploadMap(picture);
 
                 return { ...scenario, background: src };
+            });
+
+        track(`Importing ${file.name}`, imported)
+            .then((scenario) =>
+            {
+                add(scenario);
+                message.done(`Imported ${scenario.name}, with ${scenario.walls.length} walls.`);
             })
-            .then(add)
-            .catch((reason: Error) => setError(reason.message));
+            .catch((reason: Error) => message.error(reason.message));
     };
 
     // A map from a plain picture, sized to it. The grid is lined up by hand with the G tool.
     const loadPicture = (file: File) =>
     {
-        setError('');
-        store.uploadMap(file)
+        track('Uploading the map picture', store.uploadMap(file))
             .then(({ src, width, height }) =>
+            {
                 add({
                     ...blankScenario(baseName(file)),
                     width,
                     height,
                     background: src,
                     spawn: { x: width / 2, y: height / 2 },
-                }),
-            )
-            .catch(() => setError('That picture did not upload. Is it a PNG, WebP or JPEG?'));
+                });
+                message.done('New map made. Line the grid up with the Grid tool (G).');
+            })
+            .catch(() => message.error(pictureFailed));
     };
 
     // A picture behind the open map. The map takes the picture's size, and walls, props and the
-    // spawn point keep their places; the spawn is pulled inside if the map got smaller. By id,
-    // so the picture lands on the map it was picked for even if another opens while it uploads.
+    // spawn point keep their places; the spawn is pulled inside if the map got smaller.
     const setBackground = (file: File) =>
     {
         const { id } = active;
 
-        setError('');
-        store.uploadMap(file)
+        track('Uploading the background', store.uploadMap(file))
             .then(({ src, width, height }) =>
-                history.commit((current) =>
-                    current.map((scenario) =>
-                        scenario.id === id
-                            ? {
-                                ...scenario,
-                                background: src,
-                                width,
-                                height,
-                                spawn: {
-                                    x: Math.min(scenario.spawn.x, width),
-                                    y: Math.min(scenario.spawn.y, height),
-                                },
-                            }
-                            : scenario,
-                    ),
-                ),
-            )
-            .catch(() => setError('That picture did not upload. Is it a PNG, WebP or JPEG?'));
+            {
+                updateScenario(id, (scenario) => ({
+                    ...scenario,
+                    background: src,
+                    width,
+                    height,
+                    spawn: { x: Math.min(scenario.spawn.x, width), y: Math.min(scenario.spawn.y, height) },
+                }));
+                message.done('Background set.');
+            })
+            .catch(() => message.error(pictureFailed));
     };
 
     const removeBackground = () =>
     {
-        const { id } = active;
-
-        history.commit((current) =>
-            current.map((scenario) => (scenario.id === id ? { ...scenario, background: null } : scenario)),
-        );
+        updateScenario(active.id, (scenario) => ({ ...scenario, background: null }));
+        message.done('Background removed. Ctrl+Z brings it back.');
     };
 
     // A dropped .dd2vtt imports, a dropped picture becomes a map.
@@ -397,7 +446,6 @@ export function MapEditor({ initial, library: initialLibrary, store, debug, live
     // Without this the browser opens a dropped file itself instead of handing it to the page.
     const draggedOver = (event: DragEvent) => event.preventDefault();
 
-
     return (
         <main onDrop={dropped} onDragOver={draggedOver}>
             <MapCanvas
@@ -407,13 +455,13 @@ export function MapEditor({ initial, library: initialLibrary, store, debug, live
                 tool={mode === 'edit' ? (tool === 'walls' && wallKind === 'change' ? 'doors' : tool) : playTool}
                 placing={mode === 'edit' ? placing : null}
                 wallSnap={wallSnap}
-                wallDoor={wallKind === 'door'}
                 fogEpoch={fogEpoch}
                 pending={pending}
                 frozen={isFrozen}
                 peek={mode === 'play' && peek}
                 onTokenMove={moveToken}
                 onPathEnd={setPending}
+                onPathCancel={() => setPending(null)}
                 onScenarioChange={changeScenario}
                 onStats={debug ? setStats : undefined}
                 onView={(center) =>
@@ -465,31 +513,32 @@ export function MapEditor({ initial, library: initialLibrary, store, debug, live
                         live={live}
                         scenarioId={active.id}
                         onStarted={() => setMode('play')}
-                        onError={setError}
+                        onDone={message.done}
+                        onError={message.error}
                     />
                 )}
             </div>
 
-            {error && (
-                <p className="ttrpg-panel ttrpg-toast" role="alert">
-                    {error}
-                </p>
-            )}
+            <Toasts>
+                {mode === 'play' && isFrozen && (
+                    <Toast kind="info" icon={faSnowflake}>
+                        Movement paused by the GM
+                    </Toast>
+                )}
+                {busy && <Toast kind="busy">{busy}</Toast>}
+                {message.message && (
+                    <Toast kind={message.message.kind} onClose={message.clear}>
+                        {message.message.text}
+                    </Toast>
+                )}
+            </Toasts>
 
-            {mode === 'play' && isFrozen && (
-                <p className="ttrpg-panel ttrpg-toast" role="status">
-                    <FontAwesomeIcon icon={faSnowflake} /> Movement paused by the GM
-                </p>
-            )}
-
-            {mode === 'play' && pending && walker && (
-                <MoveSheet
-                    move={pending}
-                    token={walker}
-                    onMove={confirmMove}
-                    onCancel={() => setPending(null)}
-                />
-            )}
+            <MoveSheet
+                move={mode === 'play' ? pending : null}
+                token={walker}
+                onMove={confirmMove}
+                onCancel={() => setPending(null)}
+            />
 
             {mode === 'edit' ? (
                 <>
@@ -515,7 +564,7 @@ export function MapEditor({ initial, library: initialLibrary, store, debug, live
                     {tool === 'align' && (
                         <GridPanel
                             grid={active.grid}
-                            onChange={(grid) => changeScenario({ ...active, grid })}
+                            onChange={(grid, merge) => changeScenario({ ...active, grid }, merge)}
                         />
                     )}
                     <ScenarioList
@@ -531,11 +580,7 @@ export function MapEditor({ initial, library: initialLibrary, store, debug, live
                         onBackground={setBackground}
                         onRemoveBackground={removeBackground}
                     />
-                    {store.save && (
-                        <p className="ttrpg-panel ttrpg-saved" role="status">
-                            {unsaved ? 'Saving' : 'Saved'}
-                        </p>
-                    )}
+                    {store.save && <SaveState unsaved={unsaved} failed={saveFailed} />}
                 </>
             ) : (
                 !pending && (
@@ -564,11 +609,18 @@ export function MapEditor({ initial, library: initialLibrary, store, debug, live
                     onChange={setFogDraft}
                     onCommit={() => saveFog(fogDraft)}
                     onReset={() => saveFog(defaultFogSettings)}
+                    onClose={() => setPanel(null)}
                 />
             )}
 
             {mode === 'play' && !pending && liveMap && panel === 'monsters' && (
-                <Monsters live={liveMap} at={() => viewCenter.current ?? active.spawn} onError={setError} />
+                <Monsters
+                    live={liveMap}
+                    at={() => viewCenter.current ?? active.spawn}
+                    onClose={() => setPanel(null)}
+                    onDone={message.done}
+                    onError={message.error}
+                />
             )}
 
             {debug && stats && (

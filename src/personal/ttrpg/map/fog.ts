@@ -1,5 +1,6 @@
 import type { FogSettings, Point, Scenario, Wall } from '../types';
 
+import type { Area } from './geometry.ts';
 import { inSight, insidePolygon, visibilityPolygon, type Segment } from './visibility.ts';
 
 /*
@@ -110,6 +111,15 @@ export function createExplored(scenario: Scenario): Explored
     return { columns, rows, sample, seen: new Uint8Array(columns * rows) };
 }
 
+/** Whether the party has seen a point, by the sample it falls in. Off the map counts as unseen. */
+export function wasSeen({ columns, rows, sample, seen }: Explored, { x, y }: Point): boolean
+{
+    const column = Math.floor(x / sample);
+    const row = Math.floor(y / sample);
+
+    return column >= 0 && column < columns && row >= 0 && row < rows && seen[row * columns + column] === 1;
+}
+
 /** Marks every sample whose centre lies in the polygon as seen. True when any was new. */
 export function markSeen(explored: Explored, polygon: Point[]): boolean
 {
@@ -143,7 +153,7 @@ export function markSeen(explored: Explored, polygon: Point[]): boolean
 /** Marks every sample whose centre lies in a box as seen, for the game master's Reveal area. */
 export function markArea(
     explored: Explored,
-    area: { left: number; top: number; right: number; bottom: number },
+    area: Area,
 )
 {
     const { columns, rows, sample, seen } = explored;
@@ -203,7 +213,7 @@ function keepSide(polygon: Point[], wall: Wall, point: Point): Point[]
 }
 
 /** Adds the game master's Reveal area box to the sharp shape. */
-export function shapeArea(layers: FogLayers, area: { left: number; top: number; right: number; bottom: number })
+export function shapeArea(layers: FogLayers, area: Area)
 {
     shapeContext(layers).fillRect(area.left, area.top, area.right - area.left, area.bottom - area.top);
 }

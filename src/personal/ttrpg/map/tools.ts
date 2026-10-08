@@ -1,6 +1,7 @@
 import type { Point, Prop, PropPicture, Scenario, Wall } from '../types';
 
-import { distance, distanceToSegment, segmentsTouch } from './geometry.ts';
+import { danger, door as doorColour, faded, ground, highlight, ink } from './colours.ts';
+import { boxOf, distance, distanceToSegment, onMap, segmentsTouch, type Area } from './geometry.ts';
 import { cellAt, cellCenter, cellLine, snapPoint } from './grid.ts';
 import { lineFeet, pathFeet } from './path.ts';
 import { fromLocal, placedSize, propAt, propHandles, snapCenter, snapSize } from './props.ts';
@@ -27,15 +28,6 @@ export type ToolId =
     | 'measure'
     | 'reveal';
 
-/** A box of the world, for Reveal area. */
-export interface Area
-{
-    left: number;
-    top: number;
-    right: number;
-    bottom: number;
-}
-
 /**
  * Hands a changed scenario back. A drag passes final false while it moves, which only shows
  * the change, and final true once on release, which keeps it as one step to undo.
@@ -60,23 +52,28 @@ export interface MapTool
     down: (pointer: ToolPointer) => boolean;
     /** While pressed, and while hovering with a mouse. */
     move: (pointer: ToolPointer, pressed: boolean) => void;
-    up: (pointer: ToolPointer) => void;
+    up?: (pointer: ToolPointer) => void;
     /** True when the tool used the key. */
-    key: (key: string, scenario: Scenario) => boolean;
+    key?: (key: string, scenario: Scenario) => boolean;
     /**
      * A right click: drops what is half done, like a chain of walls or a box being dragged, and
-     * true when there was something. False leaves the page to put the tool away, see map/view.ts.
+     * true when there was something. False, or no cancel at all, leaves the page to put the tool
+     * away, see map/view.ts.
      */
-    cancel: () => boolean;
+    cancel?: () => boolean;
     /** Previews over the map, in world pixels. */
     draw: (ctx: CanvasRenderingContext2D, zoom: number, scenario: Scenario) => void;
 }
 
 /** How close a click has to be to a wall to hit it, in screen pixels. */
 const reach = 10;
-const accent = '#a77ee0';
-const danger = '#e0565b';
-const doorColour = '#d8a657';
+
+/** A box or a line being dragged, from where the press started to the pointer. */
+interface Drag
+{
+    start: Point;
+    end: Point;
+}
 
 /**
  * Where a click lands: the nearest snap point, steps per cell side, see snapPoint in map/grid.ts.
@@ -86,9 +83,8 @@ const doorColour = '#d8a657';
 function cornerPoint({ world, free, scenario }: ToolPointer, steps: number): Point
 {
     const exact = free || steps === 0 || scenario.grid.type === 'none';
-    const { x, y } = exact ? world : snapPoint(scenario.grid, world, steps);
 
-    return { x: Math.min(Math.max(x, 0), scenario.width), y: Math.min(Math.max(y, 0), scenario.height) };
+    return onMap(scenario, exact ? world : snapPoint(scenario.grid, world, steps));
 }
 
 /** The middle of the cell under the pointer, or the exact spot with Alt or without a grid. */
@@ -170,11 +166,27 @@ function dot(ctx: CanvasRenderingContext2D, at: Point, radius: number, colour: s
     ctx.fill();
 }
 
+/** The dashed outline of a dragged box, with a faint fill when it marks an area. */
+function drawBox(ctx: CanvasRenderingContext2D, { start, end }: Drag, zoom: number, colour: string, fill = false)
+{
+    if (fill)
+    {
+        ctx.fillStyle = faded(colour, 0.14);
+        ctx.fillRect(start.x, start.y, end.x - start.x, end.y - start.y);
+    }
+
+    ctx.setLineDash([6 / zoom, 4 / zoom]);
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = 2 / zoom;
+    ctx.strokeRect(start.x, start.y, end.x - start.x, end.y - start.y);
+    ctx.setLineDash([]);
+}
+
 /**
- * Click, click, click for a chain of walls on the snap points, or of closed doors with door.
+ * Click, click, click for a chain of walls on the snap points.
  * Clicking the last point again, a double click, or Esc ends the chain.
  */
-function wallTool(change: Change, snap: number, door: boolean): MapTool
+function wallTool(change: Change, snap: number): MapTool
 {
     let last: Point | null = null;
     let hover: Point | null = null;
@@ -204,7 +216,7 @@ function wallTool(change: Change, snap: number, door: boolean): MapTool
                     blocksMove: true,
                 };
 
-                change({ ...pointer.scenario, walls: [...pointer.scenario.walls, door ? nextDoor(wall) : wall] });
+                change({ ...pointer.scenario, walls: [...pointer.scenario.walls, wall] });
             }
 
             last = point;
@@ -215,7 +227,6 @@ function wallTool(change: Change, snap: number, door: boolean): MapTool
         {
             hover = cornerPoint(pointer, snap);
         },
-        up: () => {},
         key: (key) =>
         {
             if (key !== 'Escape' || !last)
@@ -242,17 +253,17 @@ function wallTool(change: Change, snap: number, door: boolean): MapTool
                 strokeWall(
                     ctx,
                     { id: '', x1: last.x, y1: last.y, x2: hover.x, y2: hover.y, blocksSight: true, blocksMove: true },
-                    door ? doorColour : accent,
+                    highlight,
                     3 / zoom,
                 );
                 ctx.setLineDash([]);
             }
 
             if (last)
-                dot(ctx, last, 5 / zoom, accent);
+                dot(ctx, last, 5 / zoom, highlight);
 
             if (hover)
-                dot(ctx, hover, 4 / zoom, '#fcf8ec');
+                dot(ctx, hover, 4 / zoom, ink);
 
         },
     };
@@ -263,13 +274,15 @@ function wallTool(change: Change, snap: number, door: boolean): MapTool
  * any wall pans as usual.
  */
 function wallClickTool(
-    colour: string,
     only: (wall: Wall) => boolean,
     act: (scenario: Scenario, wall: Wall) => Scenario,
+    label: (wall: Wall) => string,
     change: Change,
 ): MapTool
 {
     let hover: Wall | undefined;
+    /** Where the pointer is, so the label sits beside it rather than under the finger. */
+    let at: Point | null = null;
 
     return {
         cursor: 'pointer',
@@ -280,25 +293,45 @@ function wallClickTool(
             if (!wall)
                 return false;
 
-            change(act(pointer.scenario, wall));
-            hover = undefined;
+            const next = act(pointer.scenario, wall);
+
+            change(next);
+            // Stays on the wall as it is now, so the label already says what the next click does.
+            hover = next.walls.find((other) => other.id === wall.id);
 
             return true;
         },
-        move: (pointer, pressed) =>
+        move: (pointer) =>
         {
-            hover = pressed ? undefined : wallNear(pointer, only);
+            hover = wallNear(pointer, only);
+            at = pointer.world;
         },
-        up: () => {},
-        key: () => false,
-        cancel: () => false,
         draw: (ctx, zoom) =>
         {
-            if (hover)
-                strokeWall(ctx, hover, colour, 7 / zoom);
+            if (!hover || !at)
+                return;
 
+            // A soft glow under a crisp line, the hinge at each end, and what a click does.
+            ctx.save();
+            ctx.shadowColor = doorColour;
+            ctx.shadowBlur = 16 / zoom;
+            strokeWall(ctx, hover, faded(doorColour, 0.35), 14 / zoom);
+            ctx.restore();
+            strokeWall(ctx, hover, doorColour, 4 / zoom);
+            dot(ctx, { x: hover.x1, y: hover.y1 }, 4.5 / zoom, ink);
+            dot(ctx, { x: hover.x2, y: hover.y2 }, 4.5 / zoom, ink);
+            drawPill(ctx, label(hover), at, zoom, faded(ground, 0.9));
         },
     };
+}
+
+/** What a click with the editor's Doors tool turns a wall into, see nextDoor. */
+function nextDoorLabel({ door }: Wall): string
+{
+    if (!door)
+        return 'Make it a door';
+
+    return door.open ? 'Make it a wall' : 'Open the door';
 }
 
 function spawnTool(change: Change): MapTool
@@ -317,94 +350,11 @@ function spawnTool(change: Change): MapTool
         {
             hover = cellPoint(pointer);
         },
-        up: () => {},
-        key: () => false,
-        cancel: () => false,
         draw: (ctx, zoom) =>
         {
             if (hover)
-                dot(ctx, hover, 8 / zoom, 'rgb(167 126 224 / 0.6)');
+                dot(ctx, hover, 8 / zoom, faded(highlight, 0.6));
 
-        },
-    };
-}
-
-/**
- * Lines the grid up with one drawn on the picture: drag a box over exactly one of its cells.
- * The box sets the cell size, and its corner the offset.
- */
-function alignTool(change: Change): MapTool
-{
-    let start: Point | null = null;
-    let end: Point | null = null;
-
-    return {
-        cursor: 'crosshair',
-        down: (pointer) =>
-        {
-            start = pointer.world;
-            end = pointer.world;
-
-            return true;
-        },
-        move: (pointer, pressed) =>
-        {
-            if (pressed)
-                end = pointer.world;
-
-        },
-        up: (pointer) =>
-        {
-            if (!start || !end)
-                return;
-
-            const width = Math.abs(end.x - start.x);
-            const height = Math.abs(end.y - start.y);
-            const left = Math.min(start.x, end.x);
-            const top = Math.min(start.y, end.y);
-
-            start = null;
-            end = null;
-
-            // A click rather than a drag, or a box too small to be a cell.
-            if ((width + height) * pointer.zoom < 16)
-                return;
-
-            const size = (width + height) / 2;
-            const { scenario } = pointer;
-
-            change({
-                ...scenario,
-                grid: {
-                    ...scenario.grid,
-                    type: scenario.grid.type === 'none' ? 'square' : scenario.grid.type,
-                    size,
-                    offsetX: ((left % size) + size) % size,
-                    offsetY: ((top % size) + size) % size,
-                },
-            });
-        },
-        key: () => false,
-        cancel: () =>
-        {
-            if (!start)
-                return false;
-
-            start = null;
-            end = null;
-
-            return true;
-        },
-        draw: (ctx, zoom) =>
-        {
-            if (!start || !end)
-                return;
-
-            ctx.setLineDash([6 / zoom, 4 / zoom]);
-            ctx.strokeStyle = accent;
-            ctx.lineWidth = 2 / zoom;
-            ctx.strokeRect(start.x, start.y, end.x - start.x, end.y - start.y);
-            ctx.setLineDash([]);
         },
     };
 }
@@ -428,49 +378,43 @@ export function measure(scenario: Scenario, a: Point, b: Point): { points: Point
 /** The ruler: drag from one spot to another to see how far it is. Only this screen sees it. */
 function measureTool(): MapTool
 {
-    let start: Point | null = null;
-    let end: Point | null = null;
+    let drag: Drag | null = null;
 
     return {
         cursor: 'crosshair',
-        down: (pointer) =>
+        down: ({ world }) =>
         {
-            start = pointer.world;
-            end = pointer.world;
+            drag = { start: world, end: world };
 
             return true;
         },
-        move: (pointer, pressed) =>
+        move: ({ world }, pressed) =>
         {
-            if (pressed)
-                end = pointer.world;
+            if (pressed && drag)
+                drag.end = world;
 
         },
         up: () =>
         {
-            start = null;
-            end = null;
+            drag = null;
         },
-        key: () => false,
         cancel: () =>
         {
-            if (!start)
-                return false;
+            const had = drag !== null;
 
-            start = null;
-            end = null;
+            drag = null;
 
-            return true;
+            return had;
         },
         draw: (ctx, zoom, scenario) =>
         {
-            if (!start || !end)
+            if (!drag)
                 return;
 
-            const { points, feet } = measure(scenario, start, end);
+            const { points, feet } = measure(scenario, drag.start, drag.end);
 
-            drawRoute(ctx, points, zoom, '#fcf8ec');
-            drawPill(ctx, `${feet} ft`, end, zoom, 'rgb(30 29 31 / 0.9)');
+            drawRoute(ctx, points, zoom, ink);
+            drawPill(ctx, `${feet} ft`, drag.end, zoom, faded(ground, 0.9));
         },
     };
 }
@@ -478,62 +422,42 @@ function measureTool(): MapTool
 /** The game master's Reveal area: drag a box and everything in it counts as seen before. */
 function revealTool(reveal: (area: Area) => void): MapTool
 {
-    let start: Point | null = null;
-    let end: Point | null = null;
+    let drag: Drag | null = null;
 
     return {
         cursor: 'crosshair',
-        down: (pointer) =>
+        down: ({ world }) =>
         {
-            start = pointer.world;
-            end = pointer.world;
+            drag = { start: world, end: world };
 
             return true;
         },
-        move: (pointer, pressed) =>
+        move: ({ world }, pressed) =>
         {
-            if (pressed)
-                end = pointer.world;
+            if (pressed && drag)
+                drag.end = world;
 
         },
         up: () =>
         {
-            if (start && end)
-            {
-                reveal({
-                    left: Math.min(start.x, end.x),
-                    top: Math.min(start.y, end.y),
-                    right: Math.max(start.x, end.x),
-                    bottom: Math.max(start.y, end.y),
-                });
-            }
+            if (drag)
+                reveal(boxOf(drag.start, drag.end));
 
-            start = null;
-            end = null;
+            drag = null;
         },
-        key: () => false,
         cancel: () =>
         {
-            if (!start)
-                return false;
+            const had = drag !== null;
 
-            start = null;
-            end = null;
+            drag = null;
 
-            return true;
+            return had;
         },
         draw: (ctx, zoom) =>
         {
-            if (!start || !end)
-                return;
+            if (drag)
+                drawBox(ctx, drag, zoom, highlight, true);
 
-            ctx.fillStyle = 'rgb(167 126 224 / 0.15)';
-            ctx.fillRect(start.x, start.y, end.x - start.x, end.y - start.y);
-            ctx.setLineDash([6 / zoom, 4 / zoom]);
-            ctx.strokeStyle = accent;
-            ctx.lineWidth = 2 / zoom;
-            ctx.strokeRect(start.x, start.y, end.x - start.x, end.y - start.y);
-            ctx.setLineDash([]);
         },
     };
 }
@@ -558,17 +482,6 @@ export function wallInBox(wall: Wall, { left, top, right, bottom }: Area): boole
     );
 }
 
-/** The box between two corners, whichever way it was dragged. */
-function boxOf(start: Point, end: Point): Area
-{
-    return {
-        left: Math.min(start.x, end.x),
-        top: Math.min(start.y, end.y),
-        right: Math.max(start.x, end.x),
-        bottom: Math.max(start.y, end.y),
-    };
-}
-
 /**
  * The eraser: click a wall to take it away, or drag a box from the floor and every wall it
  * touches goes when it is let go, once confirmed, as one step to undo. The walls about to go
@@ -577,15 +490,14 @@ function boxOf(start: Point, end: Point): Area
 function eraseTool(change: Change): MapTool
 {
     let hover: Wall | undefined;
-    let start: Point | null = null;
-    let end: Point | null = null;
+    let drag: Drag | null = null;
 
     const inBox = (scenario: Scenario) =>
     {
-        if (!start || !end)
+        if (!drag)
             return [];
 
-        const box = boxOf(start, end);
+        const box = boxOf(drag.start, drag.end);
 
         return scenario.walls.filter((wall) => wallInBox(wall, box));
     };
@@ -604,15 +516,14 @@ function eraseTool(change: Change): MapTool
                 return true;
             }
 
-            start = pointer.world;
-            end = pointer.world;
+            drag = { start: pointer.world, end: pointer.world };
 
             return true;
         },
         move: (pointer, pressed) =>
         {
-            if (pressed && start)
-                end = pointer.world;
+            if (pressed && drag)
+                drag.end = pointer.world;
 
             hover = pressed ? undefined : wallNear(pointer);
         },
@@ -621,8 +532,7 @@ function eraseTool(change: Change): MapTool
             const { scenario } = pointer;
             const doomed = new Set(inBox(scenario).map((wall) => wall.id));
 
-            start = null;
-            end = null;
+            drag = null;
 
             const count = doomed.size === 1 ? 'the wall' : `${doomed.size} walls`;
 
@@ -637,35 +547,26 @@ function eraseTool(change: Change): MapTool
             }
 
         },
-        key: () => false,
         cancel: () =>
         {
-            if (!start)
-                return false;
+            const had = drag !== null;
 
-            start = null;
-            end = null;
+            drag = null;
 
-            return true;
+            return had;
         },
         draw: (ctx, zoom, scenario) =>
         {
             if (hover)
                 strokeWall(ctx, hover, danger, 7 / zoom);
 
-            if (!start || !end)
+            if (!drag)
                 return;
 
             for (const wall of inBox(scenario))
                 strokeWall(ctx, wall, danger, 7 / zoom);
 
-            ctx.fillStyle = 'rgb(224 86 91 / 0.12)';
-            ctx.fillRect(start.x, start.y, end.x - start.x, end.y - start.y);
-            ctx.setLineDash([6 / zoom, 4 / zoom]);
-            ctx.strokeStyle = danger;
-            ctx.lineWidth = 2 / zoom;
-            ctx.strokeRect(start.x, start.y, end.x - start.x, end.y - start.y);
-            ctx.setLineDash([]);
+            drawBox(ctx, drag, zoom, danger, true);
         },
     };
 }
@@ -875,12 +776,12 @@ function propTool(change: Change, placing: PropPicture | null): MapTool
                 ctx.moveTo(top.x, top.y);
                 ctx.lineTo(handles.turn.x, handles.turn.y);
                 ctx.setLineDash([6 / zoom, 4 / zoom]);
-                ctx.strokeStyle = accent;
+                ctx.strokeStyle = highlight;
                 ctx.lineWidth = 1.5 / zoom;
                 ctx.stroke();
                 ctx.setLineDash([]);
-                dot(ctx, handles.scale, 6 / zoom, accent);
-                dot(ctx, handles.turn, 6 / zoom, accent);
+                dot(ctx, handles.scale, 6 / zoom, highlight);
+                dot(ctx, handles.turn, 6 / zoom, highlight);
             }
 
             if (placing && hover)
@@ -890,7 +791,7 @@ function propTool(change: Change, placing: PropPicture | null): MapTool
                 const center = snapCenter(scenario.grid, ghost, hover);
 
                 ctx.setLineDash([6 / zoom, 4 / zoom]);
-                ctx.strokeStyle = accent;
+                ctx.strokeStyle = highlight;
                 ctx.lineWidth = 1.5 / zoom;
                 ctx.strokeRect(center.x - size.width / 2, center.y - size.height / 2, size.width, size.height);
                 ctx.setLineDash([]);
@@ -903,8 +804,7 @@ function propTool(change: Change, placing: PropPicture | null): MapTool
  * The tool for an id, or null for plain panning and token dragging. placing is the library
  * picture the props tool places with each click, null to select and edit placed props. reveal
  * hears the boxes of Reveal area, which change what was seen rather than the scenario. snap is
- * how many points per cell side walls snap to, 0 for none, and door makes the walls tool draw
- * closed doors.
+ * how many points per cell side walls snap to, 0 for none.
  */
 export function createTool(
     id: ToolId,
@@ -912,31 +812,31 @@ export function createTool(
     placing: PropPicture | null = null,
     reveal: (area: Area) => void = () => {},
     snap = 1,
-    door = false,
 ): MapTool | null
 {
-    const isDoor = (wall: Wall) => wall.door !== undefined;
-
     switch (id)
     {
         case 'walls':
-            return wallTool(change, snap, door);
+            return wallTool(change, snap);
         case 'erase':
             return eraseTool(change);
         case 'doors':
-            return wallClickTool(doorColour, () => true, (scenario, wall) => replaceWall(scenario, nextDoor(wall)), change);
+            return wallClickTool(
+                () => true,
+                (scenario, wall) => replaceWall(scenario, nextDoor(wall)),
+                nextDoorLabel,
+                change,
+            );
         case 'open-doors':
             // Play mode: only doors react, so a press anywhere else still pans or drags a token.
             return wallClickTool(
-                doorColour,
-                isDoor,
+                (wall) => wall.door !== undefined,
                 (scenario, wall) => replaceWall(scenario, toggleDoor(wall)),
+                (wall) => (wall.door?.open ? 'Close door' : 'Open door'),
                 change,
             );
         case 'spawn':
             return spawnTool(change);
-        case 'align':
-            return alignTool(change);
         case 'props':
             return propTool(change, placing);
         case 'measure':
@@ -944,6 +844,7 @@ export function createTool(
         case 'reveal':
             return revealTool(reveal);
         case 'select':
+        case 'align':
             return null;
     }
 }

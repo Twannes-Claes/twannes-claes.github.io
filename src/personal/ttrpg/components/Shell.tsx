@@ -17,8 +17,9 @@ interface ShellProps
 
 /**
  * The frame every TTRPG page sits in: the noindex head, the app's root class that
- * styles/ttrpg.css scopes everything under, and the way back to the portfolio, and the dialog that asks before anything is deleted. The app is not
- * linked from the portfolio and is private, so search engines are kept out.
+ * styles/ttrpg.css scopes everything under, the house button, and the dialog that asks before
+ * anything is deleted. The app is not linked from the portfolio and is private, so search
+ * engines are kept out.
  */
 export function Shell({ title, home = '/ttrpg', children }: ShellProps)
 {

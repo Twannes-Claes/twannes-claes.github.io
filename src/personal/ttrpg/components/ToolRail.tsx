@@ -10,9 +10,10 @@ import {
     type IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useEffect } from 'react';
 
 import type { ToolId } from '../map/tools';
+
+import { typing, useKeydown } from './useKeys';
 
 /** The edit tools, with the key that picks each one. Space also picks Move around, see ToolRail. */
 const tools: { id: ToolId; label: string; key: string; icon: IconDefinition }[] = [
@@ -34,44 +35,31 @@ interface ToolRailProps
     onRedo: () => void;
 }
 
-/** The slim column of edit tools on the left, with undo and redo at the bottom. */
+/** The slim column of edit tools on the left, with undo and redo as one stacked control below. */
 export function ToolRail({ tool, onTool, canUndo, canRedo, onUndo, onRedo }: ToolRailProps)
 {
     // A plain letter picks a tool, and Space Move around, unless it is typed into a field or held
     // with Ctrl or Cmd.
-    useEffect(() =>
+    useKeydown((event) =>
     {
-        const keydown = (event: KeyboardEvent) =>
+        if (event.ctrlKey || event.metaKey || event.altKey || typing(event))
+            return;
+
+        // Not passed on, or Space would also press the button that has focus.
+        if (event.key === ' ')
         {
-            if (
-                event.ctrlKey ||
-                event.metaKey ||
-                event.altKey ||
-                event.target instanceof HTMLInputElement ||
-                event.target instanceof HTMLSelectElement
-            )
-                return;
+            event.preventDefault();
+            onTool('select');
 
-            // Not passed on, or Space would also press the button that has focus.
-            if (event.key === ' ')
-            {
-                event.preventDefault();
-                onTool('select');
+            return;
+        }
 
-                return;
-            }
+        const picked = tools.find((entry) => entry.key === event.key.toLowerCase());
 
-            const picked = tools.find((entry) => entry.key === event.key.toLowerCase());
+        if (picked)
+            onTool(picked.id);
 
-            if (picked)
-                onTool(picked.id);
-
-        };
-
-        window.addEventListener('keydown', keydown);
-
-        return () => window.removeEventListener('keydown', keydown);
-    }, [onTool]);
+    });
 
     return (
         <nav className="ttrpg-panel ttrpg-rail" aria-label="Tools">
@@ -91,26 +79,28 @@ export function ToolRail({ tool, onTool, canUndo, canRedo, onUndo, onRedo }: Too
 
             <span className="ttrpg-rail__gap" />
 
-            <button
-                type="button"
-                className="ttrpg-icon-button"
-                aria-label="Undo"
-                title="Undo (Ctrl+Z)"
-                disabled={!canUndo}
-                onClick={onUndo}
-            >
-                <FontAwesomeIcon icon={faRotateLeft} />
-            </button>
-            <button
-                type="button"
-                className="ttrpg-icon-button"
-                aria-label="Redo"
-                title="Redo (Ctrl+Y)"
-                disabled={!canRedo}
-                onClick={onRedo}
-            >
-                <FontAwesomeIcon icon={faRotateRight} />
-            </button>
+            <div className="ttrpg-rail__history" role="group" aria-label="History">
+                <button
+                    type="button"
+                    className="ttrpg-icon-button"
+                    aria-label="Undo"
+                    title="Undo (Ctrl+Z)"
+                    disabled={!canUndo}
+                    onClick={onUndo}
+                >
+                    <FontAwesomeIcon icon={faRotateLeft} />
+                </button>
+                <button
+                    type="button"
+                    className="ttrpg-icon-button"
+                    aria-label="Redo"
+                    title="Redo (Ctrl+Y)"
+                    disabled={!canRedo}
+                    onClick={onRedo}
+                >
+                    <FontAwesomeIcon icon={faRotateRight} />
+                </button>
+            </div>
         </nav>
     );
 }

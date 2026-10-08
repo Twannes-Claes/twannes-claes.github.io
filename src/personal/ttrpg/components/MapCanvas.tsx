@@ -1,9 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useEffectEvent, useRef } from 'react';
 
 import type { FogSettings, Point, PropPicture, Scenario, SharedFog, Token } from '../types';
 
+import { demoCredit, demoScenario } from '../content/scenarios';
 import { defaultFogSettings } from '../map/fog';
-
 import type { ToolId } from '../map/tools';
 import { createMapView, type FrameStats, type MapView, type PendingMove } from '../map/view';
 
@@ -18,8 +18,6 @@ interface MapCanvasProps
     placing: PropPicture | null;
     /** Snap points per cell side for the walls tool, 0 for none. */
     wallSnap?: number;
-    /** The walls tool draws closed doors rather than walls. */
-    wallDoor?: boolean;
     /** Bump to forget everything seen before. */
     fogEpoch: number;
     /** The drawn path waiting for Move or Cancel. */
@@ -42,6 +40,8 @@ interface MapCanvasProps
     onView?: (center: Point) => void;
     /** Hears a right click with nothing half done, to put the tool away. */
     onToolCancel?: () => void;
+    /** Hears the path waiting for its Move or Cancel being dropped. */
+    onPathCancel?: () => void;
     /** What the party has seen, from the server, see SharedFog. */
     shared?: SharedFog | null;
     /** Hears what this screen has seen, to share. Only the game master's screen listens. */
@@ -64,7 +64,6 @@ export function MapCanvas({
     tool,
     placing,
     wallSnap = 1,
-    wallDoor = false,
     fogEpoch,
     pending,
     frozen,
@@ -76,6 +75,7 @@ export function MapCanvas({
     onStats,
     onView,
     onToolCancel,
+    onPathCancel,
     shared = null,
     onExplored,
     fogSettings = defaultFogSettings,
@@ -85,24 +85,14 @@ export function MapCanvas({
     const canvas = useRef<HTMLCanvasElement>(null);
     const view = useRef<MapView | null>(null);
     // The view is made once, so it calls the latest handlers through these rather than the first.
-    const moved = useRef(onTokenMove);
-    const changed = useRef(onScenarioChange);
-    const ended = useRef(onPathEnd);
-    const measured = useRef(onStats);
-    const viewed = useRef(onView);
-    const cancelled = useRef(onToolCancel);
-    const explored = useRef(onExplored);
-
-    useEffect(() =>
-    {
-        moved.current = onTokenMove;
-        changed.current = onScenarioChange;
-        ended.current = onPathEnd;
-        measured.current = onStats;
-        viewed.current = onView;
-        explored.current = onExplored;
-        cancelled.current = onToolCancel;
-    }, [onTokenMove, onScenarioChange, onPathEnd, onStats, onView, onExplored, onToolCancel]);
+    const tokenMoved = useEffectEvent((id: string, to: Point) => onTokenMove?.(id, to));
+    const scenarioChanged = useEffectEvent((next: Scenario) => onScenarioChange?.(next));
+    const pathEnded = useEffectEvent((move: PendingMove) => onPathEnd?.(move));
+    const measured = useEffectEvent((stats: FrameStats) => onStats?.(stats));
+    const viewed = useEffectEvent((center: Point) => onView?.(center));
+    const toolCancelled = useEffectEvent(() => onToolCancel?.());
+    const pathCancelled = useEffectEvent(() => onPathCancel?.());
+    const explored = useEffectEvent((fog: SharedFog) => onExplored?.(fog));
 
     useEffect(() =>
     {
@@ -110,13 +100,14 @@ export function MapCanvas({
             return;
 
         const created = createMapView(canvas.current, {
-            onTokenMove: (id, to) => moved.current?.(id, to),
-            onScenarioChange: (next) => changed.current?.(next),
-            onPathEnd: (move) => ended.current?.(move),
-            onStats: (stats) => measured.current?.(stats),
-            onView: (center) => viewed.current?.(center),
-            onToolCancel: () => cancelled.current?.(),
-            onExplored: (fog) => explored.current?.(fog),
+            onTokenMove: (id, to) => tokenMoved(id, to),
+            onScenarioChange: (next) => scenarioChanged(next),
+            onPathEnd: (move) => pathEnded(move),
+            onStats: (stats) => measured(stats),
+            onView: (center) => viewed(center),
+            onToolCancel: () => toolCancelled(),
+            onPathCancel: () => pathCancelled(),
+            onExplored: (fog) => explored(fog),
         });
 
         view.current = created;
@@ -146,8 +137,8 @@ export function MapCanvas({
 
     useEffect(() =>
     {
-        view.current?.setTool(tool, placing, wallSnap, wallDoor);
-    }, [tool, placing, wallSnap, wallDoor]);
+        view.current?.setTool(tool, placing, wallSnap);
+    }, [tool, placing, wallSnap]);
 
     useEffect(() =>
     {
@@ -192,5 +183,16 @@ export function MapCanvas({
 
     }, [fogEpoch]);
 
-    return <canvas ref={canvas} className="ttrpg-map" aria-label={`Battle map: ${scenario.name}`} />;
+    return (
+        <>
+            <canvas ref={canvas} className="ttrpg-map" aria-label={`Battle map: ${scenario.name}`} />
+            {/* The demo's picture is free to use with attribution, so every map showing it credits
+                its maker: the demo, the example session and its copies, for the GM and players. */}
+            {scenario.background === demoScenario.background && (
+                <a href={demoCredit.url} className="ttrpg-credit" target="_blank" rel="noreferrer">
+                    {demoCredit.text}
+                </a>
+            )}
+        </>
+    );
 }

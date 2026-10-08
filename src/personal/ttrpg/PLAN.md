@@ -425,8 +425,8 @@ they go to Convex file storage, so a 20 MB PNG becomes a few MB.
 ### Grid
 
 - Type: none, square, hex (pointy or flat).
-- **Align to the picture:** many battle map images have a grid drawn on them. Drag a box over one
-  drawn cell and the app sets `size` and `offset` from it. Fine tune with arrow keys.
+- **Align to the picture:** many battle map images have a grid drawn on them. Line it up with
+  the cell size and offset fields.
 - Colour, opacity, show or hide (a hidden grid still drives snapping and movement).
 - Feet per cell, 5 by default.
 
@@ -511,7 +511,7 @@ when it is someone's turn or the fight is over. Turns themselves are called out 
 - **Square:** straight steps 5 ft. Diagonals alternate **5, 10, 5, 10**, counted over the
   whole path: the 1st, 3rd, 5th diagonal cost 5 ft, the 2nd, 4th, 6th cost 10 ft, with
   straight steps in between not resetting the count. So two diagonals and a straight step are
-  20 ft. One rule for every scenario, no setting.
+  20 ft. The grid panel can make every diagonal 5 ft instead, per scenario.
 - **No grid:** the path is a free line, length converted to feet with `feetPerCell / size`.
 
 ### The walk
@@ -704,17 +704,17 @@ parts: the engine and the fog).
   `convex/play.ts` with `map/spawn.ts`; tokens live on every screen, moves written once and
   walked everywhere, Freeze for real. Tried with one browser as a player on dev.
 - **Part 2, built:**
-  - The phone opens on its own token, about 8 cells across, with a ring in its colour that
-    breathes (still, for reduced motion). See `focusOwn` in `map/view.ts`.
-  - Monsters and NPCs from the Monsters button in the play dock (`components/Monsters.tsx`): a
-    name, size, ring colour, picture, and hidden or not, added in the middle of the GM's screen.
-    Hide, show and remove them from the same panel, drag them on the map.
-  - Players only receive monsters a player can see and the GM has not hidden. The server keeps
-    an `inSight` flag on each monster (`convex/sight.ts`), redone by every write that changes
-    sight, with a line test (`inSight` in `map/visibility.ts`) that agrees with the polygons.
-  - The explored fog is shared: the GM's table screen saves what was seen 1.5 s after it last
-    changed, merged on the server (`fog` table, `play.saveFog`), and every screen and reload
-    starts from it. Reset fog raises an epoch, so every screen forgets and a stale save is dropped.
+    - The phone opens on its own token, about 8 cells across, with a ring in its colour that
+      breathes (still, for reduced motion). See `focusOwn` in `map/view.ts`.
+    - Monsters and NPCs from the Monsters button in the play dock (`components/Monsters.tsx`): a
+      name, size, ring colour, picture, and hidden or not, added in the middle of the GM's screen.
+      Hide, show and remove them from the same panel, drag them on the map.
+    - Players only receive monsters a player can see and the GM has not hidden. The server keeps
+      an `inSight` flag on each monster (`convex/sight.ts`), redone by every write that changes
+      sight, with a line test (`inSight` in `map/visibility.ts`) that agrees with the polygons.
+    - The explored fog is shared: the GM's table screen saves what was seen 1.5 s after it last
+      changed, merged on the server (`fog` table, `play.saveFog`), and every screen and reload
+      starts from it. Reset fog raises an epoch, so every screen forgets and a stale save is dropped.
 
 ### Phase 5: Movement
 
@@ -758,7 +758,7 @@ Decided:
 - **Scenario switch:** every player respawns at the new scenario's spawn point.
 - **Fog:** smoky shadow (never flat black), dimmed for seen before, clear for seen now. Sight is
   unlimited up to walls, with soft blurred edges and a light haze in the distance.
-- **Diagonals:** 5, 10, 5, 10, always.
+- **Diagonals:** 5, 10, 5, 10 by default, or 5 each as a grid setting.
 - **Hosts:** fellow GMs can host. They ask from the dashboard, you approve.
 - **Sign in:** Discord only, through Convex Auth. Only GMs sign in, and they all have Discord.
 - **NPCs and monsters:** a name and a picture, round with a border. No HP.

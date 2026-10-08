@@ -81,7 +81,12 @@ export function useWakeLock(active: boolean)
     }, [active]);
 }
 
-/** True once there has been no mouse, touch or key for a while, false again on any of them. */
+/**
+ * True once there has been no mouse, touch or key for a while, false again on any of them. Like
+ * waking a phone, a press on the map while idle only brings the controls back: the faded
+ * controls let presses through, so without this a tap on the table screen meant for a button
+ * would open a door or pan the map instead. A mouse wakes them on moving, before it clicks.
+ */
 export function useIdle(after: number, active: boolean): boolean
 {
     const [idle, setIdle] = useState(false);
@@ -91,19 +96,41 @@ export function useIdle(after: number, active: boolean): boolean
         if (!active)
             return;
 
-        let timer = window.setTimeout(() => setIdle(true), after);
+        // Mirrors idle, which the listeners below cannot read as it was set after they were made.
+        let asleep = false;
+
+        const sleep = () =>
+        {
+            asleep = true;
+            setIdle(true);
+        };
+
+        let timer = window.setTimeout(sleep, after);
 
         const wake = () =>
         {
+            asleep = false;
             setIdle(false);
             window.clearTimeout(timer);
-            timer = window.setTimeout(() => setIdle(true), after);
+            timer = window.setTimeout(sleep, after);
         };
 
-        const events = ['pointermove', 'pointerdown', 'keydown', 'wheel'] as const;
+        // Caught on the way down, before the map's own listener sees it. A press on a panel that
+        // stays in sight, like the fog panel, still works as usual.
+        const press = (event: PointerEvent) =>
+        {
+            if (asleep && event.target instanceof HTMLCanvasElement)
+                event.stopPropagation();
+
+            wake();
+        };
+
+        const events = ['pointermove', 'keydown', 'wheel'] as const;
 
         for (const name of events)
             window.addEventListener(name, wake, { passive: true });
+
+        window.addEventListener('pointerdown', press, { capture: true });
 
         return () =>
         {
@@ -112,6 +139,7 @@ export function useIdle(after: number, active: boolean): boolean
             for (const name of events)
                 window.removeEventListener(name, wake);
 
+            window.removeEventListener('pointerdown', press, { capture: true });
             setIdle(false);
         };
     }, [after, active]);

@@ -1,15 +1,13 @@
 import '../styles/ttrpg.css';
 
-import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
+import { Loading } from '../components/Feedback';
 import { Shell } from '../components/Shell';
+import { useModule } from '../components/useModule';
 import { convexUrl } from '../services/config';
 
-/**
- * Loaded on demand rather than imported, so Convex is not in the portfolio bundle and never runs
- * during the prerender.
- */
+/** Loaded on demand with Convex, see components/useModule.ts. */
 function loadPlayer()
 {
     return import('../components/PlayerView');
@@ -24,27 +22,7 @@ export default function Join()
 {
     const [search] = useSearchParams();
     const session = search.get('s');
-    const [loaded, setLoaded] = useState<Awaited<ReturnType<typeof loadPlayer>> | null>(null);
-
-    useEffect(() =>
-    {
-        if (!session || !convexUrl)
-            return;
-
-        let cancelled = false;
-
-        loadPlayer().then((module) =>
-        {
-            if (!cancelled)
-                setLoaded(module);
-
-        });
-
-        return () =>
-        {
-            cancelled = true;
-        };
-    }, [session]);
+    const loaded = useModule(loadPlayer, Boolean(session && convexUrl));
 
     if (session && loaded)
     {
@@ -59,7 +37,7 @@ export default function Join()
         <Shell title="Join" home="/">
             <main className="ttrpg-placeholder">
                 <h1>Join a session</h1>
-                <p>{session ? 'Connecting' : 'Scan the QR code on the table to join.'}</p>
+                {session ? <Loading>Connecting</Loading> : <p>Scan the QR code on the table to join.</p>}
             </main>
         </Shell>
     );

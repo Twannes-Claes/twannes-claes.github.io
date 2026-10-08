@@ -6,6 +6,8 @@ import type { CreatureSize, Live, Point } from '../types';
 
 import { confirmAction } from '../services/confirm';
 
+import { Popover } from './Popover';
+
 const sizes: CreatureSize[] = ['tiny', 'small', 'medium', 'large', 'huge', 'gargantuan'];
 
 interface MonstersProps
@@ -13,6 +15,9 @@ interface MonstersProps
     live: Live;
     /** Where a new monster goes: the middle of the game master's screen. */
     at: () => Point;
+    onClose: () => void;
+    /** Hears what worked, for the editor's toast. */
+    onDone: (message: string) => void;
     onError: (message: string) => void;
 }
 
@@ -21,7 +26,7 @@ interface MonstersProps
  * one puts it in the middle of the screen, so pan there first; drag it from there. Hidden ones
  * stay off every player's screen and the table screen, except while peeking.
  */
-export function Monsters({ live, at, onError }: MonstersProps)
+export function Monsters({ live, at, onClose, onDone, onError }: MonstersProps)
 {
     const monsters = live.tokens.filter((token) => token.kind === 'npc');
 
@@ -39,20 +44,32 @@ export function Monsters({ live, at, onError }: MonstersProps)
 
         return live
             .addMonster(monster, at())
-            .then(() => '')
+            .then(() =>
+            {
+                onDone(`${monster.name.trim()} is on the map${monster.hidden ? ', hidden' : ''}.`);
+
+                return '';
+            })
             .catch((reason: Error) => reason.message);
     }, '');
 
     const remove = (id: string, name: string) =>
     {
         void confirmAction(`Remove ${name} from the map?`, 'Remove')
-            .then((yes) => (yes ? live.removeMonster(id) : undefined))
+            .then(async (yes) =>
+            {
+                if (!yes)
+                    return;
+
+                await live.removeMonster(id);
+                onDone(`${name} is off the map.`);
+            })
             .catch((reason: Error) => onError(reason.message));
     };
 
     return (
-        <section className="ttrpg-panel ttrpg-dock-panel" aria-label="Monsters">
-            <form action={add} className="ttrpg-monsters__form">
+        <Popover title="Monsters" className="ttrpg-dock-panel" onClose={onClose}>
+            <form action={add} className="ttrpg-popover__body">
                 <label className="ttrpg-field">
                     Name
                     <input name="name" maxLength={30} autoComplete="off" required />
@@ -63,7 +80,7 @@ export function Monsters({ live, at, onError }: MonstersProps)
                         <select name="size" className="ttrpg-select" defaultValue="medium">
                             {sizes.map((size) => (
                                 <option key={size} value={size}>
-                                    {size}
+                                    {size[0].toUpperCase() + size.slice(1)}
                                 </option>
                             ))}
                         </select>
@@ -81,41 +98,51 @@ export function Monsters({ live, at, onError }: MonstersProps)
                     <input name="hidden" type="checkbox" />
                     Hidden from the players
                 </label>
-                {failure && <p role="alert">{failure}</p>}
+                {failure && (
+                    <p className="ttrpg-error" role="alert">
+                        {failure}
+                    </p>
+                )}
                 <button type="submit" className="ttrpg-button ttrpg-button--confirm" disabled={adding}>
                     {adding ? 'Adding' : 'Add to the middle of the screen'}
                 </button>
             </form>
 
             {monsters.length > 0 && (
-                <ul className="ttrpg-rows">
-                    {monsters.map((monster) => (
-                        <li key={monster.id} className="ttrpg-row">
-                            <span className="ttrpg-row__main">{monster.name}</span>
-                            <button
-                                type="button"
-                                className="ttrpg-icon-button ttrpg-icon-button--small"
-                                aria-label={monster.hidden ? `Show ${monster.name}` : `Hide ${monster.name}`}
-                                aria-pressed={monster.hidden === true}
-                                title={monster.hidden ? 'Hidden: show it' : 'Shown: hide it'}
-                                onClick={() =>
-                                    live.hide(monster.id, !monster.hidden).catch((reason: Error) => onError(reason.message))}
-                            >
-                                <FontAwesomeIcon icon={monster.hidden ? faEyeSlash : faEye} />
-                            </button>
-                            <button
-                                type="button"
-                                className="ttrpg-icon-button ttrpg-icon-button--small"
-                                aria-label={`Remove ${monster.name}`}
-                                title="Remove"
-                                onClick={() => remove(monster.id, monster.name)}
-                            >
-                                <FontAwesomeIcon icon={faTrash} />
-                            </button>
-                        </li>
-                    ))}
-                </ul>
+                <div className="ttrpg-popover__body">
+                    <h3 className="ttrpg-subhead">{`On this map · ${monsters.length}`}</h3>
+                    <ul className="ttrpg-rows">
+                        {monsters.map((monster) => (
+                            <li key={monster.id} className={`ttrpg-row${monster.hidden ? ' ttrpg-row--hidden' : ''}`}>
+                                <span className="ttrpg-row__main ttrpg-row__main--swatch">
+                                    <span className="ttrpg-swatch" style={{ background: monster.color }} />
+                                    {monster.name}
+                                </span>
+                                <button
+                                    type="button"
+                                    className="ttrpg-icon-button ttrpg-icon-button--small"
+                                    aria-label={monster.hidden ? `Show ${monster.name}` : `Hide ${monster.name}`}
+                                    aria-pressed={monster.hidden === true}
+                                    title={monster.hidden ? 'Hidden from the players: show it' : 'Shown to the players: hide it'}
+                                    onClick={() =>
+                                        live.hide(monster.id, !monster.hidden).catch((reason: Error) => onError(reason.message))}
+                                >
+                                    <FontAwesomeIcon icon={monster.hidden ? faEyeSlash : faEye} />
+                                </button>
+                                <button
+                                    type="button"
+                                    className="ttrpg-icon-button ttrpg-icon-button--small"
+                                    aria-label={`Remove ${monster.name}`}
+                                    title="Remove"
+                                    onClick={() => remove(monster.id, monster.name)}
+                                >
+                                    <FontAwesomeIcon icon={faTrash} />
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
             )}
-        </section>
+        </Popover>
     );
 }

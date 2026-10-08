@@ -7,6 +7,9 @@ import type { Live } from '../types';
 
 import { confirmAction } from '../services/confirm';
 
+import { Popover } from './Popover';
+import { useKeydown } from './useKeys';
+
 /** The QR code maker, loaded when the code is first shown, see PLAN.md. */
 function loadQr()
 {
@@ -20,14 +23,17 @@ interface LiveControlsProps
     scenarioId: string;
     /** Hears that the session started, so the editor can switch to play mode. */
     onStarted: () => void;
+    /** Hears what worked, for the editor's toast. */
+    onDone: (message: string) => void;
     onError: (message: string) => void;
 }
 
 /**
  * Starting and ending a saved session, beside the Edit and Play switch. Start asks for the
- * password players join with; while live, the QR code that leads to the join page.
+ * password players join with; while live, the players at the table and the QR code that leads
+ * to the join page.
  */
-export function LiveControls({ live, scenarioId, onStarted, onError }: LiveControlsProps)
+export function LiveControls({ live, scenarioId, onStarted, onDone, onError }: LiveControlsProps)
 {
     const [asking, setAsking] = useState(false);
     const [showQr, setShowQr] = useState(false);
@@ -42,6 +48,7 @@ export function LiveControls({ live, scenarioId, onStarted, onError }: LiveContr
                 {
                     setAsking(false);
                     onStarted();
+                    onDone('The session is live. Show the QR code so players can join.');
 
                     return '';
                 })
@@ -52,14 +59,29 @@ export function LiveControls({ live, scenarioId, onStarted, onError }: LiveContr
     const kick = (id: string, name: string) =>
     {
         void confirmAction(`Remove ${name} from the table? They cannot join again until the session starts again.`, 'Remove')
-            .then((yes) => (yes ? live.kick(id) : undefined))
+            .then(async (yes) =>
+            {
+                if (!yes)
+                    return;
+
+                await live.kick(id);
+                onDone(`${name} left the table.`);
+            })
             .catch((reason: Error) => onError(reason.message));
     };
 
     const end = () =>
     {
         void confirmAction('End the session? Players can no longer move until it starts again.', 'End')
-            .then((yes) => (yes ? live.end() : undefined))
+            .then(async (yes) =>
+            {
+                if (!yes)
+                    return;
+
+                await live.end();
+                setShowPlayers(false);
+                onDone('The session has ended.');
+            })
             .catch((reason: Error) => onError(reason.message));
     };
 
@@ -67,34 +89,45 @@ export function LiveControls({ live, scenarioId, onStarted, onError }: LiveContr
     {
         return (
             <>
-                <button type="button" className="ttrpg-segment" onClick={() => setAsking(true)}>
+                <button
+                    type="button"
+                    className="ttrpg-segment"
+                    aria-expanded={asking}
+                    onClick={() => setAsking((open) => !open)}
+                >
                     <FontAwesomeIcon icon={faPlay} />
                     Start
                 </button>
 
                 {asking && (
-                    <form action={start} className="ttrpg-panel ttrpg-start" aria-label="Start the session">
-                        <label className="ttrpg-field">
-                            Password for the players
-                            <input name="password" defaultValue={live.password} autoComplete="off" required />
-                        </label>
-                        <label
-                            className="ttrpg-check"
-                            title="Forget what the party saw of every map last time. Untick to pick up where they left off."
-                        >
-                            <input name="fresh" type="checkbox" defaultChecked />
-                            Start with fresh fog
-                        </label>
-                        {failure && <p role="alert">{failure}</p>}
-                        <div className="ttrpg-sheet__actions">
-                            <button type="submit" className="ttrpg-button ttrpg-button--confirm" disabled={starting}>
-                                Start session
-                            </button>
-                            <button type="button" className="ttrpg-button" onClick={() => setAsking(false)}>
-                                Cancel
-                            </button>
-                        </div>
-                    </form>
+                    <Popover title="Start the session" className="ttrpg-start" dismissOnOutside onClose={() => setAsking(false)}>
+                        <form action={start} className="ttrpg-popover__body">
+                            <label className="ttrpg-field">
+                                Password for the players
+                                <input name="password" defaultValue={live.password} autoComplete="off" required autoFocus />
+                            </label>
+                            <label
+                                className="ttrpg-check"
+                                title="Forget what the party saw of every map last time. Untick to pick up where they left off."
+                            >
+                                <input name="fresh" type="checkbox" defaultChecked />
+                                Start with fresh fog
+                            </label>
+                            {failure && (
+                                <p className="ttrpg-error" role="alert">
+                                    {failure}
+                                </p>
+                            )}
+                            <div className="ttrpg-sheet__actions">
+                                <button type="submit" className="ttrpg-button ttrpg-button--confirm" disabled={starting}>
+                                    {starting ? 'Starting' : 'Start session'}
+                                </button>
+                                <button type="button" className="ttrpg-button" onClick={() => setAsking(false)}>
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
+                    </Popover>
                 )}
             </>
         );
@@ -106,10 +139,11 @@ export function LiveControls({ live, scenarioId, onStarted, onError }: LiveContr
                 type="button"
                 className="ttrpg-segment"
                 aria-pressed={showPlayers}
+                aria-expanded={showPlayers}
                 onClick={() => setShowPlayers((open) => !open)}
             >
                 <FontAwesomeIcon icon={faUsers} />
-                Players {players.length}
+                Players <span className="ttrpg-count">{players.length}</span>
             </button>
             <button
                 type="button"
@@ -126,19 +160,31 @@ export function LiveControls({ live, scenarioId, onStarted, onError }: LiveContr
             </button>
 
             {showPlayers && (
-                <section className="ttrpg-panel ttrpg-start" aria-label="Players">
-                    {players.length === 0 && <p className="ttrpg-dashboard__note">Nobody has joined yet.</p>}
-                    <ul className="ttrpg-rows">
-                        {players.map((player) => (
-                            <li key={player.id} className="ttrpg-row">
-                                <span className="ttrpg-row__main">{player.name}</span>
-                                <button type="button" className="ttrpg-segment" onClick={() => kick(player.id, player.name)}>
-                                    Remove
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                </section>
+                <Popover title="Players" className="ttrpg-start" dismissOnOutside onClose={() => setShowPlayers(false)}>
+                    {players.length === 0 ? (
+                        <div className="ttrpg-empty">
+                            <p>Nobody has joined yet.</p>
+                            <button type="button" className="ttrpg-segment ttrpg-segment--block" onClick={() => setShowQr(true)}>
+                                <FontAwesomeIcon icon={faQrcode} />
+                                Show the QR code
+                            </button>
+                        </div>
+                    ) : (
+                        <ul className="ttrpg-rows">
+                            {players.map((player) => (
+                                <li key={player.id} className="ttrpg-row">
+                                    <span className="ttrpg-row__main ttrpg-row__main--swatch">
+                                        <span className="ttrpg-swatch" style={{ background: player.color }} />
+                                        {player.name}
+                                    </span>
+                                    <button type="button" className="ttrpg-segment" onClick={() => kick(player.id, player.name)}>
+                                        Remove
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </Popover>
             )}
 
             {showQr && <QrCode path={live.joinPath} password={live.password} onClose={() => setShowQr(false)} />}
@@ -178,21 +224,18 @@ function QrCode({ path, password, onClose }: QrCodeProps)
 
         });
 
-        const keydown = (event: KeyboardEvent) =>
-        {
-            if (event.key === 'Escape')
-                onClose();
-
-        };
-
-        window.addEventListener('keydown', keydown);
-
         return () =>
         {
             cancelled = true;
-            window.removeEventListener('keydown', keydown);
         };
-    }, [path, onClose]);
+    }, [path]);
+
+    useKeydown((event) =>
+    {
+        if (event.key === 'Escape')
+            onClose();
+
+    });
 
     // One square per dark module, all in one path.
     const squares = code

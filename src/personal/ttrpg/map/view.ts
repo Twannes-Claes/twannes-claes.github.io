@@ -11,14 +11,16 @@ import {
     markSeen,
     shapeArea,
     shapeSamples,
+    wasSeen,
     type Explored,
     type FogLayers,
 } from './fog.ts';
-import { distance, midpoint } from './geometry.ts';
+import { accent, tooFar } from './colours.ts';
+import { distance, midpoint, onMap, type Area } from './geometry.ts';
 import { extendPath, lineFeet, pathBlocked, pathFeet } from './path.ts';
-import { drawPill, drawRoute, render, tokenRadius, type Viewport } from './render.ts';
+import { drawPill, drawRoute, drawUnknownStep, render, tokenRadius, type Lifted, type Viewport } from './render.ts';
 import { anchorAt, footprintCenter, footprintKeys } from './size.ts';
-import { createTool, type Area, type MapTool, type ToolId, type ToolPointer } from './tools.ts';
+import { createTool, type MapTool, type ToolId, type ToolPointer } from './tools.ts';
 import { insidePolygon, sightSegments, visibilityPolygon, type Segment } from './visibility.ts';
 import { startWalk, walkAt, type Walk } from './walk.ts';
 
@@ -35,14 +37,6 @@ const ownCells = 8;
 const smokeFps = 30;
 /** How long the table screen waits after the fog last changed before it saves it: not every step of a walk. */
 const exploredDelay = 1500;
-const routeColour = '#683c9b';
-const tooFarColour = '#b4443c';
-
-/** A point pulled inside the map, so a token is never walked or dragged off it. */
-function onMap({ width, height }: Scenario, { x, y }: Point): Point
-{
-    return { x: Math.min(Math.max(x, 0), width), y: Math.min(Math.max(y, 0), height) };
-}
 
 /** A path a player drew and let go of, waiting for Move or Cancel. */
 export interface PendingMove
@@ -69,6 +63,8 @@ export interface MapViewOptions
     onView?: (center: Point) => void;
     /** A right click with nothing half done: the page puts the tool away, see MapTool.cancel. */
     onToolCancel?: () => void;
+    /** The path waiting for its Move or Cancel was dropped, by a right click or a new path. */
+    onPathCancel?: () => void;
     /** A while after more of the map was seen, what has been seen in all, to share, see SharedFog. */
     onExplored?: (fog: SharedFog) => void;
 }
@@ -95,7 +91,7 @@ export interface MapView
      */
     setMode: (mode: 'edit' | 'play') => void;
     /** placing is the library picture the props tool places, see createTool in map/tools.ts. */
-    setTool: (id: ToolId, placing?: PropPicture | null, snap?: number, door?: boolean) => void;
+    setTool: (id: ToolId, placing?: PropPicture | null, snap?: number) => void;
     /** The path waiting for Move or Cancel, drawn until it is decided. */
     setPending: (move: PendingMove | null) => void;
     /** Frozen, players cannot draw paths; the game master still drags anything. */
@@ -128,6 +124,8 @@ interface Route
     pointerId: number;
     cells: Cell[];
     points: Point[];
+    /** The finger, while it is in ground nobody has seen, which the path does not go into. */
+    unknown?: Point;
 }
 
 /**
@@ -174,9 +172,11 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     /** Where each finger or the mouse was last seen, by pointer id, for panning and pinching. */
     const pointers = new Map<number, Point>();
     /** The token being dragged freely and the pointer dragging it. */
-    let dragging: { id: string; pointerId: number } | null = null;
+    let dragging: { id: string; pointerId: number; from: Point } | null = null;
     let route: Route | null = null;
     let pending: PendingMove | null = null;
+    /** Set when a right button press already cancelled a move, so its menu event does not too. */
+    let menuHandled = false;
     let frozen = false;
     let peek = false;
     let own: string | null = null;
@@ -185,9 +185,9 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     /** Tokens on their way, by id. */
     const walks = new Map<string, Walk>();
     /** The tokens the last frame showed, by id, so one that is gone can still fade out. */
-    let lastShown = new Map<string, Token & { lift?: number }>();
+    let lastShown = new Map<string, Lifted>();
     /** Tokens fading in or out, by id: since when, which way, and the token as it last showed. */
-    const fading = new Map<string, { at: number; in: boolean; token?: Token & { lift?: number } }>();
+    const fading = new Map<string, { at: number; in: boolean; token?: Lifted }>();
     /** Where the players stood, to a quarter cell, the last time a walk redrew the fog. */
     let walkFogKey = '';
     let tool: MapTool | null = null;
@@ -213,7 +213,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     };
 
     /** Tokens where they show at a moment: walking ones partway along their path. */
-    const tokensAt = (time: number): (Token & { lift?: number })[] =>
+    const tokensAt = (time: number): Lifted[] =>
         tokens.map((token) =>
         {
             const walk = walks.get(token.id);
@@ -234,7 +234,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         fogSettings.fade > 0 ? Math.min(1, Math.max(0, (time - at) / fogSettings.fade)) : 1;
 
     /** Starts a token fading. One fading the other way turns round from where it is, no jump. */
-    const startFade = (id: string, fadingIn: boolean, time: number, token?: Token & { lift?: number }) =>
+    const startFade = (id: string, fadingIn: boolean, time: number, token?: Lifted) =>
     {
         const current = fading.get(id);
         const at =
@@ -249,7 +249,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
      * map. Gone tokens keep showing where they were last while they fade out. Reduced motion
      * shows and hides them at once.
      */
-    const fadeTokens = (visible: (Token & { lift?: number })[], time: number) =>
+    const fadeTokens = (visible: Lifted[], time: number) =>
     {
         const now = new Map(visible.map((token) => [token.id, token]));
 
@@ -398,12 +398,19 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             ? { id: route.id, points: route.points, feet: routeFeet(current, route) }
             : pending;
 
-        if (!shown || shown.points.length < 2)
+        if (!shown)
+            return;
+
+        const end = shown.points[shown.points.length - 1];
+
+        if (route?.unknown)
+            drawUnknownStep(context, end, route.unknown, camera.zoom);
+
+        if (shown.points.length < 2)
             return;
 
         const token = tokens.find((candidate) => candidate.id === shown.id);
-        const colour = token && shown.feet > token.speed ? tooFarColour : routeColour;
-        const end = shown.points[shown.points.length - 1];
+        const colour = token && shown.feet > token.speed ? tooFar : accent;
 
         drawRoute(context, shown.points, camera.zoom, colour);
         drawPill(context, `${shown.feet} ft`, end, camera.zoom, colour);
@@ -622,7 +629,25 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             ? Math.round(lineFeet(current.grid, points))
             : pathFeet(current.grid, cells);
 
-    /** Grows the route towards the finger, never through a wall. */
+    /**
+     * Whether players may walk to a point: anywhere without fog, otherwise only where they see now
+     * or have seen. The seen samples are coarse and the fog is drawn soft over them, so a point
+     * counts when any of the four samples around it was seen, rather than only the one it is in.
+     */
+    const seenGround = (point: Point) =>
+    {
+        if (!fogEnabled || !explored || lit.some((polygon) => insidePolygon(point, polygon)))
+            return true;
+
+        const known = explored;
+        const reach = known.sample / 2;
+
+        return [-reach, reach].some((dx) =>
+            [-reach, reach].some((dy) => wasSeen(known, { x: point.x + dx, y: point.y + dy })),
+        );
+    };
+
+    /** Grows the route towards the finger, never through a wall or into ground nobody has seen. */
     const extendRoute = (current: Scenario, world: Point) =>
     {
         if (!route)
@@ -635,9 +660,25 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
         const { grid, walls } = current;
 
+        route = { ...route, unknown: seenGround(world) ? undefined : world };
+
         if (grid.type !== 'none')
         {
-            const cells = extendPath(grid, walls, route.cells, anchorAt(grid, world, token.size), token.size);
+            const anchor = anchorAt(grid, world, token.size);
+
+            // A cell only counts once the finger is well inside it. Crossing a corner brushes the
+            // cells beside it, which would turn a diagonal step into two straight ones.
+            if (distance(world, footprintCenter(grid, anchor, token.size)) > grid.size * 0.35)
+                return;
+
+            const before = route.cells.length;
+            const grown = extendPath(grid, walls, route.cells, anchor, token.size);
+            // Never into ground the party has not seen, or the walls stopping a path drawn there
+            // would map it out.
+            const unseen = grown.findIndex(
+                (cell, index) => index >= before && !seenGround(footprintCenter(grid, cell, token.size)),
+            );
+            const cells = unseen === -1 ? grown : grown.slice(0, unseen);
 
             route = { ...route, cells, points: cells.map((cell) => footprintCenter(grid, cell, token.size)) };
 
@@ -647,16 +688,19 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         // Without a grid, a new point every quarter cell of finger travel, unless a wall is in the way.
         const last = route.points[route.points.length - 1];
 
-        if (!pathBlocked(walls, [last, world]) && distance(last, world) > grid.size / 4)
+        if (!pathBlocked(walls, [last, world]) && seenGround(world) && distance(last, world) > grid.size / 4)
             route = { ...route, points: [...route.points, world] };
 
     };
 
-    /** Whether a route would end on top of someone else. */
+    /**
+     * Whether a route would end on top of someone the players can see. A monster they cannot see
+     * does not count, or saying no would give away where it hides.
+     */
     const endTaken = (current: Scenario, token: Token, end: Point) =>
     {
         const { grid } = current;
-        const others = tokens.filter((other) => other.id !== token.id);
+        const others = tokens.filter((other) => other.id !== token.id && (!fogEnabled || seenByPlayers(other)));
 
         if (grid.type === 'none')
         {
@@ -701,9 +745,14 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
     const down = (event: PointerEvent) =>
     {
-        // A right click cancels, see contextMenu: it never pans or presses a tool.
+        // A right click cancels, see contextMenu: it never pans or presses a tool. A press on its own
+        // is a fresh click, so a cancel whose menu event never came does not swallow this one.
         if (event.pointerType === 'mouse' && event.button === 2)
+        {
+            menuHandled = false;
+
             return;
+        }
 
         canvas.setPointerCapture(event.pointerId);
 
@@ -745,6 +794,10 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
             const anchor = scenario && scenario.grid.type !== 'none' ? anchorAt(scenario.grid, token, token.size) : null;
 
+            // A new path replaces the one waiting, so its Move or Cancel goes too.
+            if (pending)
+                options.onPathCancel?.();
+
             pending = null;
             route = {
                 id: token.id,
@@ -758,7 +811,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         }
 
         if (token)
-            dragging = { id: token.id, pointerId: event.pointerId };
+            dragging = { id: token.id, pointerId: event.pointerId, from: { x: token.x, y: token.y } };
         else
             pointers.set(event.pointerId, point);
 
@@ -766,6 +819,15 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
     const move = (event: PointerEvent) =>
     {
+        // A right button pressed while the left one holds comes as a move, not a press. Waiting
+        // for its menu event would cancel only on letting go of it.
+        if (event.pointerType === 'mouse' && event.button === 2 && cancelMove())
+        {
+            menuHandled = true;
+
+            return;
+        }
+
         if (route?.pointerId === event.pointerId && scenario)
         {
             extendRoute(scenario, onMap(scenario, toWorld(camera, local(event))));
@@ -877,7 +939,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             toolPointerId = null;
 
             if (tool && scenario)
-                tool.up(toolPointer(event, scenario));
+                tool.up?.(toolPointer(event, scenario));
 
             redraw();
 
@@ -907,23 +969,54 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         options.onTokenMove?.(id, to);
     };
 
+    /** Drops a path being drawn, or puts a dragged token back. False when neither was going on. */
+    const cancelMove = () =>
+    {
+        if (!route && !dragging)
+            return false;
+
+        if (dragging)
+            moveToken(dragging.id, dragging.from);
+
+        route = null;
+        dragging = null;
+        redraw();
+
+        return true;
+    };
+
     /**
-     * A right click cancels: what the tool has half done first, like a drag still held down,
-     * otherwise the tool itself. The browser's own menu would be no use on the map. The menu
-     * event comes for a right click even while the left button holds a drag.
+     * A right click cancels: a token being moved goes back where it was, a path waiting to be
+     * walked is dropped, otherwise what the tool has half done, like a drag still held down, otherwise the tool itself. The browser's own
+     * menu would be no use on the map. The menu event comes for a right click even while the left
+     * button holds a drag, and the left button's let go then finds nothing to finish.
      */
     const contextMenu = (event: MouseEvent) =>
     {
         event.preventDefault();
 
+        if (menuHandled || cancelMove())
+        {
+            menuHandled = false;
+
+            return;
+        }
+
+        if (pending)
+        {
+            options.onPathCancel?.();
+
+            return;
+        }
+
         if (!tool)
             return;
 
-        const dragging = toolPointerId !== null;
+        const held = toolPointerId !== null;
 
         toolPointerId = null;
 
-        if (!tool.cancel() && !dragging)
+        if (!tool.cancel?.() && !held)
             options.onToolCancel?.();
 
         redraw();
@@ -955,7 +1048,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             event.target instanceof HTMLInputElement ||
             !tool ||
             !scenario ||
-            !tool.key(event.key, scenario)
+            !tool.key?.(event.key, scenario)
         )
             return;
 
@@ -1032,9 +1125,9 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             refreshFog();
             redraw();
         },
-        setTool: (id, placing = null, snap = 1, door = false) =>
+        setTool: (id, placing = null, snap = 1) =>
         {
-            tool = createTool(id, changeScenario, placing, revealArea, snap, door);
+            tool = createTool(id, changeScenario, placing, revealArea, snap);
             toolPointerId = null;
             // The tool's cursor, or the stylesheet's grab hand when there is no tool.
             canvas.style.cursor = tool ? tool.cursor : '';

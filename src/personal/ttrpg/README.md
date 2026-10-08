@@ -6,6 +6,11 @@ a password. Not linked from the portfolio and marked `noindex`.
 
 The full design and build order is in [PLAN.md](PLAN.md).
 
+The demo's map, `public/assets/ttrpg/home-in-the-reeds.webp`, is
+[Home in the Reeds](https://explorersguildpublishing.itch.io/free-battlemap-1-home-in-the-reeds)
+by Explorer's Guild Publishing: free to use, even commercially, with attribution, which the demo
+shows on screen.
+
 | Route                | Page              | Who                                 |
 | -------------------- | ----------------- | ----------------------------------- |
 | `/ttrpg`             | `pages/Dashboard` | Game masters: sign in, sessions     |

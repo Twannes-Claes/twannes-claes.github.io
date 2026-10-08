@@ -14,8 +14,10 @@ import { explain, upload } from '../services/backend';
 import { toAvatar } from '../services/images';
 
 import { Backend } from './Backend';
+import { Loading, Toast, Toasts } from './Feedback';
 import { MapCanvas } from './MapCanvas';
 import { MoveSheet } from './MoveSheet';
+import { useMessage } from './useMessage';
 
 /** Ring colours to start from, the portfolio's accent first. The player can pick any other. */
 const ringColours = ['#683c9b', '#2f8f55', '#c27c2c', '#2c7cc2', '#b4443c', '#c2b22c'];
@@ -71,7 +73,7 @@ function Player({ sessionId }: PlayerViewProps)
     }
 
     if (status === undefined)
-        return <Note>Connecting</Note>;
+        return <Note><Loading>Connecting</Loading></Note>;
 
     if (status === null)
     {
@@ -192,9 +194,9 @@ function JoinForm({ sessionId, name }: JoinFormProps)
                         Password
                         <input name="password" type="password" autoComplete="off" required autoFocus />
                     </label>
-                    {wrong && <p role="alert">{wrong}</p>}
+                    {wrong && <p className="ttrpg-error" role="alert">{wrong}</p>}
                     <button type="submit" className="ttrpg-button ttrpg-button--confirm" disabled={checking}>
-                        Next
+                        {checking ? 'Checking' : 'Next'}
                     </button>
                 </form>
             </main>
@@ -220,7 +222,7 @@ function JoinForm({ sessionId, name }: JoinFormProps)
                     Picture, from the camera or your photos
                     <input name="picture" type="file" accept="image/*" />
                 </label>
-                {failure && <p role="alert">{failure}</p>}
+                {failure && <p className="ttrpg-error" role="alert">{failure}</p>}
                 <button type="submit" className="ttrpg-button ttrpg-button--confirm" disabled={creating}>
                     {creating ? 'Joining' : 'Join'}
                 </button>
@@ -248,17 +250,17 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
     const avatarUrl = useMutation(api.play.avatarUrl);
     const setAvatar = useMutation(api.play.setAvatar);
     const [pending, setPending] = useState<PendingMove | null>(null);
-    const [error, setError] = useState('');
+    const message = useMessage();
     const [uploading, setUploading] = useState(false);
 
     if (scenario === undefined || tokens === undefined)
-        return <Note>Opening the map</Note>;
+        return <Note><Loading>Opening the map</Loading></Note>;
 
     if (tokens === null)
         return <Note>You are no longer at this table. Scan the QR code to join again.</Note>;
 
     if (!scenario)
-        return <Note>The GM is setting up the map.</Note>;
+        return <Note><Loading>The GM is setting up the map</Loading></Note>;
 
     const token = tokens.find((candidate) => candidate.id === mine);
 
@@ -270,9 +272,9 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
         const end = pending.points[pending.points.length - 1];
 
         setPending(null);
-        setError('');
+        message.clear();
         move({ tokenId: mine, ...end, path: pending.points }).catch((reason: unknown) =>
-            setError(explain(reason, 'That move did not go through. Try again.')),
+            message.error(explain(reason, 'That move did not go through. Try again.')),
         );
     };
 
@@ -283,7 +285,7 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
         if (!picture)
             return;
 
-        setError('');
+        message.clear();
         setUploading(true);
         toAvatar(picture)
             .then(
@@ -291,13 +293,15 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
                 {
                     const kept = await setAvatar({ sessionId, storageId: await upload(blob, await avatarUrl({ sessionId })) });
 
-                    if (!kept)
-                        setError('That picture was refused. Pick another one.');
+                    if (kept)
+                        message.done('Your token has its new picture.');
+                    else
+                        message.error('That picture was refused. Pick another one.');
 
                 },
-                () => setError('That picture could not be read. Pick another one.'),
+                () => message.error('That picture could not be read. Pick another one.'),
             )
-            .catch((reason: unknown) => setError(explain(reason, 'The picture did not upload. Check the connection and try again.')))
+            .catch((reason: unknown) => message.error(explain(reason, 'The picture did not upload. Check the connection and try again.')))
             .finally(() => setUploading(false));
     };
 
@@ -310,7 +314,7 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
                     <input
                         type="file"
                         accept="image/*"
-                        hidden
+                        className="ttrpg-hidden-input"
                         disabled={uploading}
                         onChange={(event) =>
                         {
@@ -335,23 +339,24 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
                 shared={fog ?? null}
                 fogSettings={fogLook ?? defaultFogSettings}
                 onPathEnd={setPending}
+                onPathCancel={() => setPending(null)}
             />
 
-            {frozen && (
-                <p className="ttrpg-panel ttrpg-toast" role="status">
-                    <FontAwesomeIcon icon={faSnowflake} /> Movement paused by the GM
-                </p>
-            )}
+            <Toasts>
+                {frozen && (
+                    <Toast kind="info" icon={faSnowflake}>
+                        Movement paused by the GM
+                    </Toast>
+                )}
+                {uploading && <Toast kind="busy">Uploading your picture</Toast>}
+                {message.message && (
+                    <Toast kind={message.message.kind} onClose={message.clear}>
+                        {message.message.text}
+                    </Toast>
+                )}
+            </Toasts>
 
-            {error && !frozen && (
-                <p className="ttrpg-panel ttrpg-toast" role="alert">
-                    {error}
-                </p>
-            )}
-
-            {pending && token && (
-                <MoveSheet move={pending} token={token} onMove={confirm} onCancel={() => setPending(null)} />
-            )}
+            <MoveSheet move={pending} token={token} onMove={confirm} onCancel={() => setPending(null)} />
         </main>
     );
 }
