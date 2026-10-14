@@ -85,6 +85,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const status = useQuery(api.play.status, following ? { sessionId } : 'skip');
     const tokens = useQuery(api.play.tokens, following ? { sessionId: id } : 'skip');
     const fog = useQuery(api.play.fog, following ? { sessionId: id } : 'skip');
+    const ping = useQuery(api.play.ping, following ? { sessionId: id } : 'skip');
     const saveFog = useMutation(api.play.saveFog);
     const resetFog = useMutation(api.play.resetFog);
     const setFogLook = useMutation(api.play.setFogLook);
@@ -97,6 +98,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const addNpc = useMutation(api.play.addMonster);
     const hideNpc = useMutation(api.play.hide);
     const removeNpc = useMutation(api.play.removeMonster);
+    const sendPing = useMutation(api.play.sendPing);
 
     useEffect(() =>
     {
@@ -158,6 +160,8 @@ function Session({ sessionId, debug }: SessionEditorProps)
             fog: fog ?? null,
             saveFog: (shared, forget) => friendly(saveFog({ sessionId: id, ...shared, forget })),
             resetFog: () => friendly(resetFog({ sessionId: id })),
+            ping,
+            sendPing: (at) => friendly(sendPing({ sessionId: id, ...at })),
             fogLook: status.fogLook,
             setFogLook: (look) => friendly(setFogLook({ sessionId: id, look })),
         }

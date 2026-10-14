@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useRef } from 'react';
 
-import type { FogSettings, Point, PropPicture, Scenario, SharedFog, Token } from '../types';
+import type { FogSettings, Ping, Point, PropPicture, Scenario, SharedFog, Token } from '../types';
 
 import { demoCredit, demoScenario } from '../content/scenarios';
 import { defaultFogSettings } from '../map/fog';
@@ -49,6 +49,13 @@ interface MapCanvasProps
      * the game master's screen listens.
      */
     onExplored?: (fog: SharedFog, forget?: boolean) => void;
+    /**
+     * The last ping on this map. Each new one flashes; undefined while it loads, so the one already
+     * there when the page opens never does.
+     */
+    ping?: Ping | null;
+    /** A long press on an empty spot in play mode, to ping it. */
+    onPing?: (at: Point) => void;
     /** How the fog looks, see FogSettings. */
     fogSettings?: FogSettings;
     /** Whose fog this is, see setFogSource in map/view.ts. A phone is always live. */
@@ -81,6 +88,8 @@ export function MapCanvas({
     onPathCancel,
     shared = null,
     onExplored,
+    ping,
+    onPing,
     fogSettings = defaultFogSettings,
     fogSource = 'live',
 }: MapCanvasProps)
@@ -96,6 +105,9 @@ export function MapCanvas({
     const toolCancelled = useEffectEvent(() => onToolCancel?.());
     const pathCancelled = useEffectEvent(() => onPathCancel?.());
     const explored = useEffectEvent((fog: SharedFog, forget?: boolean) => onExplored?.(fog, forget));
+    const pinged = useEffectEvent((at: Point) => onPing?.(at));
+    // The last ping seen, to tell a new one from the one already there.
+    const lastPing = useRef<Ping | null | undefined>(undefined);
 
     useEffect(() =>
     {
@@ -111,6 +123,7 @@ export function MapCanvas({
             onToolCancel: () => toolCancelled(),
             onPathCancel: () => pathCancelled(),
             onExplored: (fog, forget) => explored(fog, forget),
+            onPing: (at) => pinged(at),
         });
 
         view.current = created;
@@ -164,15 +177,28 @@ export function MapCanvas({
     }, [own]);
 
     // Before the shared fog: a switch to live forgets the preview first, then takes the party's.
+    // The ping there then is old news too, so the next one seen is where counting starts again.
     useEffect(() =>
     {
         view.current?.setFogSource(fogSource);
+        lastPing.current = undefined;
     }, [fogSource]);
 
     useEffect(() =>
     {
         view.current?.setShared(shared);
     }, [shared]);
+
+    useEffect(() =>
+    {
+        if (ping === undefined)
+            return;
+
+        if (lastPing.current !== undefined && ping && ping.at !== lastPing.current?.at)
+            view.current?.ping(ping, ping.color);
+
+        lastPing.current = ping;
+    }, [ping]);
 
     useEffect(() =>
     {

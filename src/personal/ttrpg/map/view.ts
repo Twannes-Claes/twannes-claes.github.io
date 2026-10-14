@@ -17,7 +17,7 @@ import {
 import { accent, tooFar } from './colours.ts';
 import { distance, midpoint, onMap } from './geometry.ts';
 import { extendPath, lineFeet, pathBlocked, pathFeet } from './path.ts';
-import { drawPill, drawRoute, drawUnknownStep, render, tokenRadius, type Lifted, type Viewport } from './render.ts';
+import { drawPill, drawPing, drawRoute, drawUnknownStep, render, tokenRadius, type Lifted, type Viewport } from './render.ts';
 import { anchorAt, footprintCenter, footprintKeys } from './size.ts';
 import { createTool, type MapTool, type ToolId, type ToolPointer } from './tools.ts';
 import { insidePolygon, sightSegments, visibilityPolygon, type Segment } from './visibility.ts';
@@ -36,6 +36,10 @@ const ownCells = 8;
 const smokeFps = 30;
 /** How long the table screen waits after the fog last changed before it saves it: not every step of a walk. */
 const exploredDelay = 1500;
+/** How long a press is held still before it pings, a little under a phone's own long press. */
+const holdDelay = 450;
+/** How long a ping flashes. */
+const pingLife = 1600;
 
 /** A path a player drew and let go of, waiting for Move or Cancel. */
 export interface PendingMove
@@ -64,6 +68,8 @@ export interface MapViewOptions
     onToolCancel?: () => void;
     /** The path waiting for its Move or Cancel was dropped, by a right click or a new path. */
     onPathCancel?: () => void;
+    /** A long press on an empty spot in play mode, to flash it on every screen, see ping. */
+    onPing?: (at: Point) => void;
     /**
      * A while after more of the map was seen, what has been seen in all, to share, see SharedFog.
      * At once with forget when the game master hid some, so every screen forgets it too.
@@ -100,6 +106,8 @@ export interface MapView
     setFrozen: (frozen: boolean) => void;
     /** The game master looks through the fog, monsters included, while this is on. */
     setPeek: (peek: boolean) => void;
+    /** Flashes a spot: rings spread from it for a moment, in a player's colour or the GM's. */
+    ping: (at: Point, color?: string) => void;
     /**
      * On a player's phone, their own token: the only one they can draw a path from. Every other
      * press pans. Null is the game master's screen, where every token answers.
@@ -197,6 +205,21 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     let toolPointerId: number | null = null;
     /** The mouse panning with its middle button, which shows the closed hand while it does. */
     let middlePan: number | null = null;
+    /** A press held still on an empty spot, which pings once it has been held for holdDelay. */
+    let hold: { pointerId: number; from: Point; timer: number } | null = null;
+    /** The pings flashing now, with when each started on the clock frames are drawn with. */
+    let pings: { x: number; y: number; color?: string; start: number }[] = [];
+    /** When the phone's own token last stopped walking, for its ring, see drawPulse in map/render.ts. */
+    let ownRestedAt = performance.now();
+
+    /** Drops a press that was on its way to a ping. */
+    const letGo = () =>
+    {
+        if (hold)
+            window.clearTimeout(hold.timer);
+
+        hold = null;
+    };
 
     /** A picture ready to draw, or null while it loads; it asks for a frame once it has. */
     const loaded = (src: string): HTMLImageElement | null =>
@@ -226,7 +249,12 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             const { point, lift, done } = walkAt(walk, time);
 
             if (done)
+            {
                 walks.delete(token.id);
+
+                if (token.id === own)
+                    ownRestedAt = time;
+            }
 
             return { ...token, ...point, lift: done ? 0 : lift };
         });
@@ -457,8 +485,11 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             return;
 
         const walking = walks.size > 0;
+
         // The fog or a token still fading in or out.
-        const settling = fading.size > 0 || (layers !== null && time - layers.changedAt < fogSettings.fade);
+        pings = pings.filter((ping) => time - ping.start < pingLife);
+
+        const settling = fading.size > 0 || pings.length > 0 || (layers !== null && time - layers.changedAt < fogSettings.fade);
 
         // Only the smoke is moving: skip frames until its own rate comes round.
         if (!urgent && !walking && !settling && time - drawnAt < 1000 / smokeFps)
@@ -502,6 +533,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             tokens: fadeTokens(fogEnabled && !peek ? shown.filter(seenByPlayers) : shown, time),
             editing: !fogEnabled,
             own,
+            ownRestedAt,
             motion: !calm.matches,
             fog,
             fogLook: { fade: !calm.matches, opacity: peek ? 0.3 : 1, settings: fogSettings },
@@ -527,11 +559,14 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
         tool?.draw(context, camera.zoom, scenario);
 
+        for (const ping of pings)
+            drawPing(context, ping, (time - ping.start) / pingLife, camera.zoom, !calm.matches);
+
         // The smoke drifts, walking tokens move, fog changes and tokens fade, so they ask for
         // the next frame. Reduced motion keeps the smoke still and skips the fades; a walk still
         // plays. Only once: the fog refreshed above may already have asked, and two would draw
         // every frame twice.
-        if ((walking || fading.size > 0 || (fog && !calm.matches)) && frame === 0)
+        if ((walking || fading.size > 0 || pings.length > 0 || (fog && !calm.matches)) && frame === 0)
             frame = requestAnimationFrame(draw);
 
         measure(time, performance.now() - started);
@@ -842,6 +877,25 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         else
             pointers.set(event.pointerId, point);
 
+        // One finger or the mouse held still on the floor in play mode pings; a second finger means
+        // a pinch instead.
+        letGo();
+
+        if (!token && fogEnabled && options.onPing && pointers.size === 1 && scenario)
+        {
+            const at = onMap(scenario, toWorld(camera, point));
+            const { onPing } = options;
+
+            hold = {
+                pointerId: event.pointerId,
+                from: point,
+                timer: window.setTimeout(() =>
+                {
+                    hold = null;
+                    onPing(at);
+                }, holdDelay),
+            };
+        }
     };
 
     const move = (event: PointerEvent) =>
@@ -891,6 +945,11 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             return;
 
         const point = local(event);
+
+        // A press that wanders is a pan, not a ping. A few pixels of wobble still count as still.
+        if (hold?.pointerId === event.pointerId && distance(point, hold.from) > 6)
+            letGo();
+
         const other = [...pointers].find(([id]) => id !== event.pointerId);
 
         pointers.set(event.pointerId, point);
@@ -940,6 +999,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     const up = (event: PointerEvent) =>
     {
         pointers.delete(event.pointerId);
+        letGo();
 
         if (middlePan === event.pointerId)
         {
@@ -1022,6 +1082,10 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     const contextMenu = (event: MouseEvent) =>
     {
         event.preventDefault();
+
+        // A long press on a phone opens the menu too. It is a ping there, never a cancel.
+        if (event instanceof PointerEvent && event.pointerType === 'touch')
+            return;
 
         if (menuHandled || cancelMove())
         {
@@ -1169,6 +1233,11 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             pending = move;
             redraw();
         },
+        ping: (at, color) =>
+        {
+            pings.push({ ...at, color, start: performance.now() });
+            redraw();
+        },
         setPeek: (next) =>
         {
             peek = next;
@@ -1229,6 +1298,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         },
         destroy: () =>
         {
+            letGo();
             observer.disconnect();
             canvas.removeEventListener('pointerdown', down);
             canvas.removeEventListener('pointermove', move);

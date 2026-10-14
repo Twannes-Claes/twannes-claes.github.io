@@ -1,6 +1,6 @@
-import { faGear } from '@fortawesome/free-solid-svg-icons';
+import { faEye, faGear } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useState, type CSSProperties } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 
 import { Popover } from './Popover';
 import { largestScale, smallestScale, type ScreenSettings } from './useScreenSettings';
@@ -48,6 +48,7 @@ const shortcuts: { title: string; keys: [string, string][] }[] = [
         title: 'Player view',
         keys: [
             ['Space', 'Hold to see through fog'],
+            ['Long press', 'Ping a spot for everyone'],
             ['Enter', 'Move along the path'],
             ['Esc', 'Cancel the path'],
             ['Alt', 'Drag a monster freely'],
@@ -55,10 +56,36 @@ const shortcuts: { title: string; keys: [string, string][] }[] = [
     },
 ];
 
+/** On a phone: what a finger does on the map, in place of the keys. */
+const gestures: { title: string; keys: [string, string][] }[] = [
+    {
+        title: 'On the map',
+        keys: [
+            ['Drag token', 'Draw your path'],
+            ['Drag', 'Look around'],
+            ['Pinch', 'Zoom'],
+            ['Long press', 'Ping a spot for everyone'],
+        ],
+    },
+];
+
+interface SettingsProps
+{
+    settings: ScreenSettings;
+    onChange: (settings: ScreenSettings) => void;
+    /** On a player's phone: no controls to hide, and gestures rather than keys. */
+    phone?: boolean;
+    /** Settings of the page's own, above the screen's, like a player's picture. */
+    children?: ReactNode;
+    /** The bar the gear is on has faded out, see useIdle: the panel steps aside with it. */
+    hidden?: boolean;
+}
+
 /**
- * The gear beside the modes: this screen's settings, see useScreenSettings.ts, and every shortcut.
+ * The gear beside the modes: this screen's settings, see useScreenSettings.ts, and every shortcut,
+ * or on a phone every gesture.
  */
-export function Settings({ settings, onChange }: { settings: ScreenSettings; onChange: (settings: ScreenSettings) => void })
+export function Settings({ settings, onChange, phone = false, children, hidden = false }: SettingsProps)
 {
     const [open, setOpen] = useState(false);
     const set = (change: Partial<ScreenSettings>) => onChange({ ...settings, ...change });
@@ -87,9 +114,10 @@ export function Settings({ settings, onChange }: { settings: ScreenSettings; onC
                 <FontAwesomeIcon icon={faGear} />
             </button>
 
-            {open && (
-                <Popover title="Settings" className="ttrpg-start" dismissOnOutside closeButton={false} onClose={() => setOpen(false)}>
+            {open && !hidden && (
+                <Popover title="Settings" className={phone ? 'ttrpg-dock-panel' : 'ttrpg-start'} dismissOnOutside closeButton={false} onClose={() => setOpen(false)}>
                     <div className="ttrpg-popover__body ttrpg-settings">
+                        {children}
                         <section className="ttrpg-shortcuts" aria-label="Control size" title="How big the controls are on this screen">
                             <h3 className="ttrpg-subhead">Control size</h3>
                             <div className="ttrpg-settings__line">
@@ -109,34 +137,25 @@ export function Settings({ settings, onChange }: { settings: ScreenSettings; onC
                                 <span className="ttrpg-settings__value">{`${Math.round(shown * 100)}%`}</span>
                             </div>
                         </section>
-                        <section className="ttrpg-shortcuts" aria-label="Hide controls after" title="In player view, after this long without the mouse">
-                            <h3 className="ttrpg-subhead">Hide controls after</h3>
-                            <div className="ttrpg-settings__choices">
-                                {hideChoices.map((choice) => (
-                                    <button
-                                        key={choice.after}
-                                        type="button"
-                                        className="ttrpg-segment"
-                                        aria-pressed={settings.hideAfter === choice.after}
-                                        onClick={() => set({ hideAfter: choice.after })}
-                                    >
-                                        {choice.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </section>
-                        <section className="ttrpg-shortcuts" aria-label="Frame rate" title="Frames per second in the corner, for checking a screen">
-                            <h3 className="ttrpg-subhead">Frame rate</h3>
-                            <div className="ttrpg-settings__choices">
-                                <button type="button" className="ttrpg-segment" aria-pressed={!settings.frameRate} onClick={() => set({ frameRate: false })}>
-                                    Hidden
-                                </button>
-                                <button type="button" className="ttrpg-segment" aria-pressed={settings.frameRate} onClick={() => set({ frameRate: true })}>
-                                    Shown
-                                </button>
-                            </div>
-                        </section>
-                        {shortcuts.map((group) => (
+                        {!phone && (
+                            <section className="ttrpg-shortcuts" aria-label="Hide controls after" title="In player view, after this long without the mouse">
+                                <h3 className="ttrpg-subhead">Hide controls after</h3>
+                                <div className="ttrpg-settings__choices">
+                                    {hideChoices.map((choice) => (
+                                        <button
+                                            key={choice.after}
+                                            type="button"
+                                            className="ttrpg-segment"
+                                            aria-pressed={settings.hideAfter === choice.after}
+                                            onClick={() => set({ hideAfter: choice.after })}
+                                        >
+                                            {choice.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
+                        {(phone ? gestures : shortcuts).map((group) => (
                             <section key={group.title} className="ttrpg-shortcuts" aria-label={group.title}>
                                 <h3 className="ttrpg-subhead">{group.title}</h3>
                                 <dl>
@@ -151,6 +170,19 @@ export function Settings({ settings, onChange }: { settings: ScreenSettings; onC
                                 </dl>
                             </section>
                         ))}
+                        <div className="ttrpg-subhead ttrpg-subhead--row">
+                            <h3>Frame rate</h3>
+                            <button
+                                type="button"
+                                className="ttrpg-icon-button ttrpg-icon-button--small"
+                                aria-pressed={settings.frameRate}
+                                aria-label="Show the frame rate"
+                                title={settings.frameRate ? 'Hide the frame rate' : 'Show the frame rate, for checking a screen'}
+                                onClick={() => set({ frameRate: !settings.frameRate })}
+                            >
+                                <FontAwesomeIcon icon={faEye} />
+                            </button>
+                        </div>
                     </div>
                 </Popover>
             )}

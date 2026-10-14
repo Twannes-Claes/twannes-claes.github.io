@@ -172,6 +172,14 @@ export const remove = mutation({
         if (guesses)
             await ctx.db.delete('guesses', guesses._id);
 
+        const ping = await ctx.db
+            .query('pings')
+            .withIndex('by_sessionId', (q) => q.eq('sessionId', sessionId))
+            .unique();
+
+        if (ping)
+            await ctx.db.delete('pings', ping._id);
+
         await ctx.db.delete('sessions', sessionId);
 
         return null;

@@ -7,20 +7,20 @@ import { distance, lerp } from './geometry.ts';
  * was confirmed, see Token in types.ts. Nothing is sent while it walks.
  */
 
-/** Milliseconds per cell walked: brisk, but slow enough to follow on the table screen. */
-const stepTime = 220;
+/** Milliseconds per cell walked: steady, so the table can follow it on the big screen. */
+const stepTime = 380;
 /** Even a one cell step takes this long, so it never looks like a jump. */
-const shortest = 300;
+const shortest = 450;
 /** How long a token takes to get up to speed, and to slow down before it stops. */
-const rampTime = 200;
+const rampTime = 250;
+/** How long a token takes to rise as it sets off, and to settle as it arrives. */
+const liftTime = 250;
 
 export interface Walk
 {
     points: Point[];
     start: number;
     duration: number;
-    /** The cells walked, for the little bob on each step. */
-    steps: number;
 }
 
 /**
@@ -59,7 +59,7 @@ export function startWalk(points: Point[], start: number, cellSize: number): Wal
 
     const steps = length / cellSize;
 
-    return { points: rounded(points), start, duration: Math.max(shortest, steps * stepTime), steps };
+    return { points: rounded(points), start, duration: Math.max(shortest, steps * stepTime) };
 }
 
 /**
@@ -84,8 +84,9 @@ function progress(elapsed: number, duration: number): number
 }
 
 /**
- * Where a walking token is at a moment, how high it is in its bob, 0 to 1, and whether the walk
- * is over.
+ * Where a walking token is at a moment, how high it is lifted off the map, 0 to 1, and whether
+ * the walk is over. It rises as it sets off, stays up as it walks and settles as it arrives, like a
+ * piece picked up and put down, rather than hopping on every cell.
  */
 export function walkAt(walk: Walk, time: number): { point: Point; lift: number; done: boolean }
 {
@@ -113,5 +114,8 @@ export function walkAt(walk: Walk, time: number): { point: Point; lift: number; 
         left -= stretch;
     }
 
-    return { point, lift: Math.abs(Math.sin(along * walk.steps * Math.PI)), done: time - walk.start >= walk.duration };
+    const elapsed = time - walk.start;
+    const up = Math.min(1, Math.max(0, Math.min(elapsed, walk.duration - elapsed) / liftTime));
+
+    return { point, lift: (1 - Math.cos(Math.PI * up)) / 2, done: elapsed >= walk.duration };
 }

@@ -143,6 +143,19 @@ export default defineSchema({
         rows: v.number(),
         seen: v.bytes(),
     }).index('by_sessionId_and_scenarioId', ['sessionId', 'scenarioId']),
+    /**
+     * The last ping of a session, one row each: a spot on the map being played that flashes on
+     * every screen, see ping in convex/play.ts. Its own table, as it changes often.
+     */
+    pings: defineTable({
+        sessionId: v.id('sessions'),
+        scenarioId: v.string(),
+        x: v.number(),
+        y: v.number(),
+        /** A player's ring colour. Missing for the host, whose pings take the app's own. */
+        color: v.optional(v.string()),
+        at: v.number(),
+    }).index('by_sessionId', ['sessionId']),
     // One document per scenario, so saving a change to one map never rewrites the others.
     scenarios: defineTable({ sessionId: v.id('sessions'), scenario: scenarioValidator }).index(
         'by_sessionId_and_scenario_id',

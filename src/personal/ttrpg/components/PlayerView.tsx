@@ -9,7 +9,7 @@ import type { FogSettings } from '../types';
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
 import { defaultFogSettings } from '../map/fog';
-import type { PendingMove } from '../map/view';
+import type { FrameStats, PendingMove } from '../map/view';
 import { explain, uploadAvatar } from '../services/backend';
 import { toAvatar } from '../services/images';
 
@@ -17,7 +17,9 @@ import { Backend } from './Backend';
 import { Loading, Toast, Toasts } from './Feedback';
 import { MapCanvas } from './MapCanvas';
 import { MoveSheet } from './MoveSheet';
+import { Settings } from './Settings';
 import { useMessage } from './useMessage';
+import { useScreenSettings } from './useScreenSettings';
 
 /** Ring colours to start from, the portfolio's accent first. The player can pick any other. */
 const ringColours = ['#683c9b', '#2f8f55', '#c27c2c', '#2c7cc2', '#b4443c', '#c2b22c'];
@@ -249,10 +251,14 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
     const scenario = useQuery(api.play.scenario, { sessionId });
     const tokens = useQuery(api.play.tokens, { sessionId });
     const fog = useQuery(api.play.fog, { sessionId });
+    const ping = useQuery(api.play.ping, { sessionId });
     const move = useMutation(api.play.move);
+    const sendPing = useMutation(api.play.sendPing);
     const authToken = useAuthToken();
     const [pending, setPending] = useState<PendingMove | null>(null);
     const message = useMessage();
+    const [screen, setScreen] = useScreenSettings();
+    const [stats, setStats] = useState<FrameStats | null>(null);
     const [uploading, setUploading] = useState(false);
 
     if (scenario === undefined || tokens === undefined)
@@ -309,23 +315,31 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
 
     return (
         <main className="ttrpg-player">
-            <div className="ttrpg-panel ttrpg-modes">
-                <label className="ttrpg-segment" aria-disabled={uploading}>
-                    <FontAwesomeIcon icon={faImage} />
-                    {uploading ? 'Uploading' : 'Change picture'}
-                    <input
-                        type="file"
-                        accept="image/*"
-                        className="ttrpg-hidden-input"
-                        disabled={uploading}
-                        onChange={(event) =>
-                        {
-                            changePicture(event.target.files?.[0]);
-                            event.target.value = '';
-                        }}
-                    />
-                </label>
-            </div>
+            {/* Out of the way of the move sheet, which slides up over the bottom of the screen. */}
+            {!pending && (
+                <div className="ttrpg-panel ttrpg-corner">
+                    <Settings settings={screen} onChange={setScreen} phone>
+                        <section className="ttrpg-shortcuts" aria-label="Your token">
+                            <h3 className="ttrpg-subhead">Your token</h3>
+                            <label className="ttrpg-segment ttrpg-segment--block" aria-disabled={uploading}>
+                                <FontAwesomeIcon icon={faImage} />
+                                {uploading ? 'Uploading' : 'Change picture'}
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="ttrpg-hidden-input"
+                                    disabled={uploading}
+                                    onChange={(event) =>
+                                    {
+                                        changePicture(event.target.files?.[0]);
+                                        event.target.value = '';
+                                    }}
+                                />
+                            </label>
+                        </section>
+                    </Settings>
+                </div>
+            )}
 
             <MapCanvas
                 scenario={scenario}
@@ -342,6 +356,12 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
                 fogSettings={fogLook ?? defaultFogSettings}
                 onPathEnd={setPending}
                 onPathCancel={() => setPending(null)}
+                onStats={screen.frameRate ? setStats : undefined}
+                ping={ping}
+                onPing={(at) =>
+                    void sendPing({ sessionId, ...at }).catch((reason: unknown) =>
+                        message.error(explain(reason, 'That ping did not go through. Try again.')),
+                    )}
             />
 
             <Toasts>
@@ -359,6 +379,12 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
             </Toasts>
 
             <MoveSheet move={pending} token={token} onMove={confirm} onCancel={() => setPending(null)} />
+
+            {screen.frameRate && stats && (
+                <p className="ttrpg-panel ttrpg-stats" aria-hidden="true">
+                    {`${stats.fps} fps · ${stats.frameMs.toFixed(1)} ms · worst ${stats.worstMs.toFixed(1)} ms`}
+                </p>
+            )}
         </main>
     );
 }

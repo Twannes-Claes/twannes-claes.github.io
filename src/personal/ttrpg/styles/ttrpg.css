@@ -470,14 +470,14 @@ html:has(.ttrpg) {
 }
 
 /* The settings' sections: the control size, then every shortcut, keys on the left. */
-.ttrpg-shortcuts dl {
-    display: grid;
-    gap: 0.4rem;
+/* Whatever sits under a section's heading: a slider, choices, a button or the keys. */
+.ttrpg-shortcuts > :not(.ttrpg-subhead) {
     margin-top: 0.5rem;
 }
 
-.ttrpg-shortcuts :is(.ttrpg-settings__line, .ttrpg-settings__choices) {
-    margin-top: 0.5rem;
+.ttrpg-shortcuts dl {
+    display: grid;
+    gap: 0.4rem;
 }
 
 .ttrpg-shortcuts dl > div {
@@ -504,6 +504,7 @@ html:has(.ttrpg) {
  */
 .ttrpg-home,
 .ttrpg-editor > :not(.ttrpg-map),
+.ttrpg-player > :not(.ttrpg-map),
 .ttrpg-popover,
 .ttrpg-tip,
 .ttrpg-confirm {
@@ -895,6 +896,22 @@ html:has(.ttrpg) {
     font-family: var(--ttrpg-mono);
     font-size: 0.75rem;
     pointer-events: none;
+}
+
+/* A phone's settings, in the bottom right where a thumb reaches, see PlayerView.tsx. */
+.ttrpg-corner {
+    position: fixed;
+    right: max(16px, env(safe-area-inset-right));
+    bottom: max(16px, env(safe-area-inset-bottom));
+    z-index: 10;
+    display: flex;
+    padding: 4px;
+}
+
+/* Top right on a phone, which keeps its bottom right for the settings. */
+.ttrpg-player .ttrpg-stats {
+    top: max(16px, env(safe-area-inset-top));
+    bottom: auto;
 }
 
 /* Move or Cancel after drawing a path, at the bottom in thumb reach. */
@@ -1546,11 +1563,19 @@ html:has(.ttrpg) {
     border-top: 1px solid var(--ttrpg-edge);
 }
 
-/* Under the mode switch: starting the session, the players at the table. */
+/* A heading with its one switch beside it, like the frame rate in the settings. */
+.ttrpg-subhead--row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* Under the mode switch: starting the session, the players at the table, the settings. */
 .ttrpg-start {
     top: 72px;
-    /* Viewport units do not zoom with the control size, so the screen is divided by it. */
-    max-height: calc(100dvh / var(--ttrpg-ui, 1) - 96px);
+    /* Clear of the play dock at the bottom. Viewport units do not zoom with the control size, so
+       the screen is divided by it. */
+    max-height: calc(100dvh / var(--ttrpg-ui, 1) - 168px);
 }
 
 /* Above the play dock: the monsters or the fog. */

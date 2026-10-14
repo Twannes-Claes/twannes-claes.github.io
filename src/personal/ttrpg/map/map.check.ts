@@ -567,7 +567,7 @@ assert.deepEqual(keys(extendPath(base, gap, [{ q: 0, r: 0 }], { q: 5, r: 0 }, 'l
     '1,0',
 ]);
 
-// A walk eases from its first point to its last, a little slower than a fifth of a second a cell.
+// A walk eases from its first point to its last, a little over a third of a second a cell.
 const walk = startWalk(
     [
         { x: 0, y: 0 },
@@ -578,13 +578,16 @@ const walk = startWalk(
     100,
 );
 
-assert.equal(walk.duration, 440);
+assert.equal(walk.duration, 760);
 assert.deepEqual(walkAt(walk, 1000).point, { x: 0, y: 0 });
-assert.ok(Math.abs(walkAt(walk, 1220).point.x - 100) < 1e-9);
-assert.deepEqual([walkAt(walk, 1440).point, walkAt(walk, 1440).done], [{ x: 200, y: 0 }, true]);
+assert.ok(Math.abs(walkAt(walk, 1380).point.x - 100) < 1e-9);
+assert.deepEqual([walkAt(walk, 1760).point, walkAt(walk, 1760).done], [{ x: 200, y: 0 }, true]);
 
 // It sets off slower than it walks, and a corner is cut, never more than a quarter step.
 assert.ok(walkAt(walk, 1050).point.x < 50 / 2);
+
+// It lifts once and stays up while it walks, rather than bobbing on every cell, and lands at rest.
+assert.deepEqual([walkAt(walk, 1000).lift, walkAt(walk, 1380).lift, walkAt(walk, 1760).lift], [0, 1, 0]);
 
 const corner = startWalk(
     [

@@ -2,7 +2,7 @@ import { faCheck, faEye, faPen, faSnowflake, faTriangleExclamation } from '@fort
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useEffectEvent, useRef, useState, type DragEvent } from 'react';
 
-import type { FogSettings, Live, PictureBytes, Point, PropPicture, Scenario, Store } from '../types';
+import type { FogSettings, Live, PictureBytes, Ping, Point, PropPicture, Scenario, Store } from '../types';
 
 import { blankScenario, demoTokens } from '../content/scenarios';
 import { defaultFogSettings } from '../map/fog';
@@ -120,6 +120,8 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     // The fog's look: the session's when it is saved, this screen's in the demo. While a slider
     // moves, the draft shows here only, and letting go saves it, see FogPanel.
     const [demoFog, setDemoFog] = useState<FogSettings>(defaultFogSettings);
+    // Pings off a live map stay on this screen.
+    const [localPing, setLocalPing] = useState<Ping | null>(null);
     const [fogDraft, setFogDraft] = useState<FogSettings | null>(null);
     // The middle of the screen, where a new monster goes. A ref: it changes every frame.
     const viewCenter = useRef<Point | null>(null);
@@ -541,6 +543,8 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 onToolCancel={putToolAway}
                 shared={liveMap ? liveMap.fog : null}
                 onExplored={liveMap ? (fog, forget) => fail(liveMap.saveFog(fog, forget)) : undefined}
+                ping={liveMap ? liveMap.ping : localPing}
+                onPing={(at) => (liveMap ? fail(liveMap.sendPing(at)) : setLocalPing({ ...at, at: Date.now() }))}
                 fogSettings={fogSettings}
                 fogSource={liveMap ? 'live' : 'preview'}
             />
@@ -588,7 +592,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                         onError={message.error}
                     />
                 )}
-                <Settings settings={screen} onChange={setScreen} />
+                <Settings settings={screen} onChange={setScreen} hidden={idle} />
             </div>
 
             <Toasts>
@@ -677,7 +681,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 )
             )}
 
-            {mode === 'play' && !pending && panel === 'fog' && (
+            {mode === 'play' && !pending && !idle && panel === 'fog' && (
                 <FogPanel
                     settings={fogSettings}
                     onChange={setFogDraft}
@@ -688,7 +692,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 />
             )}
 
-            {mode === 'play' && !pending && liveMap && panel === 'monsters' && (
+            {mode === 'play' && !pending && !idle && liveMap && panel === 'monsters' && (
                 <Monsters
                     live={liveMap}
                     at={() => viewCenter.current ?? active.spawn}

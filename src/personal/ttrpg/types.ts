@@ -197,6 +197,10 @@ export interface Live
     saveFog: (fog: SharedFog, forget?: boolean) => Promise<void>;
     /** Forgets what everyone has seen of the map being played. */
     resetFog: () => Promise<void>;
+    /** The last ping on the map being played, undefined while it loads, see Ping. */
+    ping: Ping | null | undefined;
+    /** Flashes a spot of the map being played on every screen. */
+    sendPing: (at: Point) => Promise<void>;
     /** How the fog looks on every screen, null until the game master changes it. */
     fogLook: FogSettings | null;
     setFogLook: (look: FogSettings) => Promise<void>;
@@ -232,6 +236,19 @@ export interface SharedFog
     columns: number;
     rows: number;
     seen: ArrayBuffer;
+}
+
+/**
+ * A spot someone at the table flashed on every screen, see convex/play.ts. at is when, by the
+ * server's clock, and tells one ping from the next.
+ */
+export interface Ping
+{
+    x: number;
+    y: number;
+    /** A player's ring colour. Missing for the game master's, which take the app's own. */
+    color?: string;
+    at: number;
 }
 
 /** What the game master fills in to add a monster, see components/Monsters.tsx. */

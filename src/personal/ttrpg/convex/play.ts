@@ -796,3 +796,64 @@ export const open = mutation({
         return null;
     },
 });
+
+/** How soon after one ping the next is taken, so a held finger or a stuck key cannot flood screens. */
+const pingGap = 500;
+
+/**
+ * The last ping on the map being played, for the host and the players. Every screen flashes one
+ * when it changes, never the one already there when the page opens, so the clock stays out of
+ * this query.
+ */
+export const ping = query({
+    args: { sessionId: v.id('sessions') },
+    handler: async (ctx, { sessionId }) =>
+    {
+        const session = await memberOf(ctx, sessionId);
+        const doc = session
+            ? await ctx.db
+                .query('pings')
+                .withIndex('by_sessionId', (q) => q.eq('sessionId', sessionId))
+                .unique()
+            : null;
+
+        if (!session || !doc || !session.live || doc.scenarioId !== session.activeScenarioId)
+            return null;
+
+        return { x: doc.x, y: doc.y, color: doc.color, at: doc.at };
+    },
+});
+
+/** The host or a player at the table flashes a spot on the map being played, on every screen. */
+export const sendPing = mutation({
+    args: { sessionId: v.id('sessions'), x: v.number(), y: v.number() },
+    handler: async (ctx, { sessionId, x, y }) =>
+    {
+        const userId = await requireUser(ctx);
+        const session = await sessionOf(ctx, sessionId);
+        const scenarioId = session.activeScenarioId;
+        const mine = session.ownerId === userId ? null : await ownToken(ctx, sessionId, userId);
+
+        if (session.ownerId !== userId && !mine)
+            throw new ConvexError('Join the session to ping.');
+
+        const scenario = scenarioId && session.live ? await scenarioOf(ctx, sessionId, scenarioId) : null;
+
+        if (!scenarioId || !scenario || !onScenario(scenario, { x, y }))
+            return null;
+
+        const doc = await ctx.db
+            .query('pings')
+            .withIndex('by_sessionId', (q) => q.eq('sessionId', sessionId))
+            .unique();
+        const at = Date.now();
+        const ping = { sessionId, scenarioId, x, y, at, ...(mine ? { color: mine.color } : {}) };
+
+        if (!doc)
+            await ctx.db.insert('pings', ping);
+        else if (at - doc.at >= pingGap)
+            await ctx.db.replace('pings', doc._id, ping);
+
+        return null;
+    },
+});

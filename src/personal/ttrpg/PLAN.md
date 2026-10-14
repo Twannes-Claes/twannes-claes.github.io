@@ -595,7 +595,6 @@ Kept out on purpose so the first version ships. Each is a clean add-on.
 | -------------------- | ------------------------------------------------------------------------------------------- |
 | Initiative tracker   | Turn order, and unlocking movement only for whoever's turn it is (Freeze covers it for now) |
 | Lights               | The `.dd2vtt` light sources, for dark dungeons                                              |
-| Pings                | Tap and hold to flash a spot on every screen                                                |
 | Live path preview    | Show a player's path in play mode while they are still drawing it                           |
 | Lights, darkvision   | Per token vision ranges and light sources                                                   |
 | Dice, HP, conditions | Most tables already do this on paper or in a character app                                  |
@@ -751,6 +750,10 @@ parts: the engine and the fog).
   or a light spell: drag from where it lands out to how far it shines, in whole cells, stopped by
   walls. Hiding forgets what was seen there on every screen, by raising the fog's epoch like a
   reset (`forget` in `play.saveFog`); what a player sees right now stays seen.
+- **Pings:** hold still on an empty spot for a moment, on the table screen or a phone, and rings
+  spread from it on every screen, in the player's colour or the GM's. One row per session in
+  `pings`, the last ping, at most two a second; a screen only flashes pings that arrive while it
+  is open (`ping` and `sendPing` in `convex/play.ts`).
 
 ---
 

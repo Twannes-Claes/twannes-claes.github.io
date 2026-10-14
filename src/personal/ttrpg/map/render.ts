@@ -20,7 +20,7 @@ export interface Viewport
     dpr: number;
 }
 
-/** A token as it shows mid walk: lift is how high it is in its bob, 0 to 1, see map/walk.ts. */
+/** A token as it shows mid walk: lift is how high it is off the map, 0 to 1, see map/walk.ts. */
 export type Lifted = Token & { lift?: number };
 
 /** Everything one frame shows. */
@@ -37,6 +37,9 @@ export interface Scene
     editing: boolean;
     /** On a phone, the player's own token, which gets a pulsing ring. */
     own: string | null;
+    /** When the own token last came to rest, on the clock frames are drawn with. Its ring waits a
+     * moment after that, so it never starts the instant a walk ends. */
+    ownRestedAt: number;
     /** False for people who reduce motion: the ring around the own token stands still. */
     motion: boolean;
     /** Null when the fog is off, like in edit mode. */
@@ -100,6 +103,33 @@ export function drawUnknownStep(ctx: CanvasRenderingContext2D, from: Point, to: 
     ctx.stroke();
     ctx.setLineDash([]);
     drawPill(ctx, 'Unknown', to, zoom, ground);
+}
+
+/**
+ * A ping, progress 0 to 1 through its life: a dot, and three rings spreading from it one after
+ * another and fading, the same size on screen at any zoom. With motion reduced, one still ring
+ * fades out instead. In the player's colour, or the app's own for the GM.
+ */
+export function drawPing(ctx: CanvasRenderingContext2D, at: Point & { color?: string }, progress: number, zoom: number, motion: boolean)
+{
+    const colour = at.color ?? highlight;
+    const fade = 1 - progress;
+    const rings = motion ? [0, 0.2, 0.4].map((delay) => (progress - delay) / 0.6) : [0.5];
+
+    ctx.lineWidth = 3 / zoom;
+
+    for (const ring of rings.filter((step) => step > 0 && step < 1))
+    {
+        ctx.beginPath();
+        ctx.arc(at.x, at.y, (8 + ring * 52) / zoom, 0, Math.PI * 2);
+        ctx.strokeStyle = faded(colour, (motion ? 1 - ring : 1) * fade);
+        ctx.stroke();
+    }
+
+    ctx.beginPath();
+    ctx.arc(at.x, at.y, 6 / zoom, 0, Math.PI * 2);
+    ctx.fillStyle = faded(colour, fade);
+    ctx.fill();
 }
 
 /** A small rounded label, such as the feet a path costs, the same size at any zoom. */
@@ -219,7 +249,7 @@ function drawToken(
     avatar: CanvasImageSource | null,
 )
 {
-    // A walking token grows a touch and its shadow drops on every step, a small hop.
+    // A walking token grows a touch and its shadow drops, as if picked up off the map.
     const lift = token.lift ?? 0;
     const radius = base * (1 + lift * 0.06);
 
@@ -229,45 +259,79 @@ function drawToken(
     ctx.shadowOffsetY = radius * (0.1 + lift * 0.15);
     ctx.beginPath();
     ctx.arc(token.x, token.y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = ground;
+    ctx.fillStyle = token.color;
     ctx.fill();
     ctx.restore();
+
+    // The ring is a frame around the picture rather than a line over its edge, lit from above.
+    const inner = radius * 0.82;
+    const light = ctx.createLinearGradient(token.x, token.y - radius, token.x, token.y + radius);
+
+    light.addColorStop(0, 'rgb(255 255 255 / 0.35)');
+    light.addColorStop(0.5, 'rgb(255 255 255 / 0)');
+    light.addColorStop(1, 'rgb(0 0 0 / 0.3)');
+    ctx.fillStyle = light;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(token.x, token.y, inner, 0, Math.PI * 2);
+    ctx.fillStyle = ground;
+    ctx.fill();
 
     if (avatar)
     {
         ctx.save();
         ctx.clip();
-        ctx.drawImage(avatar, token.x - radius, token.y - radius, radius * 2, radius * 2);
+        ctx.drawImage(avatar, token.x - inner, token.y - inner, inner * 2, inner * 2);
         ctx.restore();
     }
 
-    ctx.lineWidth = radius * 0.18;
-    ctx.strokeStyle = token.color;
+    // Hairlines inside and outside the ring, so it reads on a light map and the picture sits in it.
+    ctx.lineWidth = radius * 0.04;
+    ctx.strokeStyle = 'rgb(0 0 0 / 0.45)';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(token.x, token.y, radius - ctx.lineWidth / 2, 0, Math.PI * 2);
     ctx.stroke();
 
     if (avatar)
         return;
 
     ctx.fillStyle = ink;
-    ctx.font = `600 ${radius * 0.9}px 'Onest Variable', system-ui, sans-serif`;
+    ctx.font = `600 ${inner * 0.9}px 'Onest Variable', system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(token.name.slice(0, 1).toUpperCase(), token.x, token.y + radius * 0.05);
+    ctx.fillText(token.name.slice(0, 1).toUpperCase(), token.x, token.y + inner * 0.05);
 }
+
+/** How long the own token stands still before its ring first shows, how long one pulse lasts, and
+ * how often one starts. */
+const pulseDelay = 1000;
+const pulseTime = 2400;
+const pulseEvery = 4000;
 
 /**
  * A soft ring in the token's colour around a phone's own token, so the player finds themselves at
- * a glance. It breathes out and fades every two seconds, or stays put without motion.
+ * a glance. A moment after the token comes to rest it fades in, drifts out and fades away, then
+ * rests before the next, every four seconds; it stays put without motion. rested is how long the
+ * token has stood still.
  */
-function drawPulse(ctx: CanvasRenderingContext2D, token: Token, base: number, time: number, motion: boolean)
+function drawPulse(ctx: CanvasRenderingContext2D, token: Token, base: number, rested: number, motion: boolean)
 {
-    const phase = motion ? (time % 2000) / 2000 : 0.3;
+    const cycle = (rested - pulseDelay) % pulseEvery;
+
+    if (motion && (rested < pulseDelay || cycle > pulseTime))
+        return;
+
+    const phase = motion ? cycle / pulseTime : 0.5;
+    // Eased out, so it leaves the token quickly and settles as it fades.
+    const spread = 1 - (1 - phase) ** 2;
 
     ctx.save();
-    ctx.globalAlpha *= 0.8 * (1 - phase);
+    ctx.globalAlpha *= 0.45 * Math.sin(Math.PI * phase);
     ctx.beginPath();
-    ctx.arc(token.x, token.y, base * (1.15 + phase * 0.45), 0, Math.PI * 2);
-    ctx.lineWidth = base * 0.12;
+    ctx.arc(token.x, token.y, base * (1.1 + spread * 0.4), 0, Math.PI * 2);
+    ctx.lineWidth = base * 0.08;
     ctx.strokeStyle = token.color;
     ctx.stroke();
     ctx.restore();
@@ -296,7 +360,7 @@ function drawSpawn(ctx: CanvasRenderingContext2D, at: Point, radius: number)
  */
 export function render(
     ctx: CanvasRenderingContext2D,
-    { scenario, background, picture, tokens, editing, own, motion, fog, fogLook, time, beneath }: Scene,
+    { scenario, background, picture, tokens, editing, own, ownRestedAt, motion, fog, fogLook, time, beneath }: Scene,
     camera: Camera,
     viewport: Viewport,
 )
@@ -403,8 +467,9 @@ export function render(
     {
         ctx.globalAlpha = token.alpha ?? 1;
 
-        if (token.id === own)
-            drawPulse(ctx, token, tokenRadius(grid, token.size), time, motion);
+        // Not while it walks: the lift and the trail of fog say enough, and a ring would chase it.
+        if (token.id === own && token.lift === undefined)
+            drawPulse(ctx, token, tokenRadius(grid, token.size), time - ownRestedAt, motion);
 
         drawToken(ctx, token, tokenRadius(grid, token.size), token.avatar ? picture(token.avatar) : null);
     }
