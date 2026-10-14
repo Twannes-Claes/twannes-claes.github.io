@@ -5,7 +5,7 @@ import type { MutationCtx, QueryCtx } from './_generated/server';
  * The running total of stored bytes behind the storage meter, so it never reads every file. It
  * counts the files something keeps: a prop, a map picture or a token picture. An upload on its
  * way, or one refused, is not counted, and is deleted with ctx.storage.delete as it is. A kept
- * file is deleted with dropFile, so the total stays true. pictures:tidy sets it from scratch.
+ * file is deleted with dropFile, so the total stays true.
  */
 
 /** Every kept file's bytes together. */

@@ -159,13 +159,12 @@ async function twinOf(ctx: QueryCtx, ownerId: Id<'users'>, hash: string)
 
     const { _id: id, name, src, width, height, bytes } = twin;
 
-    return { id, name, src, width, height, bytes: bytes ?? 0 };
+    return { id, name, src, width, height, bytes };
 }
 
 /**
  * The prop already in the library with the same content as a picture about to be uploaded, so the
- * browser skips sending it again, see uploadProp in services/backend.ts. Pictures from before the
- * hash existed are never matched.
+ * browser skips sending it again, see uploadProp in services/backend.ts.
  */
 export const findProp = query({
     args: { hash: v.string() },
@@ -265,77 +264,8 @@ export const usage = query({
             .query('pictures')
             .withIndex('by_ownerId', (q) => q.eq('ownerId', ownerId))
             .take(1000);
-        const propBytes = pictures.reduce((sum, picture) => sum + (picture.bytes ?? 0), 0);
+        const propBytes = pictures.reduce((sum, picture) => sum + picture.bytes, 0);
 
         return { propBytes, otherBytes: (await totalBytes(ctx)) - propBytes };
-    },
-});
-
-/** Most rows tidy reads from a table. A table that holds more stops it, see tidy. */
-const tidyLimit = 10000;
-
-/**
- * Run once, with `npx convex run pictures:tidy`, for the files stored before deleting a map,
- * a background or a session freed them. Map pictures still in use are recorded with their
- * session, so they are freed from now on, see freeMaps in sessions.ts, and every other file
- * nothing uses is deleted. Files from the last day stay, as an upload may be on its way. A table
- * too big to read whole stops it before it deletes anything, since a file used from the rows it
- * did not read would look unused. It also sets the storage meter's total, see usage.ts, and the
- * size of every prop, so it can run again whenever the meter looks wrong. Gives the bytes it freed.
- */
-export const tidy = internalMutation({
-    args: {},
-    handler: async (ctx) =>
-    {
-        const pictures = await ctx.db.query('pictures').take(tidyLimit);
-        const tokens = await ctx.db.query('tokens').take(tidyLimit);
-        const recorded = await ctx.db.query('mapPictures').take(tidyLimit);
-        const scenarios = await ctx.db.query('scenarios').take(tidyLimit);
-        const files = await ctx.db.system.query('_storage').take(tidyLimit);
-
-        if ([pictures, tokens, recorded, scenarios, files].some((rows) => rows.length === tidyLimit))
-            throw new Error('Too many rows to read at once, nothing was deleted.');
-
-        const used = new Set<string>([
-            ...pictures.map((picture) => picture.storageId),
-            ...tokens.flatMap((token) => token.avatarId ?? []),
-            ...recorded.map((picture) => picture.storageId),
-        ]);
-        const sessionOf = new Map(scenarios.flatMap(({ sessionId, scenario }) => (scenario.background ? [[scenario.background, sessionId] as const] : [])));
-        let freed = 0;
-        let kept = 0;
-
-        for (const file of files)
-        {
-            if (used.has(file._id))
-            {
-                kept += file.size;
-
-                continue;
-            }
-
-            const src = (await ctx.storage.getUrl(file._id)) ?? '';
-            const sessionId = sessionOf.get(src);
-
-            if (sessionId)
-            {
-                await ctx.db.insert('mapPictures', { sessionId, storageId: file._id, src });
-                kept += file.size;
-            }
-            else if (file._creationTime < Date.now() - 24 * 60 * 60 * 1000)
-            {
-                await ctx.storage.delete(file._id);
-                freed += file.size;
-            }
-        }
-
-        const sizes = new Map(files.map((file) => [file._id, file.size]));
-
-        for (const picture of pictures)
-            await ctx.db.patch('pictures', picture._id, { bytes: sizes.get(picture.storageId) ?? 0 });
-
-        await count(ctx, kept - (await totalBytes(ctx)));
-
-        return freed;
     },
 });

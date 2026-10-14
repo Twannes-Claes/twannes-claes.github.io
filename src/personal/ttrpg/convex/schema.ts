@@ -175,10 +175,10 @@ export default defineSchema({
         src: v.string(),
         width: v.number(),
         height: v.number(),
-        /** The stored file's size, for the storage meter. Missing until pictures:tidy runs. */
-        bytes: v.optional(v.number()),
+        /** The stored file's size, for the storage meter. */
+        bytes: v.number(),
         /** The SHA-256 of the file as picked, so the same picture is not stored twice, see findProp. */
-        hash: v.optional(v.string()),
+        hash: v.string(),
     })
         .index('by_ownerId', ['ownerId'])
         .index('by_ownerId_and_hash', ['ownerId', 'hash'])

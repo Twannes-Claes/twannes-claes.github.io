@@ -29,8 +29,7 @@ export function scenariosOf(ctx: QueryCtx, sessionId: Id<'sessions'>)
 
 /**
  * Deletes the session's map pictures that are not in keep, and their files, see addMap in
- * pictures.ts. Ones younger than spare stay too, see save. Pictures uploaded before mapPictures
- * existed have no row, and stay.
+ * pictures.ts. Ones younger than spare stay too, see save.
  */
 async function freeMaps(ctx: MutationCtx, sessionId: Id<'sessions'>, keep: Set<string>, spare = 0)
 {
@@ -203,7 +202,7 @@ export const load = query({
             src: picture.src,
             width: picture.width,
             height: picture.height,
-            bytes: picture.bytes ?? 0,
+            bytes: picture.bytes,
         }));
         const total = await totalBytes(ctx);
         const maps = await ctx.db
