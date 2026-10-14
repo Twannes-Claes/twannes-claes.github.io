@@ -76,6 +76,8 @@ export function useHistory<T>(initial: () => T)
 
     return {
         present: history.present,
+        /** Every state undo and redo can reach, the present one too. */
+        states: [...history.past, history.present, ...history.future],
         commit,
         undo: () => setHistory(undone),
         redo: () => setHistory(redone),

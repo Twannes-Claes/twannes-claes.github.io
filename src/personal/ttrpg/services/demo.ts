@@ -22,6 +22,8 @@ export const demoStore: Store = {
         ...(await keep(file)),
         id: crypto.randomUUID(),
         name: baseName(file),
+        bytes: file.size,
     }),
+    removeProp: async (picture) => URL.revokeObjectURL(picture.src),
     uploadMap: keep,
 };

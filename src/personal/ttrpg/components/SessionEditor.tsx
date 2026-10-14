@@ -26,6 +26,8 @@ interface Opened
 {
     scenarios: Scenario[];
     library: PropPicture[];
+    /** Every stored file that is not a prop, see load in convex/sessions.ts. */
+    otherBytes: number;
 }
 
 /** Waits for a call, and turns its failure into a message the editor can show. */
@@ -166,6 +168,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
             <MapEditor
                 initial={opened.scenarios}
                 library={opened.library}
+                otherBytes={opened.otherBytes}
                 store={store}
                 debug={debug}
                 live={live}

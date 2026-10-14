@@ -415,7 +415,7 @@ assert.equal(createTool('align', keep), null);
 assert.equal(createTool('select', keep), null);
 
 // Props land one cell per 200 pixels of their longest side.
-const picture = { id: 'barrel', name: 'Barrel', src: 'barrel.png', width: 400, height: 200 };
+const picture = { id: 'barrel', name: 'Barrel', src: 'barrel.png', width: 400, height: 200, bytes: 0 };
 
 assert.deepEqual(placedSize(picture, base), { width: 200, height: 100 });
 

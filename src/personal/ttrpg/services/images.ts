@@ -10,6 +10,8 @@ export interface Converted
     blob: Blob;
     width: number;
     height: number;
+    /** How much it was shrunk, 1 when it already fit. */
+    scale: number;
 }
 
 /**
@@ -28,7 +30,7 @@ export async function toWebp(picture: Blob, maxSide: number): Promise<Converted>
     canvas.getContext('2d')?.drawImage(bitmap, 0, 0, width, height);
     bitmap.close();
 
-    return { blob: await canvas.convertToBlob({ type: 'image/webp', quality: 0.85 }), width, height };
+    return { blob: await canvas.convertToBlob({ type: 'image/webp', quality: 0.85 }), width, height, scale };
 }
 
 /** A token picture's side in pixels: sharp on the 4K screen, about 20 KB as WebP. */
@@ -47,4 +49,22 @@ export async function toAvatar(picture: Blob): Promise<Blob>
     bitmap.close();
 
     return canvas.convertToBlob({ type: 'image/webp', quality: 0.85 });
+}
+
+/** A file size in the largest unit that keeps it above 1, like 240 kB or 12.4 MB, kB at the least. */
+export function fileSize(bytes: number): string
+{
+    const units = ['byte', 'kilobyte', 'megabyte', 'gigabyte'];
+    const step = Math.min(units.length - 1, Math.max(1, Math.floor(Math.log(Math.max(bytes, 1)) / Math.log(1024))));
+    const format = new Intl.NumberFormat(undefined, { style: 'unit', unit: units[step], maximumFractionDigits: 1 });
+
+    return format.format(bytes / 1024 ** step);
+}
+
+/** The SHA-256 of a file in hex, the same for the same picture whatever its name. */
+export async function fingerprint(file: Blob): Promise<string>
+{
+    const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+
+    return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }

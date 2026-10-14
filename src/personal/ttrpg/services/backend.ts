@@ -7,7 +7,7 @@ import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
 
 import { convexUrl } from './config';
-import { baseName, toWebp } from './images';
+import { baseName, fingerprint, toWebp } from './images';
 
 /*
  * The connection to Convex. Only ever reached through a dynamic import(), see pages/, so Convex
@@ -25,17 +25,19 @@ export function explain(reason: unknown, fallback: string): string
 /** Why the server gave null for an upload, see storedPicture in convex/pictures.ts. */
 const refused = 'That file is not a picture, or it is too big.';
 
-/** Map and prop pictures are shrunk to this before uploading: sharp on a 4K screen. */
+/** Map pictures are shrunk to this before uploading: sharp on a 4K screen. */
 const maxSide = 4096;
 
 /**
- * Sends a picture to Convex storage, to a one-time address from convex/pictures.ts, or from
- * convex/play.ts for a player's token.
+ * Props are a few cells on the map, so half that is still sharp zoomed in, at a quarter of the
+ * storage for a big one.
  */
-export async function upload(blob: Blob, address?: string): Promise<Id<'_storage'>>
-{
-    address ??= await client.mutation(api.pictures.uploadUrl, {});
+const propSide = 2048;
 
+/** Sends a host's picture to Convex storage, to a one-time address from convex/pictures.ts. */
+export async function upload(blob: Blob): Promise<Id<'_storage'>>
+{
+    const address = await client.mutation(api.pictures.uploadUrl, {});
     const response = await fetch(address, {
         method: 'POST',
         headers: { 'Content-Type': blob.type },
@@ -50,20 +52,55 @@ export async function upload(blob: Blob, address?: string): Promise<Id<'_storage
     return storageId;
 }
 
+/** Where the HTTP routes in convex/http.ts answer: the deployment's address on .site, not .cloud. */
+const siteUrl = import.meta.env.VITE_CONVEX_SITE_URL || convexUrl.replace(/\.cloud$/, '.site');
+
+/**
+ * Sends a player's token picture to the /avatar route in convex/http.ts, which checks it before it
+ * is stored and deletes their old one. authToken is the anonymous sign in, from useAuthToken. False
+ * when the picture was refused.
+ */
+export async function uploadAvatar(sessionId: string, picture: Blob, authToken: string | null): Promise<boolean>
+{
+    const response = await fetch(`${siteUrl}/avatar?session=${encodeURIComponent(sessionId)}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${authToken ?? ''}`, 'Content-Type': picture.type },
+        body: picture,
+    });
+
+    if (response.status === 413 || response.status === 415 || response.status === 422)
+        return false;
+
+    if (!response.ok)
+        throw new Error('The picture did not upload. Check the connection and try again.');
+
+    return true;
+}
+
 /** The editor's store for one saved session, see Store in types.ts. */
 export function sessionStore(sessionId: Id<'sessions'>): Store
 {
     return {
         uploadProp: async (file) =>
         {
-            const { blob, width, height } = await toWebp(file, maxSide);
+            // A picture already in the library is given back as it is, without sending it again.
+            const hash = await fingerprint(file);
+            const twin = await client.query(api.pictures.findProp, { hash });
+
+            if (twin)
+                return twin;
+
+            const { blob, width, height, scale } = await toWebp(file, propSide);
             const storageId = await upload(blob);
 
+            // The size before shrinking, which sets how big it lands on the map, see placedSize in
+            // map/props.ts, so a shrunk prop lands as big as the picture it came from.
             const picture = await client.mutation(api.pictures.addProp, {
                 storageId,
                 name: baseName(file),
-                width,
-                height,
+                width: Math.round(width / scale),
+                height: Math.round(height / scale),
+                hash,
             });
 
             if (!picture)
@@ -71,21 +108,30 @@ export function sessionStore(sessionId: Id<'sessions'>): Store
 
             return picture;
         },
+        removeProp: async (picture) =>
+        {
+            await client.mutation(api.pictures.removeProp, { pictureId: picture.id as Id<'pictures'> });
+        },
         uploadMap: async (picture) =>
         {
             const { blob, width, height } = await toWebp(picture, maxSide);
-            const src = await client.mutation(api.pictures.addMap, { storageId: await upload(blob) });
+            const storageId = await upload(blob);
+            const src = await client.mutation(api.pictures.addMap, { sessionId, storageId });
 
             if (!src)
                 throw new Error(refused);
 
             return { src, width, height };
         },
-        save: async (scenarios, changed) =>
+        save: async (scenarios, changed, held) =>
         {
             const order = scenarios.map((scenario) => scenario.id);
 
-            await client.mutation(api.sessions.save, { sessionId, order, changed });
+            await client.mutation(api.sessions.save, { sessionId, order, changed, held });
+        },
+        release: async () =>
+        {
+            await client.mutation(api.sessions.release, { sessionId });
         },
     };
 }

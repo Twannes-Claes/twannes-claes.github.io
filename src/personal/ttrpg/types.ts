@@ -83,6 +83,8 @@ export interface PropPicture
     /** The picture's own size in pixels, which sets its size on the map when placed. */
     width: number;
     height: number;
+    /** The stored file's size, for the storage meter in components/PropLibrary.tsx. */
+    bytes: number;
 }
 
 export type CreatureSize = 'tiny' | 'small' | 'medium' | 'large' | 'huge' | 'gargantuan';
@@ -128,10 +130,17 @@ export interface Store
 {
     /** Adds a picture to the game master's prop library. */
     uploadProp: (file: File) => Promise<PropPicture>;
+    /** Takes a picture out of the library and frees its file. */
+    removeProp: (picture: PropPicture) => Promise<void>;
     /** Stores a map's background picture. */
     uploadMap: (picture: Blob) => Promise<StoredPicture>;
-    /** Saves the scenarios, in order, sending only the changed ones. Missing in the demo. */
-    save?: (scenarios: Scenario[], changed: Scenario[]) => Promise<void>;
+    /**
+     * Saves the scenarios, in order, sending only the changed ones. held is every background undo
+     * and redo can still bring back, so its picture is kept. Missing in the demo.
+     */
+    save?: (scenarios: Scenario[], changed: Scenario[], held: string[]) => Promise<void>;
+    /** Frees the map pictures only undo could still bring back, as the editor closes. */
+    release?: () => Promise<void>;
 }
 
 /**

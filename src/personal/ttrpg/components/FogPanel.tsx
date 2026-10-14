@@ -1,5 +1,6 @@
 import { faClockRotateLeft, faCloud } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import type { CSSProperties } from 'react';
 
 import type { FogSettings } from '../types';
 
@@ -52,6 +53,7 @@ function Slider({
                     max={max}
                     step={step}
                     value={value}
+                    style={{ '--fill': `${((value - min) / (max - min)) * 100}%` } as CSSProperties}
                     onChange={(event) => onChange(event.target.valueAsNumber)}
                 />
                 <span className="ttrpg-settings__value">{shown}</span>
@@ -129,7 +131,7 @@ export function FogPanel({ settings, onChange, onCommit, onReset, onResetFog, on
                     onChange={(smoke) => set({ smoke })}
                 />
             </div>
-            <div className="ttrpg-settings__actions">
+            <div className="ttrpg-popover__foot">
                 <button
                     type="button"
                     className="ttrpg-segment ttrpg-segment--block"

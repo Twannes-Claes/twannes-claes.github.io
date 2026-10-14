@@ -1,4 +1,4 @@
-import { faPlay, faQrcode, faStop, faUserXmark, faUsers } from '@fortawesome/free-solid-svg-icons';
+import { faCloud, faEye, faPlay, faQrcode, faStop, faUserXmark, faUsers } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useActionState, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -7,6 +7,7 @@ import type { Live } from '../types';
 
 import { confirmAction } from '../services/confirm';
 
+import { Spinner } from './Feedback';
 import { Popover } from './Popover';
 import { useKeydown } from './useKeys';
 
@@ -118,6 +119,7 @@ export function LiveControls({ live, scenarioId, onStarted, onDone, onError }: L
                                         title="Forget what the party saw last time"
                                         onClick={() => setFreshFog(true)}
                                     >
+                                        <FontAwesomeIcon icon={faCloud} />
                                         Fresh
                                     </button>
                                     <button
@@ -127,6 +129,7 @@ export function LiveControls({ live, scenarioId, onStarted, onDone, onError }: L
                                         title="Pick up where they left off"
                                         onClick={() => setFreshFog(false)}
                                     >
+                                        <FontAwesomeIcon icon={faEye} />
                                         Keep
                                     </button>
                                 </div>
@@ -136,12 +139,13 @@ export function LiveControls({ live, scenarioId, onStarted, onDone, onError }: L
                                     {failure}
                                 </p>
                             )}
-                            <div className="ttrpg-sheet__actions">
-                                <button type="button" className="ttrpg-button" onClick={() => setAsking(false)}>
+                            <div className="ttrpg-popover__foot">
+                                <button type="button" className="ttrpg-segment ttrpg-segment--block" onClick={() => setAsking(false)}>
                                     Cancel
                                 </button>
-                                <button type="submit" className="ttrpg-button ttrpg-button--confirm" disabled={starting}>
-                                    {starting ? 'Starting' : 'Start session'}
+                                <button type="submit" className="ttrpg-segment ttrpg-segment--block ttrpg-segment--confirm" disabled={starting}>
+                                    {starting ? <Spinner /> : <FontAwesomeIcon icon={faPlay} />}
+                                    {starting ? 'Starting' : 'Start'}
                                 </button>
                             </div>
                         </form>
@@ -285,7 +289,7 @@ function QrCode({ path, password, onClose }: QrCodeProps)
                 <p className="ttrpg-qr__next">Then type the password</p>
                 <p className="ttrpg-qr__password">{password}</p>
                 {code && <p className="ttrpg-qr__url">{code.url}</p>}
-                <p className="ttrpg-qr__close">Click anywhere or press Esc to close</p>
+                <p className="ttrpg-qr__close">Click anywhere or press <kbd>Esc</kbd> to close</p>
             </div>
         </div>,
         document.querySelector('.ttrpg') ?? document.body,

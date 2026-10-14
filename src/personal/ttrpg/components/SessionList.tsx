@@ -14,7 +14,7 @@ import { Loading } from './Feedback';
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
 
 /**
- * The host's sessions, newest first. A new one opens in the editor; the example map only joins
+ * The host's sessions, newest first. A new one opens in the editor; the demo map only joins
  * the list. The pencil turns a session's name into a field, saved on Enter or a click away; Esc
  * keeps the old name.
  */
@@ -49,7 +49,7 @@ export function SessionList()
         setProblem('');
         setAddingExample(true);
         createExample({})
-            .catch(() => setProblem('The example was not added. Try again.'))
+            .catch(() => setProblem('The demo map was not added. Try again.'))
             .finally(() => setAddingExample(false));
     };
 
@@ -164,7 +164,7 @@ export function SessionList()
                 onClick={addExample}
             >
                 <FontAwesomeIcon icon={faMap} />
-                {addingExample ? 'Adding the example' : 'Add the example map'}
+                {addingExample ? 'Adding the demo map' : 'Add the demo map'}
             </button>
             {(failure || problem) && (
                 <p className="ttrpg-error" role="alert">

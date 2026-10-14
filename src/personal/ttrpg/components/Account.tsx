@@ -11,6 +11,7 @@ import { Backend } from './Backend';
 import { Loading, Spinner } from './Feedback';
 import { HostList } from './HostList';
 import { SessionList } from './SessionList';
+import { StorageMeter } from './StorageMeter';
 
 /**
  * The dashboard behind sign in: the host's sessions, asking to host, and for the owner the hosts,
@@ -51,6 +52,7 @@ function Home()
             </section>
 
             {hosting && <SessionList />}
+            {hosting && <Storage />}
             {me.role === 'owner' && <HostList />}
             {me.role === 'guest' && <AskToHost />}
             {me.role === 'asked' && (
@@ -63,6 +65,18 @@ function Home()
                 </section>
             )}
         </>
+    );
+}
+
+/** The whole plan's storage, shared by every host, with this host's props marked in it. */
+function Storage()
+{
+    const usage = useQuery(api.pictures.usage);
+
+    return (
+        <section className="ttrpg-panel ttrpg-card" aria-label="Storage">
+            {usage ? <StorageMeter {...usage} plan /> : <Loading>Adding up the files</Loading>}
+        </section>
     );
 }
 

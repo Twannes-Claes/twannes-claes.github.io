@@ -1,6 +1,6 @@
 import { faImage, faSnowflake } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useAuthActions, useConvexAuth } from '@convex-dev/auth/react';
+import { useAuthActions, useAuthToken, useConvexAuth } from '@convex-dev/auth/react';
 import { useConvex, useMutation, useQuery } from 'convex/react';
 import { useActionState, useEffect, useState, type ReactNode } from 'react';
 
@@ -10,7 +10,7 @@ import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
 import { defaultFogSettings } from '../map/fog';
 import type { PendingMove } from '../map/view';
-import { explain, upload } from '../services/backend';
+import { explain, uploadAvatar } from '../services/backend';
 import { toAvatar } from '../services/images';
 
 import { Backend } from './Backend';
@@ -126,8 +126,7 @@ function JoinForm({ sessionId, name }: JoinFormProps)
 {
     const convex = useConvex();
     const join = useMutation(api.play.join);
-    const avatarUrl = useMutation(api.play.avatarUrl);
-    const setAvatar = useMutation(api.play.setAvatar);
+    const authToken = useAuthToken();
     const [password, setPassword] = useState<string | null>(null);
     const [colour] = useState(() => ringColours[Math.floor(Math.random() * ringColours.length)]);
 
@@ -172,7 +171,7 @@ function JoinForm({ sessionId, name }: JoinFormProps)
                     .then(async () =>
                     {
                         if (blob)
-                            await setAvatar({ sessionId, storageId: await upload(blob, await avatarUrl({ sessionId })) });
+                            await uploadAvatar(sessionId, blob, authToken);
 
                         return '';
                     })
@@ -247,8 +246,7 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
     const tokens = useQuery(api.play.tokens, { sessionId });
     const fog = useQuery(api.play.fog, { sessionId });
     const move = useMutation(api.play.move);
-    const avatarUrl = useMutation(api.play.avatarUrl);
-    const setAvatar = useMutation(api.play.setAvatar);
+    const authToken = useAuthToken();
     const [pending, setPending] = useState<PendingMove | null>(null);
     const message = useMessage();
     const [uploading, setUploading] = useState(false);
@@ -279,7 +277,7 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
     };
 
     // A new picture for the token, or a first one for a player who joined without. The old one is
-    // deleted by the server, see setAvatar in convex/play.ts.
+    // deleted by the server, see keepAvatar in convex/play.ts.
     const changePicture = (picture: File | undefined) =>
     {
         if (!picture)
@@ -291,7 +289,7 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
             .then(
                 async (blob) =>
                 {
-                    const kept = await setAvatar({ sessionId, storageId: await upload(blob, await avatarUrl({ sessionId })) });
+                    const kept = await uploadAvatar(sessionId, blob, authToken);
 
                     if (kept)
                         message.done('Your token has its new picture.');

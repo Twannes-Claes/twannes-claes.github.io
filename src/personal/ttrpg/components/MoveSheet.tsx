@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { faPersonWalking } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { useState, type CSSProperties } from 'react';
 
 import type { Token } from '../types';
 
@@ -90,7 +92,10 @@ function Sheet({ move, token, closing, onMove, onCancel, onGone }: SheetProps)
             }}
         >
             <div className="ttrpg-sheet__head">
-                <span className="ttrpg-swatch" style={{ background: token.color }} />
+                {/* The token as it is on the map: its picture, or its initial, in its ring colour. */}
+                <span className="ttrpg-sheet__avatar" style={{ borderColor: token.color }} aria-hidden="true">
+                    {token.avatar ? <img src={token.avatar} alt="" /> : token.name.charAt(0)}
+                </span>
                 <span className="ttrpg-sheet__who">
                     <strong>{token.name}</strong>
                     <span className={move.blocked || over ? 'ttrpg-sheet__warning' : undefined}>{note}</span>
@@ -100,21 +105,28 @@ function Sheet({ move, token, closing, onMove, onCancel, onGone }: SheetProps)
                     <small> / {token.speed} ft</small>
                 </span>
             </div>
-            {/* How much of the token's speed the path uses, red once past it. */}
-            <div className={over ? 'ttrpg-sheet__bar ttrpg-sheet__bar--over' : 'ttrpg-sheet__bar'} aria-hidden="true">
+            {/* How much of the token's speed the path uses, notched every 5 ft, red once past it. */}
+            <div
+                className={over ? 'ttrpg-sheet__bar ttrpg-sheet__bar--over' : 'ttrpg-sheet__bar'}
+                style={{ '--steps': Math.max(1, token.speed / 5) } as CSSProperties}
+                aria-hidden="true"
+            >
                 <span style={{ width: `${Math.min(100, (move.feet / token.speed) * 100)}%` }} />
             </div>
-            <div className="ttrpg-sheet__actions">
-                <button type="button" className="ttrpg-button" onClick={onCancel}>
+            <div className="ttrpg-popover__foot">
+                <button type="button" className="ttrpg-segment ttrpg-segment--block" onClick={onCancel}>
                     Cancel
+                    <kbd>Esc</kbd>
                 </button>
                 <button
                     type="button"
-                    className="ttrpg-button ttrpg-button--confirm"
+                    className="ttrpg-segment ttrpg-segment--block ttrpg-segment--confirm"
                     disabled={move.blocked}
                     onClick={onMove}
                 >
+                    <FontAwesomeIcon icon={faPersonWalking} />
                     Move
+                    <kbd>Enter</kbd>
                 </button>
             </div>
         </div>

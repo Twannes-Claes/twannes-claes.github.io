@@ -271,7 +271,7 @@ What the server checks beyond who is asking:
   pictures, up to 15 MB, or 512 KB for a player's token. Anything else is deleted. A token's old
   picture is deleted when it gets a new one.
 - **Sizes.** Session names up to 60 characters, character names 30, passwords 50, ring colours
-  `#rrggbb`, 100 maps per session, 30 players per table.
+  `#rrggbb`, 100 maps per session, 12 players per table.
 
 ---
 

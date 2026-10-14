@@ -1,9 +1,12 @@
-import { faUpload } from '@fortawesome/free-solid-svg-icons';
+import { faTrashCan, faUpload } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import type { ChangeEvent } from 'react';
 
 import type { PropPicture } from '../types';
 
+import { fileSize } from '../services/images';
+
+import { StorageMeter } from './StorageMeter';
 import { useKeydown } from './useKeys';
 
 interface PropLibraryProps
@@ -13,14 +16,19 @@ interface PropLibraryProps
     placing: PropPicture | null;
     onPick: (picture: PropPicture | null) => void;
     onUpload: (files: File[]) => void;
+    /** Deletes a picture and its placed copies, after asking, see removePicture in MapEditor.tsx. */
+    onRemove: (picture: PropPicture) => void;
+    /** The size of every stored file besides the props, see load in convex/sessions.ts. */
+    otherBytes: number;
 }
 
 /**
  * The game master's own prop pictures, shown with the Props tool. Pick one and every click on
  * the map places it; pick it again, or press Esc, to go back to moving and scaling placed props.
+ * The bin on a hovered tile deletes the picture, which frees its storage.
  * There is no built-in set, everyone brings the art they own, see PLAN.md.
  */
-export function PropLibrary({ pictures, placing, onPick, onUpload }: PropLibraryProps)
+export function PropLibrary({ pictures, placing, onPick, onUpload, onRemove, otherBytes }: PropLibraryProps)
 {
     useKeydown((event) =>
     {
@@ -39,18 +47,10 @@ export function PropLibrary({ pictures, placing, onPick, onUpload }: PropLibrary
     return (
         <section className="ttrpg-panel ttrpg-properties ttrpg-settings" aria-label="Props">
             <h2>Props</h2>
-            {placing ? (
-                <p className="ttrpg-settings__hint">
-                    Click the map to place it. <kbd>Esc</kbd> done
-                </p>
-            ) : (
-                <p className="ttrpg-settings__hint">
-                    Pick a picture to place it. Drag a placed prop to move it, its corner to scale,
-                    its top handle to turn. <kbd>Del</kbd> removes, hold <kbd>Alt</kbd>: no snap
-                </p>
-            )}
 
-            {pictures.length > 0 && (
+            {pictures.length === 0 ? (
+                <p className="ttrpg-empty">Upload pictures you own to place them.</p>
+            ) : (
                 <ul className="ttrpg-library">
                     {pictures.map((picture) => (
                         <li key={picture.id}>
@@ -58,17 +58,26 @@ export function PropLibrary({ pictures, placing, onPick, onUpload }: PropLibrary
                                 type="button"
                                 className="ttrpg-library__item"
                                 aria-pressed={placing?.id === picture.id}
-                                title={picture.name}
+                                title={`${picture.name}, ${fileSize(picture.bytes)}`}
                                 onClick={() => onPick(placing?.id === picture.id ? null : picture)}
                             >
                                 <img src={picture.src} alt={picture.name} />
+                            </button>
+                            <button
+                                type="button"
+                                className="ttrpg-icon-button ttrpg-library__remove"
+                                aria-label={`Delete ${picture.name}`}
+                                title="Delete"
+                                onClick={() => onRemove(picture)}
+                            >
+                                <FontAwesomeIcon icon={faTrashCan} />
                             </button>
                         </li>
                     ))}
                 </ul>
             )}
 
-            <label className="ttrpg-segment">
+            <label className="ttrpg-segment ttrpg-segment--block">
                 <FontAwesomeIcon icon={faUpload} />
                 Upload pictures
                 <input
@@ -79,6 +88,29 @@ export function PropLibrary({ pictures, placing, onPick, onUpload }: PropLibrary
                     onChange={picked}
                 />
             </label>
+
+            <StorageMeter
+                propBytes={pictures.reduce((sum, picture) => sum + picture.bytes, 0)}
+                otherBytes={otherBytes}
+            />
+
+            {/* Moving, scaling and turning need no words, the handles and cursor on the map show them. */}
+            <ul className="ttrpg-keys" aria-label="Keys">
+                {placing ? (
+                    <li>
+                        <kbd>Esc</kbd> Stop placing
+                    </li>
+                ) : (
+                    <>
+                        <li>
+                            <kbd>Del</kbd> Remove
+                        </li>
+                        <li>
+                            <kbd>Alt</kbd> No snap
+                        </li>
+                    </>
+                )}
+            </ul>
         </section>
     );
 }

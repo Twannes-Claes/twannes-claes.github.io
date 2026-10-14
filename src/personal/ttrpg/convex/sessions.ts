@@ -18,12 +18,42 @@ function tidyName(name: string): string
 }
 
 /** Every scenario document of a session, which is a handful, so one batch reads them all. */
-function scenariosOf(ctx: QueryCtx, sessionId: Id<'sessions'>)
+export function scenariosOf(ctx: QueryCtx, sessionId: Id<'sessions'>)
 {
     return ctx.db
         .query('scenarios')
         .withIndex('by_sessionId_and_scenario_id', (q) => q.eq('sessionId', sessionId))
         .take(500);
+}
+
+/**
+ * Deletes the session's map pictures that are not in keep, and their files, see addMap in
+ * pictures.ts. Ones younger than spare stay too, see save. Pictures uploaded before mapPictures
+ * existed have no row, and stay.
+ */
+async function freeMaps(ctx: MutationCtx, sessionId: Id<'sessions'>, keep: Set<string>, spare = 0)
+{
+    const pictures = await ctx.db
+        .query('mapPictures')
+        .withIndex('by_sessionId', (q) => q.eq('sessionId', sessionId))
+        .take(1000);
+
+    for (const picture of pictures)
+    {
+        if (keep.has(picture.src) || picture._creationTime > Date.now() - spare)
+            continue;
+
+        await ctx.storage.delete(picture.storageId);
+        await ctx.db.delete('mapPictures', picture._id);
+    }
+}
+
+/** The backgrounds the session's saved maps show. */
+async function backgroundsOf(ctx: QueryCtx, sessionId: Id<'sessions'>): Promise<Set<string>>
+{
+    const docs = await scenariosOf(ctx, sessionId);
+
+    return new Set(docs.flatMap((doc) => doc.scenario.background ?? []));
 }
 
 /**
@@ -36,7 +66,7 @@ export async function addExample(ctx: MutationCtx, ownerId: Id<'users'>): Promis
     const scenario = { ...demoScenario, id: crypto.randomUUID() };
     const sessionId = await ctx.db.insert('sessions', {
         ownerId,
-        name: `Example: ${demoScenario.name}`,
+        name: `Demo: ${demoScenario.name}`,
         order: [scenario.id],
         updatedAt: Date.now(),
     });
@@ -105,21 +135,26 @@ export const rename = mutation({
 });
 
 /**
- * Deletes a session and its scenarios.
- * ponytail: their uploaded map pictures stay in storage. Clean up files no scenario uses if the
- * free 1 GB ever runs short.
+ * Deletes a session with everything in it, the files of its map and token pictures too. Its
+ * placed props stay, they belong to the host's library.
  */
 export const remove = mutation({
     args: { sessionId: v.id('sessions') },
     handler: async (ctx, { sessionId }) =>
     {
         await requireSession(ctx, sessionId);
+        await freeMaps(ctx, sessionId, new Set());
 
         for (const doc of await scenariosOf(ctx, sessionId))
             await ctx.db.delete('scenarios', doc._id);
 
         for (const token of await tokensOf(ctx, sessionId))
+        {
+            if (token.avatarId)
+                await ctx.storage.delete(token.avatarId);
+
             await ctx.db.delete('tokens', token._id);
+        }
 
         const fog = await ctx.db
             .query('fog')
@@ -138,6 +173,10 @@ export const remove = mutation({
 /**
  * Everything the editor opens with: the session's name, its scenarios in order and the host's
  * prop library. Read once, the editor holds the truth while it is open and saves it back.
+ * Also the size of every stored file, for the storage meter in components/PropLibrary.tsx: each
+ * prop's own, and the rest of the deployment's files together, maps and tokens and all.
+ * ponytail: reads every file's metadata on each open. Keep a running total in a table if the
+ * files ever number in the tens of thousands.
  */
 export const load = query({
     args: { sessionId: v.id('sessions') },
@@ -150,32 +189,41 @@ export const load = query({
             .query('pictures')
             .withIndex('by_ownerId', (q) => q.eq('ownerId', session.ownerId))
             .take(1000);
+        const files = await ctx.db.system.query('_storage').take(10000);
+        const sizes = new Map(files.map((file) => [file._id, file.size]));
+        const library = pictures.map((picture) => ({
+            id: picture._id,
+            name: picture.name,
+            src: picture.src,
+            width: picture.width,
+            height: picture.height,
+            bytes: sizes.get(picture.storageId) ?? 0,
+        }));
+        const total = files.reduce((sum, file) => sum + file.size, 0);
 
         return {
             name: session.name,
             scenarios: session.order.flatMap((id) => byId.get(id) ?? []),
-            library: pictures.map((picture) => ({
-                id: picture._id,
-                name: picture.name,
-                src: picture.src,
-                width: picture.width,
-                height: picture.height,
-            })),
+            library,
+            otherBytes: total - library.reduce((sum, picture) => sum + picture.bytes, 0),
         };
     },
 });
 
 /**
  * The editor's autosave: the scenario ids in order, and only the scenarios that changed since the
- * last save. Scenarios missing from the order were deleted.
+ * last save. Scenarios missing from the order were deleted. A map picture no saved map shows is
+ * deleted too, unless it is in held: the backgrounds the editor's undo and redo can still bring
+ * back. Those go when the editor closes, see release.
  */
 export const save = mutation({
     args: {
         sessionId: v.id('sessions'),
         order: v.array(v.string()),
         changed: v.array(scenarioValidator),
+        held: v.array(v.string()),
     },
-    handler: async (ctx, { sessionId, order, changed }) =>
+    handler: async (ctx, { sessionId, order, changed, held }) =>
     {
         const session = await requireSession(ctx, sessionId);
 
@@ -208,11 +256,31 @@ export const save = mutation({
 
         await ctx.db.patch('sessions', sessionId, { order, updatedAt: Date.now() });
 
+        // A picture that finished uploading while this save was on its way is not in it yet.
+        const keep = new Set([...(await backgroundsOf(ctx, sessionId)), ...held]);
+
+        await freeMaps(ctx, sessionId, keep, 10 * 60 * 1000);
+
         // A door opened or a wall moved on the map being played changes what players see.
         const played = changed.find((scenario) => scenario.id === session.activeScenarioId);
 
         if (played && session.live === true)
             await refreshSight(ctx, sessionId, played);
+
+        return null;
+    },
+});
+
+/**
+ * When the editor closes, its undo goes with it, so the map pictures only undo could bring back
+ * are deleted now, see save.
+ */
+export const release = mutation({
+    args: { sessionId: v.id('sessions') },
+    handler: async (ctx, { sessionId }) =>
+    {
+        await requireSession(ctx, sessionId);
+        await freeMaps(ctx, sessionId, await backgroundsOf(ctx, sessionId));
 
         return null;
     },

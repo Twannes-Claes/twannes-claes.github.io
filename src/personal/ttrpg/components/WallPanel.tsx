@@ -78,9 +78,11 @@ export function WallPanel({ kind, onKind, snap, onSnap }: WallPanelProps)
                             ))}
                         </div>
                     </div>
-                    <p className="ttrpg-settings__hint">
-                        Hold <kbd>Alt</kbd>: no snap
-                    </p>
+                    <ul className="ttrpg-keys" aria-label="Keys">
+                        <li>
+                            <kbd>Alt</kbd> No snap
+                        </li>
+                    </ul>
                 </>
             )}
         </section>

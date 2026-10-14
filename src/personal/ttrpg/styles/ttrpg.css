@@ -28,6 +28,8 @@ html:has(.ttrpg) {
     --ttrpg-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 
     background: var(--ttrpg-bg);
+    /* Inherited, so every scrolling panel gets a quiet bar instead of the browser's light one. */
+    scrollbar-color: color-mix(in srgb, var(--ttrpg-ink) 25%, transparent) transparent;
     color-scheme: dark;
 }
 
@@ -350,8 +352,14 @@ html:has(.ttrpg) {
 
 /* A segment that says yes, like approving a host, in the confirm green. */
 .ttrpg-segment--confirm {
+    border-color: transparent;
     background: var(--ttrpg-confirm);
     color: var(--ttrpg-ink);
+    transition: filter 150ms var(--ttrpg-ease);
+}
+
+.ttrpg-segment--confirm:is(:hover, :focus-visible):not(:disabled) {
+    filter: brightness(1.2);
 }
 
 /* A number on a segment, like the players at the table. */
@@ -369,7 +377,9 @@ html:has(.ttrpg) {
 /* Panel and card headings, small and quiet, so the map stays the loudest thing on screen. */
 .ttrpg-properties h2,
 .ttrpg-scenarios h2,
-.ttrpg-card h2 {
+.ttrpg-card h2,
+.ttrpg-popover__header h2,
+.ttrpg-subhead {
     color: var(--ttrpg-muted);
     font-size: 0.75rem;
     font-weight: 600;
@@ -404,9 +414,38 @@ html:has(.ttrpg) {
     font-size: 0.875rem;
 }
 
-.ttrpg-settings__hint {
+/* The keys of the open tool, a quiet legend at the foot of its panel. */
+.ttrpg-keys {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.25rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--ttrpg-edge);
     color: var(--ttrpg-muted);
-    font-size: 0.8rem;
+    font-size: 0.75rem;
+}
+
+.ttrpg-keys li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* A key cap, with a thicker bottom edge so it reads as a key rather than a tag. Every key the app
+   names looks like this: the legends, the tooltips and the QR code's way out. */
+.ttrpg kbd {
+    display: inline-block;
+    min-width: 2rem;
+    /* A pixel more above than below: the mono letters ride high, and the thick bottom edge more so. */
+    padding: calc(0.1rem + 1px) 0.4rem calc(0.1rem - 1px);
+    border: 1px solid var(--ttrpg-edge);
+    border-bottom-width: 2px;
+    border-radius: 6px;
+    background: var(--ttrpg-well);
+    color: var(--ttrpg-ink);
+    font-family: var(--ttrpg-mono);
+    font-size: 0.7rem;
+    text-align: center;
 }
 
 .ttrpg-settings label,
@@ -499,8 +538,65 @@ html:has(.ttrpg) {
     white-space: nowrap;
 }
 
-.ttrpg-settings input[type='range'] {
-    accent-color: var(--ttrpg-accent);
+/*
+ * Sliders in the app's colours: a thin track filled in the accent up to the handle. The browser's
+ * own track turns white on a dark page. The fill share comes in as --fill from the component, as
+ * Chrome has no pseudo-element for the filled part. Each engine's pseudo-element gets its own
+ * rule, because a selector one engine does not know drops the whole rule.
+ */
+.ttrpg input[type='range'] {
+    height: 20px;
+    background: transparent;
+    cursor: pointer;
+    appearance: none;
+}
+
+.ttrpg input[type='range']:focus-visible {
+    outline: none;
+}
+
+.ttrpg input[type='range']:disabled {
+    cursor: not-allowed;
+}
+
+.ttrpg input[type='range']::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(to right, var(--ttrpg-accent) var(--fill, 0%), var(--ttrpg-edge) 0);
+}
+
+.ttrpg input[type='range']::-moz-range-track {
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(to right, var(--ttrpg-accent) var(--fill, 0%), var(--ttrpg-edge) 0);
+}
+
+.ttrpg input[type='range']::-webkit-slider-thumb {
+    width: 14px;
+    height: 14px;
+    margin-top: -5px;
+    border-radius: 50%;
+    background: var(--ttrpg-ink);
+    transition: box-shadow 150ms var(--ttrpg-ease);
+    appearance: none;
+}
+
+.ttrpg input[type='range']::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--ttrpg-ink);
+    transition: box-shadow 150ms var(--ttrpg-ease);
+}
+
+/* A ring in the accent while hovered or reached with the keyboard, in place of the outline. */
+.ttrpg input[type='range']:is(:hover, :focus-visible):not(:disabled)::-webkit-slider-thumb {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--ttrpg-accent) 60%, transparent);
+}
+
+.ttrpg input[type='range']:is(:hover, :focus-visible):not(:disabled)::-moz-range-thumb {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--ttrpg-accent) 60%, transparent);
 }
 
 .ttrpg-settings input[type='color'] {
@@ -513,28 +609,39 @@ html:has(.ttrpg) {
     cursor: pointer;
 }
 
-/* Two buttons sharing the foot of a panel, like the fog's default look and reset. */
-.ttrpg-settings__actions {
+/* The buttons at the foot of a popover or the move sheet, under a hairline, the one that does it
+   in green: starting the session, moving, the fog's default look and reset. */
+.ttrpg-popover__foot {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.5rem;
+    padding-top: 0.875rem;
+    border-top: 1px solid var(--ttrpg-edge);
 }
 
 /* The prop pictures, as a grid of tiles in the props panel. */
+/* The scrollbar keeps its place whether the list scrolls or not, out in the panel's padding, so
+   the tiles line up with the button under them and never touch the bar. */
 .ttrpg-library {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 4px;
     max-height: 40svh;
+    margin-right: -12px;
+    padding-right: 4px;
     overflow: hidden auto;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
 }
 
+/* A block rather than a grid, so the picture's 100% height is the tile's and a tall picture
+   cannot stretch its row. Every picture fits inside the same square, whatever its shape. */
 .ttrpg-library__item {
-    display: grid;
-    place-items: center;
+    display: block;
     width: 100%;
     aspect-ratio: 1;
-    padding: 4px;
+    padding: 6px;
+    overflow: hidden;
     border: 1px solid var(--ttrpg-edge);
     border-radius: 10px;
     background: var(--ttrpg-well);
@@ -542,8 +649,9 @@ html:has(.ttrpg) {
 }
 
 .ttrpg-library__item img {
-    max-width: 100%;
-    max-height: 100%;
+    display: block;
+    width: 100%;
+    height: 100%;
     object-fit: contain;
 }
 
@@ -557,11 +665,112 @@ html:has(.ttrpg) {
     background: color-mix(in srgb, var(--ttrpg-accent) 35%, transparent);
 }
 
+.ttrpg-library li {
+    position: relative;
+}
+
+/* A bin in the corner of a tile, shown on hover or keyboard focus, always on a touch screen. */
+.ttrpg-library__remove {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    background: var(--ttrpg-bg);
+    font-size: 0.7rem;
+    opacity: 0;
+    transition:
+        opacity 150ms var(--ttrpg-ease),
+        color 150ms var(--ttrpg-ease);
+}
+
+.ttrpg-library li:is(:hover, :focus-within) .ttrpg-library__remove {
+    opacity: 1;
+}
+
+.ttrpg-library__remove:is(:hover, :focus-visible) {
+    color: var(--ttrpg-danger);
+}
+
+@media (hover: none) {
+    .ttrpg-library__remove {
+        opacity: 1;
+    }
+}
+
+/* How much of the plan's storage is used, under the props. The track is a slider's, the props
+   their accent, the rest of the files a quiet grey beside them. */
+.ttrpg-storage {
+    display: grid;
+    gap: 0.5rem;
+    color: var(--ttrpg-muted);
+    font-size: 0.75rem;
+}
+
+.ttrpg-storage__head {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.ttrpg-storage__head span {
+    color: var(--ttrpg-ink);
+    font-family: var(--ttrpg-mono);
+}
+
+.ttrpg-storage__bar {
+    display: flex;
+    gap: 2px;
+    height: 6px;
+    overflow: hidden;
+    border-radius: 3px;
+    background: var(--ttrpg-edge);
+}
+
+/* A sliver at least, so a few small props still show on a bar of a whole gigabyte. */
+.ttrpg-storage__bar span {
+    min-width: 3px;
+    background: color-mix(in srgb, var(--ttrpg-ink) 35%, transparent);
+}
+
+.ttrpg-storage__bar .ttrpg-storage__props {
+    background: var(--ttrpg-accent);
+}
+
+.ttrpg-storage__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+}
+
+.ttrpg-storage__legend li {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.ttrpg-storage__legend li::before {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--ttrpg-ink) 35%, transparent);
+    content: '';
+}
+
+.ttrpg-storage__legend .ttrpg-storage__props::before {
+    background: var(--ttrpg-accent);
+}
+
 /* A file picker as a button, like uploading props. Beats the two columns every other label gets. */
 .ttrpg-settings label.ttrpg-segment {
     display: flex;
     justify-content: center;
     min-width: 0;
+}
+
+/* One in a form row, like a monster's picture, is a field to fill rather than an action. */
+.ttrpg-settings__group label.ttrpg-segment {
     border: 1px dashed var(--ttrpg-edge);
 }
 
@@ -647,12 +856,57 @@ html:has(.ttrpg) {
     color: #f0a39e;
 }
 
+.ttrpg-sheet__avatar {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    overflow: hidden;
+    border: 3px solid;
+    border-radius: 50%;
+    background: var(--ttrpg-well);
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.ttrpg-sheet__avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
 /* The share of the token's speed the path uses. */
 .ttrpg-sheet__bar {
-    height: 4px;
+    position: relative;
+    height: 6px;
     overflow: hidden;
-    border-radius: 2px;
-    background: var(--ttrpg-well);
+    border-radius: 3px;
+    background: var(--ttrpg-edge);
+}
+
+/* A notch every 5 ft of the token's speed, so the bar reads as squares walked. --steps comes
+   from MoveSheet.tsx. */
+.ttrpg-sheet__bar::after {
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        90deg,
+        transparent 0 calc(100% / var(--steps) - 2px),
+        var(--ttrpg-bg) 0 calc(100% / var(--steps))
+    );
+    content: '';
+}
+
+/* In thumb reach on a phone, where the keys beside the words mean nothing and step aside. */
+.ttrpg-sheet .ttrpg-segment {
+    min-height: 44px;
+}
+
+@media (hover: none) {
+    .ttrpg-sheet kbd {
+        display: none;
+    }
 }
 
 .ttrpg-sheet__bar span {
@@ -665,12 +919,6 @@ html:has(.ttrpg) {
 
 .ttrpg-sheet__bar--over span {
     background: var(--ttrpg-danger);
-}
-
-.ttrpg-sheet__actions {
-    display: grid;
-    grid-template-columns: 1fr 2fr;
-    gap: 0.5rem;
 }
 
 .ttrpg-button {
@@ -789,19 +1037,18 @@ html:has(.ttrpg) {
     }
 }
 
-/* The scenarios of the session, on the right. */
+/* The scenarios of the session, in the top right corner, with the rows of .ttrpg-settings. */
 .ttrpg-scenarios {
     position: fixed;
-    top: 72px;
+    top: 16px;
     right: 16px;
     z-index: 10;
     display: grid;
-    gap: 0.5rem;
-    width: 15rem;
-    max-height: calc(100svh - 104px);
+    /* Just wide enough for the three new map buttons in one row. */
+    width: 17rem;
+    max-height: calc(100svh - 48px);
     padding: 1rem;
     overflow: hidden auto;
-    font-size: 0.875rem;
 }
 
 /* The dropdown of maps, in the app's font rather than the mono of number fields. */
@@ -878,16 +1125,66 @@ html:has(.ttrpg) {
     color: var(--ttrpg-ink);
 }
 
-.ttrpg-scenarios__name {
-    display: flex;
-    align-items: center;
-    gap: 2px;
+/* The title row, which folds the panel. The open map's name shows beside it only while folded. */
+/* Folded, as tall as the mode switch beside it: its 24px title row plus this padding. The top
+   is the same open or folded, so the title stays put. */
+.ttrpg-scenarios {
+    padding-top: 10.5px;
 }
 
-.ttrpg-scenarios__name input,
-.ttrpg-scenarios__name select {
+.ttrpg-scenarios:has(details:not([open])) {
+    padding-bottom: 10.5px;
+}
+
+.ttrpg-scenarios summary {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    list-style: none;
+}
+
+.ttrpg-scenarios summary::-webkit-details-marker {
+    display: none;
+}
+
+.ttrpg-scenarios summary h2 {
+    margin: 0;
+}
+
+.ttrpg-scenarios__current {
     flex: 1;
     min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ttrpg-scenarios details[open] .ttrpg-scenarios__current {
+    visibility: hidden;
+}
+
+.ttrpg-scenarios__chevron {
+    color: var(--ttrpg-muted);
+    transition: rotate 150ms var(--ttrpg-ease);
+}
+
+.ttrpg-scenarios summary:hover .ttrpg-scenarios__chevron {
+    color: var(--ttrpg-ink);
+}
+
+.ttrpg-scenarios details[open] .ttrpg-scenarios__chevron {
+    rotate: 180deg;
+}
+
+/* A notch tighter than the tool panels: it sits on screen all the time, so it takes less map. */
+.ttrpg-scenarios__body {
+    gap: 0.625rem;
+    margin-top: 0.875rem;
+}
+
+/* The name being renamed, in the dropdown's font rather than the mono of number fields. */
+.ttrpg-scenarios input:not([type]) {
     font-family: inherit;
     font-size: 0.875rem;
 }
@@ -895,21 +1192,12 @@ html:has(.ttrpg) {
 .ttrpg-scenarios__background {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 4px;
 }
 
 .ttrpg-scenarios__background .ttrpg-segment {
     flex: 1;
-    justify-content: center;
     border: 1px dashed var(--ttrpg-edge);
-}
-
-.ttrpg-scenarios__add {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    padding-top: 0.5rem;
-    border-top: 1px solid var(--ttrpg-edge);
 }
 
 /* The editor is made for a laptop; on a phone the scenario list would cover the map, so it
@@ -917,6 +1205,14 @@ html:has(.ttrpg) {
 @media (width < 640px) {
     .ttrpg-scenarios {
         display: none;
+    }
+}
+
+/* Too narrow for the corner beside the mode switch, so it drops under the top bar. */
+@media (width < 820px) {
+    .ttrpg-scenarios {
+        top: 72px;
+        max-height: calc(100svh - 104px);
     }
 }
 
@@ -1002,13 +1298,49 @@ html:has(.ttrpg) {
     color: var(--ttrpg-danger);
 }
 
-/* The dashboard: one column of cards, centred, like a page rather than a map. */
+/* The dashboard: one column of cards, centred, like a page rather than a map. Isolated, so the
+   grid behind it sits over the page's background and under the cards. */
 .ttrpg-dashboard {
+    isolation: isolate;
     display: grid;
     gap: 1rem;
     width: min(36rem, 100%);
     margin-inline: auto;
     padding: 96px 16px 48px;
+}
+
+/* A faint battle map grid with a glow of the accent across the top, fading out by the cards. */
+.ttrpg-dashboard::before {
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: -1;
+    height: 32rem;
+    background:
+        linear-gradient(var(--ttrpg-edge) 1px, transparent 1px) 0 0 / 48px 48px,
+        linear-gradient(90deg, var(--ttrpg-edge) 1px, transparent 1px) 0 0 / 48px 48px,
+        radial-gradient(
+            ellipse at top,
+            color-mix(in srgb, var(--ttrpg-accent) 30%, transparent),
+            transparent 70%
+        );
+    mask-image: radial-gradient(ellipse 70% 100% at top, black, transparent);
+    pointer-events: none;
+    content: '';
+}
+
+.ttrpg-dashboard__header {
+    margin-bottom: 0.5rem;
+}
+
+.ttrpg-dashboard__header h1 {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.ttrpg-dashboard__mark {
+    color: color-mix(in srgb, var(--ttrpg-accent) 55%, var(--ttrpg-ink));
+    font-size: 0.8em;
 }
 
 .ttrpg-card {
@@ -1069,8 +1401,8 @@ html:has(.ttrpg) {
 }
 
 /*
- * A floating panel with a title and a close button, see components/Popover.tsx. Nearly solid, so
- * the busy map does not show through the form, and it scrolls when it gets long.
+ * A floating panel with a title and a close button, see components/Popover.tsx. The same surface,
+ * padding and rhythm as the tool panels beside the rail, and it scrolls when it gets long.
  */
 .ttrpg-popover {
     position: fixed;
@@ -1078,29 +1410,22 @@ html:has(.ttrpg) {
     z-index: 20;
     display: grid;
     align-content: start;
-    gap: 1rem;
-    width: min(22rem, calc(100% - 32px));
-    padding: 0.75rem 1rem 1rem;
+    gap: 0.875rem;
+    width: min(21.5rem, calc(100% - 32px));
+    padding: 1rem;
     overflow-y: auto;
-    background: color-mix(in srgb, var(--ttrpg-bg) 96%, transparent);
+    font-size: 0.875rem;
     translate: -50% 0;
     animation: ttrpg-rise 150ms var(--ttrpg-ease);
 }
 
+/* The close button hangs into the padding, so the title sits where a tool panel's does. */
 .ttrpg-popover__header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
-    margin-right: -0.5rem;
-}
-
-.ttrpg-popover__header h2 {
-    color: var(--ttrpg-muted);
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    margin: -0.5rem -0.5rem 0 0;
 }
 
 .ttrpg-popover__body {
@@ -1112,11 +1437,6 @@ html:has(.ttrpg) {
 .ttrpg-subhead {
     padding-top: 0.75rem;
     border-top: 1px solid var(--ttrpg-edge);
-    color: var(--ttrpg-muted);
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
 }
 
 /* Under the mode switch: starting the session, the players at the table. */
@@ -1377,30 +1697,16 @@ a.ttrpg-row__main:focus-visible {
 .ttrpg-tip {
     position: fixed;
     z-index: 50;
+    /* A row, so the key caps sit in the middle of the words rather than on their baseline. */
+    display: flex;
+    align-items: center;
+    gap: 6px;
     max-width: 280px;
     padding: 8px 12px;
     color: var(--ttrpg-ink);
     font-size: 0.875rem;
     pointer-events: none;
     animation: ttrpg-tip 120ms var(--ttrpg-ease);
-}
-
-.ttrpg-tip kbd,
-.ttrpg-settings__hint kbd {
-    display: inline-block;
-    margin-left: 6px;
-    padding: 0 6px;
-    border: 1px solid var(--ttrpg-edge);
-    border-radius: 5px;
-    background: var(--ttrpg-well);
-    color: var(--ttrpg-muted);
-    font-family: var(--ttrpg-mono);
-    font-size: 0.75rem;
-}
-
-.ttrpg-settings__hint kbd {
-    margin-right: 2px;
-    margin-left: 2px;
 }
 
 .ttrpg-tip--above {
@@ -1419,4 +1725,13 @@ a.ttrpg-row__main:focus-visible {
     from {
         opacity: 0;
     }
+}
+
+/* The map panel's buttons and fields, a little lower than a tool panel's, see .ttrpg-scenarios. */
+.ttrpg-scenarios .ttrpg-settings__choices .ttrpg-segment,
+.ttrpg-scenarios .ttrpg-segment,
+.ttrpg-scenarios select,
+.ttrpg-scenarios input:not([type]) {
+    min-height: 32px;
+    padding-block: 0.3rem;
 }

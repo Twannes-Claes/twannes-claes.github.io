@@ -8,7 +8,7 @@ import { anchorAt, footprintCenter, footprintKeys } from '../map/size';
 import { spawnCells } from '../map/spawn';
 
 import type { Doc, Id } from './_generated/dataModel';
-import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
+import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireSession, requireUser } from './access';
 import { fogSettingsValidator, sizeValidator } from './schema';
 import { refreshSight, tokensOf } from './sight';
@@ -23,12 +23,13 @@ import { storedPicture } from './pictures';
 
 /** A walk longer than this is not something anyone drew by hand. */
 const maxPathPoints = 1000;
-/** Players at one table, well past any real group, so one password cannot fill the tokens table. */
-const maxPlayers = 30;
+/** Players at one table, past any real group, so one password cannot fill the tokens or storage. */
+const maxPlayers = 12;
 /** Monsters and NPCs in one session, on all its maps. With the players it stays under tokensOf's 200. */
 const maxMonsters = 150;
+
 /** A 256 px WebP avatar from services/images.ts is about 20 KB. */
-const maxAvatarBytes = 512 * 1024;
+export const maxAvatarBytes = 512 * 1024;
 const colourPattern = /^#[0-9a-f]{6}$/i;
 /** A 400 by 300 cell map at two samples per cell, one byte each. */
 const maxFogBytes = 512 * 1024;
@@ -313,45 +314,36 @@ export const join = mutation({
     },
 });
 
-/** A one-time address for a player to upload their token's picture to. */
-export const avatarUrl = mutation({
-    args: { sessionId: v.id('sessions') },
-    handler: async (ctx, { sessionId }) =>
-    {
-        const userId = await requireUser(ctx);
-
-        if (!(await ownToken(ctx, sessionId, userId)))
-            throw new ConvexError('Join the session first.');
-
-        return await ctx.storage.generateUploadUrl();
-    },
-});
-
 /**
- * Puts an uploaded picture on the player's token, in place of the one before. False when the
- * file was refused, see storedPicture in pictures.ts.
+ * Puts a stored picture on the player's token and deletes the one before. Only the /avatar route
+ * in http.ts calls it, with a file it already checked and stored, so a player never gets an upload
+ * address of their own to fill storage with. The file is deleted when it cannot be kept: from
+ * someone who has not joined, or refused by storedPicture in pictures.ts.
  */
-export const setAvatar = mutation({
-    args: { sessionId: v.id('sessions'), storageId: v.id('_storage') },
-    handler: async (ctx, { sessionId, storageId }) =>
+export const keepAvatar = internalMutation({
+    args: { sessionId: v.id('sessions'), userId: v.id('users'), storageId: v.id('_storage') },
+    handler: async (ctx, { sessionId, userId, storageId }) =>
     {
-        const userId = await requireUser(ctx);
         const token = await ownToken(ctx, sessionId, userId);
 
         if (!token)
-            throw new ConvexError('Join the session first.');
+        {
+            await ctx.storage.delete(storageId);
+
+            return 'not joined';
+        }
 
         const avatar = await storedPicture(ctx, storageId, maxAvatarBytes);
 
         if (!avatar)
-            return false;
+            return 'refused';
 
         if (token.avatarId && token.avatarId !== storageId)
             await ctx.storage.delete(token.avatarId);
 
         await ctx.db.patch('tokens', token._id, { avatar, avatarId: storageId });
 
-        return true;
+        return 'kept';
     },
 });
 

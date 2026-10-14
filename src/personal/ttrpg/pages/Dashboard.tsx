@@ -1,5 +1,7 @@
 import '../styles/ttrpg.css';
 
+import { faDiceD20, faMap } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Link } from 'react-router-dom';
 
 import { Loading } from '../components/Feedback';
@@ -22,7 +24,10 @@ export default function Dashboard()
         <Shell title="Sessions" home="/">
             <main className="ttrpg-dashboard">
                 <header className="ttrpg-dashboard__header">
-                    <h1>TTRPG</h1>
+                    <h1>
+                        <FontAwesomeIcon icon={faDiceD20} className="ttrpg-dashboard__mark" />
+                        TTRPG
+                    </h1>
                     <p>Battle maps for the table.</p>
                 </header>
 
@@ -32,12 +37,19 @@ export default function Dashboard()
                     <p className="ttrpg-dashboard__note">The backend is not set up yet, see README.md.</p>
                 )}
 
-                <p className="ttrpg-dashboard__note">
-                    <Link to="/ttrpg/edit?demo" className="ttrpg-link">
-                        Try the demo map
-                    </Link>
-                    , no account needed.
-                </p>
+                <section className="ttrpg-panel ttrpg-card" aria-label="Demo">
+                    <h2>Try it first</h2>
+                    <p className="ttrpg-dashboard__note">
+                        A finished battle map with walls, fog and two test players. No account
+                        needed.
+                    </p>
+                    <div className="ttrpg-card__actions">
+                        <Link to="/ttrpg/edit?demo" className="ttrpg-button">
+                            <FontAwesomeIcon icon={faMap} />
+                            Open the demo map
+                        </Link>
+                    </div>
+                </section>
             </main>
         </Shell>
     );

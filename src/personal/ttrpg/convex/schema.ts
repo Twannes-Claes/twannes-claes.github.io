@@ -145,6 +145,15 @@ export default defineSchema({
         'by_sessionId_and_scenario_id',
         ['sessionId', 'scenario.id'],
     ),
+    /**
+     * The map pictures uploaded for a session, so each file is deleted once nothing can bring it
+     * back, see freeMaps in sessions.ts. Scenarios keep only the address.
+     */
+    mapPictures: defineTable({
+        sessionId: v.id('sessions'),
+        storageId: v.id('_storage'),
+        src: v.string(),
+    }).index('by_sessionId', ['sessionId']),
     /** The prop library of each game master. */
     pictures: defineTable({
         ownerId: v.id('users'),
@@ -153,5 +162,8 @@ export default defineSchema({
         src: v.string(),
         width: v.number(),
         height: v.number(),
-    }).index('by_ownerId', ['ownerId']),
+        /** The SHA-256 of the file as picked, so the same picture is not stored twice, see findProp. */
+        hash: v.optional(v.string()),
+    }).index('by_ownerId', ['ownerId'])
+        .index('by_ownerId_and_hash', ['ownerId', 'hash']),
 });

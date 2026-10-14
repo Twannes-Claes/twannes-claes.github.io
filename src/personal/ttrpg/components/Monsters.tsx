@@ -1,4 +1,4 @@
-import { faEye, faEyeSlash, faImage, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faEye, faEyeSlash, faImage, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useActionState, useState } from 'react';
 
@@ -136,7 +136,8 @@ export function Monsters({ live, at, onClose, onDone, onError }: MonstersProps)
                         {failure}
                     </p>
                 )}
-                <button type="submit" className="ttrpg-button ttrpg-button--confirm" disabled={adding}>
+                <button type="submit" className="ttrpg-segment ttrpg-segment--block ttrpg-segment--confirm" disabled={adding}>
+                    <FontAwesomeIcon icon={faPlus} />
                     {adding ? 'Adding' : 'Add to the middle of the screen'}
                 </button>
             </form>

@@ -1,6 +1,6 @@
 import { faCheck, faEye, faPen, faSnowflake, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useEffect, useRef, useState, type DragEvent } from 'react';
+import { useEffect, useEffectEvent, useRef, useState, type DragEvent } from 'react';
 
 import type { FogSettings, Live, Point, PropPicture, Scenario, Store } from '../types';
 
@@ -9,6 +9,7 @@ import { defaultFogSettings } from '../map/fog';
 import type { ToolId } from '../map/tools';
 import { scenarioFromUvtt } from '../map/uvtt';
 import type { FrameStats, PendingMove } from '../map/view';
+import { confirmAction } from '../services/confirm';
 import { baseName } from '../services/images';
 
 import { Spinner, Toast, Toasts } from './Feedback';
@@ -67,6 +68,8 @@ interface MapEditorProps
     initial: Scenario[];
     /** The game master's prop pictures it opens with. */
     library: PropPicture[];
+    /** The size of every stored file besides the props, for the storage meter. 0 in the demo. */
+    otherBytes?: number;
     /** Where pictures go and changes are saved, see Store in types.ts. */
     store: Store;
     /** Shows the frame rate, see pages/Editor.tsx. */
@@ -80,7 +83,7 @@ interface MapEditorProps
  * importing .dd2vtt maps. The demo and a saved session both use it, with a different store; with
  * a save in the store it saves a second after the last change.
  */
-export function MapEditor({ initial, library: initialLibrary, store, debug, live }: MapEditorProps)
+export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, store, debug, live }: MapEditorProps)
 {
     const history = useHistory(() => (initial.length > 0 ? initial : [blankScenario('Map 1')]));
     const scenarios = history.present;
@@ -119,6 +122,12 @@ export function MapEditor({ initial, library: initialLibrary, store, debug, live
 
     useWakeLock(mode === 'play');
 
+    // The backgrounds undo and redo can still bring back, so the save keeps their pictures. Read
+    // when the save goes, rather than a dependency, so a render alone never delays it.
+    const held = useEffectEvent(() => [
+        ...new Set(history.states.flatMap((state) => state.flatMap((scenario) => scenario.background ?? []))),
+    ]);
+
     // Saves a moment after the last change, sending only the scenarios that changed. Undo and
     // every edit make new objects, so comparing them by identity is enough.
     useEffect(() =>
@@ -131,7 +140,7 @@ export function MapEditor({ initial, library: initialLibrary, store, debug, live
         {
             const changed = scenarios.filter((scenario) => !saved.includes(scenario));
 
-            save(scenarios, changed)
+            save(scenarios, changed, held())
                 .then(() =>
                 {
                     setSaved(scenarios);
@@ -142,6 +151,10 @@ export function MapEditor({ initial, library: initialLibrary, store, debug, live
 
         return () => window.clearTimeout(timer);
     }, [scenarios, saved, store]);
+
+    // Leaving the editor drops its undo, so the map pictures only undo still held are freed now, see
+    // release in convex/sessions.ts. A failure only leaves them for the next save.
+    useEffect(() => () => void store.release?.().catch(() => undefined), [store]);
 
     // Closing the tab with changes still waiting asks first.
     useEffect(() =>
@@ -181,12 +194,47 @@ export function MapEditor({ initial, library: initialLibrary, store, debug, live
         track(`Uploading ${count}`, Promise.all(files.map(store.uploadProp)))
             .then((pictures) =>
             {
-                setLibrary((current) => [...current, ...pictures]);
+                // A picture already in the library comes back as that one, see uploadProp in
+                // services/backend.ts, so it is placed but not listed twice.
+                const known = new Set(library.map((picture) => picture.id));
+                const added = pictures.filter((picture, at) => !known.has(picture.id) && pictures.findIndex((other) => other.id === picture.id) === at);
+                const what = added.length === 1 ? 'the picture' : `${added.length} pictures`;
+
+                setLibrary((current) => [...current, ...added]);
                 setPlacing(pictures[0] ?? null);
-                message.done(`Added ${count} to your props. Click the map to place it.`);
+                message.done(
+                    added.length === 0
+                        ? 'Already in your props. Click the map to place it.'
+                        : `Added ${what} to your props. Click the map to place it.`,
+                );
             })
             .catch(() => message.error('One of those pictures did not upload. Is it a PNG, WebP or JPEG?'));
     };
+
+    // Its placed copies go with it, on these maps here and on the others in convex/pictures.ts.
+    // Only the maps that had one change, so the autosave sends just those.
+    const removePicture = (picture: PropPicture) =>
+        void confirmAction(`Delete ${picture.name} from your props? Every copy placed on your maps goes with it.`, 'Delete')
+            .then((yes) =>
+            {
+                if (!yes)
+                    return;
+
+                return track(`Deleting ${picture.name}`, store.removeProp(picture)).then(() =>
+                {
+                    setLibrary((current) => current.filter((other) => other.id !== picture.id));
+                    setPlacing((current) => (current?.id === picture.id ? null : current));
+                    history.commit((current) =>
+                        current.map((scenario) =>
+                            scenario.props.some((prop) => prop.src === picture.src)
+                                ? { ...scenario, props: scenario.props.filter((prop) => prop.src !== picture.src) }
+                                : scenario,
+                        ),
+                    );
+                    message.done(`Deleted ${picture.name}.`);
+                });
+            })
+            .catch(() => message.error(`${picture.name} was not deleted. Check the connection and try again.`));
 
     // Undo can take away the open scenario, then the first one shows.
     const active = scenarios.find((scenario) => scenario.id === activeId) ?? scenarios[0];
@@ -557,6 +605,8 @@ export function MapEditor({ initial, library: initialLibrary, store, debug, live
                             placing={placing}
                             onPick={setPlacing}
                             onUpload={upload}
+                            onRemove={removePicture}
+                            otherBytes={otherBytes}
                         />
                     )}
                     {tool === 'walls' && (

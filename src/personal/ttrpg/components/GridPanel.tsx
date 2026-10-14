@@ -7,7 +7,7 @@ import {
     type IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useRef, type ChangeEvent } from 'react';
+import { useRef, type ChangeEvent, type CSSProperties } from 'react';
 
 import type { Grid } from '../types';
 
@@ -211,6 +211,7 @@ export function GridPanel({ grid, onChange }: GridPanelProps)
                         max={1}
                         step={0.05}
                         value={grid.opacity}
+                        style={{ '--fill': `${grid.opacity * 100}%` } as CSSProperties}
                         // Hidden lines have no strength to set.
                         disabled={!grid.visible}
                         onChange={(event) =>
