@@ -120,6 +120,15 @@ export interface StoredPicture
     src: string;
     width: number;
     height: number;
+    /** Its file size. Missing for a picture the site ships, like the demo map's. */
+    bytes?: number;
+}
+
+/** A stored map picture's file size, see load in convex/sessions.ts. */
+export interface PictureBytes
+{
+    src: string;
+    bytes: number;
 }
 
 /**

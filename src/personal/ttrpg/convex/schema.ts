@@ -127,7 +127,9 @@ export default defineSchema({
         hidden: v.optional(v.boolean()),
         /** A monster a player can see right now, kept by sight.ts. Others are not sent to players. */
         inSight: v.optional(v.boolean()),
-    }).index('by_sessionId_and_userId', ['sessionId', 'userId']),
+    })
+        .index('by_sessionId_and_userId', ['sessionId', 'userId'])
+        .index('by_avatarId', ['avatarId']),
     /**
      * What the party has seen of each scenario of a session, see SharedFog in types.ts. Its own
      * table, so the frequent fog saves never rewrite the scenario.
@@ -145,6 +147,15 @@ export default defineSchema({
         'by_sessionId_and_scenario_id',
         ['sessionId', 'scenario.id'],
     ),
+    /** The bytes of every kept file together, one row, see usage.ts. */
+    usage: defineTable({ bytes: v.number() }),
+    /** Wrong passwords tried on a session lately, so they cannot be guessed at speed, see play.ts. */
+    guesses: defineTable({
+        sessionId: v.id('sessions'),
+        misses: v.number(),
+        /** When the current minute of counting began. */
+        since: v.number(),
+    }).index('by_sessionId', ['sessionId']),
     /**
      * The map pictures uploaded for a session, so each file is deleted once nothing can bring it
      * back, see freeMaps in sessions.ts. Scenarios keep only the address.
@@ -153,7 +164,9 @@ export default defineSchema({
         sessionId: v.id('sessions'),
         storageId: v.id('_storage'),
         src: v.string(),
-    }).index('by_sessionId', ['sessionId']),
+    })
+        .index('by_sessionId', ['sessionId'])
+        .index('by_storageId', ['storageId']),
     /** The prop library of each game master. */
     pictures: defineTable({
         ownerId: v.id('users'),
@@ -162,8 +175,12 @@ export default defineSchema({
         src: v.string(),
         width: v.number(),
         height: v.number(),
+        /** The stored file's size, for the storage meter. Missing until pictures:tidy runs. */
+        bytes: v.optional(v.number()),
         /** The SHA-256 of the file as picked, so the same picture is not stored twice, see findProp. */
         hash: v.optional(v.string()),
-    }).index('by_ownerId', ['ownerId'])
-        .index('by_ownerId_and_hash', ['ownerId', 'hash']),
+    })
+        .index('by_ownerId', ['ownerId'])
+        .index('by_ownerId_and_hash', ['ownerId', 'hash'])
+        .index('by_storageId', ['storageId']),
 });

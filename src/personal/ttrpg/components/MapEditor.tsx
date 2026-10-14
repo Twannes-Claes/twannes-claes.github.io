@@ -2,7 +2,7 @@ import { faCheck, faEye, faPen, faSnowflake, faTriangleExclamation } from '@fort
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useEffectEvent, useRef, useState, type DragEvent } from 'react';
 
-import type { FogSettings, Live, Point, PropPicture, Scenario, Store } from '../types';
+import type { FogSettings, Live, PictureBytes, Point, PropPicture, Scenario, Store } from '../types';
 
 import { blankScenario, demoTokens } from '../content/scenarios';
 import { defaultFogSettings } from '../map/fog';
@@ -70,6 +70,8 @@ interface MapEditorProps
     library: PropPicture[];
     /** The size of every stored file besides the props, for the storage meter. 0 in the demo. */
     otherBytes?: number;
+    /** The size of each stored map picture of the session. Missing in the demo. */
+    backgrounds?: PictureBytes[];
     /** Where pictures go and changes are saved, see Store in types.ts. */
     store: Store;
     /** Shows the frame rate, see pages/Editor.tsx. */
@@ -83,7 +85,7 @@ interface MapEditorProps
  * importing .dd2vtt maps. The demo and a saved session both use it, with a different store; with
  * a save in the store it saves a second after the last change.
  */
-export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, store, debug, live }: MapEditorProps)
+export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, backgrounds = [], store, debug, live }: MapEditorProps)
 {
     const history = useHistory(() => (initial.length > 0 ? initial : [blankScenario('Map 1')]));
     const scenarios = history.present;
@@ -98,6 +100,8 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, st
     // An upload or import on its way, shown with a spinner until it lands.
     const [busy, setBusy] = useState<string | null>(null);
     const [saveFailed, setSaveFailed] = useState(false);
+    // For the background button's tip, see ScenarioList, by picture address.
+    const [pictureBytes, setPictureBytes] = useState(() => new Map(backgrounds.map(({ src, bytes }) => [src, bytes])));
     const [library, setLibrary] = useState(initialLibrary);
     const [placing, setPlacing] = useState<PropPicture | null>(null);
     const [wallSnap, setWallSnap] = useState(1);
@@ -407,6 +411,17 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, st
 
     };
 
+    const uploadMap = async (picture: Blob) =>
+    {
+        const stored = await store.uploadMap(picture);
+        const { src, bytes } = stored;
+
+        if (bytes !== undefined)
+            setPictureBytes((sizes) => new Map(sizes).set(src, bytes));
+
+        return stored;
+    };
+
     // The file's picture is stored first, so the scenario only keeps its address.
     const load = (file: File) =>
     {
@@ -418,7 +433,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, st
                     return scenario;
 
                 const picture = await fetch(scenario.background).then((response) => response.blob());
-                const { src } = await store.uploadMap(picture);
+                const { src } = await uploadMap(picture);
 
                 return { ...scenario, background: src };
             });
@@ -435,7 +450,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, st
     // A map from a plain picture, sized to it. The grid is lined up by hand with the G tool.
     const loadPicture = (file: File) =>
     {
-        track('Uploading the map picture', store.uploadMap(file))
+        track('Uploading the map picture', uploadMap(file))
             .then(({ src, width, height }) =>
             {
                 add({
@@ -456,7 +471,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, st
     {
         const { id } = active;
 
-        track('Uploading the background', store.uploadMap(file))
+        track('Uploading the background', uploadMap(file))
             .then(({ src, width, height }) =>
             {
                 updateScenario(id, (scenario) => ({
@@ -495,7 +510,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, st
     const draggedOver = (event: DragEvent) => event.preventDefault();
 
     return (
-        <main onDrop={dropped} onDragOver={draggedOver}>
+        <main className="ttrpg-editor" onDrop={dropped} onDragOver={draggedOver}>
             <MapCanvas
                 scenario={active}
                 tokens={shown}
@@ -630,6 +645,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, st
                         onPicture={loadPicture}
                         onBackground={setBackground}
                         onRemoveBackground={removeBackground}
+                        backgroundBytes={active.background ? pictureBytes.get(active.background) : undefined}
                     />
                     {store.save && <SaveState unsaved={unsaved} failed={saveFailed} />}
                 </>

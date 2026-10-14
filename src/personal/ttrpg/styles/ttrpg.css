@@ -457,6 +457,20 @@ html:has(.ttrpg) {
     gap: 0.5rem;
 }
 
+/*
+ * Double clicks and long presses on the editor, the phone view and the popovers, which sit
+ * outside both, select nothing, while fields still select what is typed.
+ */
+.ttrpg-editor,
+.ttrpg-player,
+.ttrpg-popover {
+    user-select: none;
+}
+
+:is(.ttrpg-editor, .ttrpg-player, .ttrpg-popover) :is(input, textarea) {
+    user-select: text;
+}
+
 /* A number field's name, which drags the value left and right, see NumberField in GridPanel.tsx. */
 .ttrpg-settings__scrub {
     cursor: ew-resize;
@@ -1701,6 +1715,8 @@ a.ttrpg-row__main:focus-visible {
     display: flex;
     align-items: center;
     gap: 6px;
+    /* Its own width, not what is left right of where it is anchored, near the edge of the screen. */
+    width: max-content;
     max-width: 280px;
     padding: 8px 12px;
     color: var(--ttrpg-ink);

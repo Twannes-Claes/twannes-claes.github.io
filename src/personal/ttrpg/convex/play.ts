@@ -12,6 +12,7 @@ import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } fr
 import { requireSession, requireUser } from './access';
 import { fogSettingsValidator, sizeValidator } from './schema';
 import { refreshSight, tokensOf } from './sight';
+import { dropFile } from './usage';
 import { storedPicture } from './pictures';
 
 /*
@@ -233,24 +234,55 @@ export const tokens = query({
     },
 });
 
+/** Wrong passwords a session takes in a minute before it takes no more tries until it is over. */
+const maxMisses = 10;
+const missWindow = 60 * 1000;
+
 /**
- * Whether a password opens a live session, so the join page can ask it before the character.
- * ponytail: nothing slows down guessing. Fine for a password said out loud at a table; count
- * tries per user if sessions ever hold anything worth guessing for.
+ * Whether a password opens a live session, counting the wrong ones. The count is per session, not
+ * per player, since anyone can sign in anonymously as many players as they like. Past maxMisses
+ * every try is refused for the rest of the minute, the right password too, so guessing runs at
+ * ten a minute at most. A wrong password returns false rather than throwing, which would undo the
+ * count.
  */
-export const check = query({
+async function tryPassword(ctx: MutationCtx, session: Doc<'sessions'>, password: string): Promise<boolean>
+{
+    const guesses = await ctx.db
+        .query('guesses')
+        .withIndex('by_sessionId', (q) => q.eq('sessionId', session._id))
+        .unique();
+    const now = Date.now();
+    const counting = guesses !== null && guesses.since > now - missWindow;
+
+    if (counting && guesses.misses >= maxMisses)
+        throw new ConvexError('Too many wrong passwords. Wait a minute and try again.');
+
+    if (session.live === true && password.trim() === session.password)
+        return true;
+
+    if (!guesses)
+        await ctx.db.insert('guesses', { sessionId: session._id, misses: 1, since: now });
+    else
+        await ctx.db.patch('guesses', guesses._id, counting ? { misses: guesses.misses + 1 } : { misses: 1, since: now });
+
+    return false;
+}
+
+/** Whether a password opens a live session, so the join page can ask it before the character. */
+export const check = mutation({
     args: { sessionId: v.id('sessions'), password: v.string() },
     handler: async (ctx, { sessionId, password }) =>
     {
         await requireUser(ctx);
 
-        const session = await sessionOf(ctx, sessionId);
-
-        return session.live === true && password.trim() === session.password;
+        return await tryPassword(ctx, await sessionOf(ctx, sessionId), password);
     },
 });
 
-/** A player joins with the password and their character, and appears at the spawn point. */
+/**
+ * A player joins with the password and their character, and appears at the spawn point. Null for
+ * a wrong password, see tryPassword.
+ */
 export const join = mutation({
     args: { sessionId: v.id('sessions'), password: v.string(), name: v.string(), color: v.string() },
     handler: async (ctx, { sessionId, password, name, color }) =>
@@ -265,8 +297,8 @@ export const join = mutation({
         if (session.kicked?.includes(userId))
             throw new ConvexError('The GM removed you from this table.');
 
-        if (password.trim() !== session.password)
-            throw new ConvexError('That is not the password.');
+        if (!(await tryPassword(ctx, session, password)))
+            return null;
 
         if (!character)
             throw new ConvexError('Your character needs a name.');
@@ -339,7 +371,7 @@ export const keepAvatar = internalMutation({
             return 'refused';
 
         if (token.avatarId && token.avatarId !== storageId)
-            await ctx.storage.delete(token.avatarId);
+            await dropFile(ctx, token.avatarId);
 
         await ctx.db.patch('tokens', token._id, { avatar, avatarId: storageId });
 
@@ -473,7 +505,7 @@ export const kick = mutation({
             throw new ConvexError('Only players can be removed.');
 
         if (token.avatarId)
-            await ctx.storage.delete(token.avatarId);
+            await dropFile(ctx, token.avatarId);
 
         await ctx.db.delete('tokens', tokenId);
 
@@ -596,7 +628,7 @@ export const removeMonster = mutation({
         const token = await requireMonster(ctx, tokenId);
 
         if (token.avatarId)
-            await ctx.storage.delete(token.avatarId);
+            await dropFile(ctx, token.avatarId);
 
         await ctx.db.delete('tokens', tokenId);
 

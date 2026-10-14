@@ -14,6 +14,7 @@ import { useState, useSyncExternalStore, type ChangeEvent } from 'react';
 import type { Scenario } from '../types';
 
 import { confirmAction } from '../services/confirm';
+import { fileSize } from '../services/images';
 
 interface ScenarioListProps
 {
@@ -31,6 +32,8 @@ interface ScenarioListProps
     onBackground: (file: File) => void;
     /** Takes the open map's picture away; the map keeps its size. */
     onRemoveBackground: () => void;
+    /** The open map's picture's file size, for the tip of its button. Missing when unknown. */
+    backgroundBytes?: number;
 }
 
 /** Where the map panel remembers being folded, in this browser only. */
@@ -86,6 +89,7 @@ export function ScenarioList({
     onPicture,
     onBackground,
     onRemoveBackground,
+    backgroundBytes,
 }: ScenarioListProps)
 {
     const active = scenarios.find((scenario) => scenario.id === activeId) ?? scenarios[0];
@@ -199,7 +203,10 @@ export function ScenarioList({
                     </div>
 
                     <div className="ttrpg-scenarios__background">
-                        <label className="ttrpg-segment" title="A picture behind this map">
+                        <label
+                            className="ttrpg-segment"
+                            title={backgroundBytes === undefined ? 'A picture behind this map' : `This map's picture, ${fileSize(backgroundBytes)}`}
+                        >
                             <FontAwesomeIcon icon={faImage} />
                             {active.background ? 'Change background' : 'Add background'}
                             <input

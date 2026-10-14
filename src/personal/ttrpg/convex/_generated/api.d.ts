@@ -16,6 +16,7 @@ import type * as pictures from "../pictures.js";
 import type * as play from "../play.js";
 import type * as sessions from "../sessions.js";
 import type * as sight from "../sight.js";
+import type * as usage from "../usage.js";
 
 import type {
   ApiFromModules,
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   play: typeof play;
   sessions: typeof sessions;
   sight: typeof sight;
+  usage: typeof usage;
 }>;
 
 /**

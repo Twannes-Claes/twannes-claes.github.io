@@ -7,6 +7,7 @@ import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/s
 import { requireHost, requireSession } from './access';
 import { scenarioValidator } from './schema';
 import { refreshSight, tokensOf } from './sight';
+import { dropFile, totalBytes } from './usage';
 
 /** More maps than anyone plays in one session, and a cap on what one save can ask for. */
 const maxScenarios = 100;
@@ -43,7 +44,7 @@ async function freeMaps(ctx: MutationCtx, sessionId: Id<'sessions'>, keep: Set<s
         if (keep.has(picture.src) || picture._creationTime > Date.now() - spare)
             continue;
 
-        await ctx.storage.delete(picture.storageId);
+        await dropFile(ctx, picture.storageId);
         await ctx.db.delete('mapPictures', picture._id);
     }
 }
@@ -151,7 +152,7 @@ export const remove = mutation({
         for (const token of await tokensOf(ctx, sessionId))
         {
             if (token.avatarId)
-                await ctx.storage.delete(token.avatarId);
+                await dropFile(ctx, token.avatarId);
 
             await ctx.db.delete('tokens', token._id);
         }
@@ -164,6 +165,14 @@ export const remove = mutation({
         for (const doc of fog)
             await ctx.db.delete('fog', doc._id);
 
+        const guesses = await ctx.db
+            .query('guesses')
+            .withIndex('by_sessionId', (q) => q.eq('sessionId', sessionId))
+            .unique();
+
+        if (guesses)
+            await ctx.db.delete('guesses', guesses._id);
+
         await ctx.db.delete('sessions', sessionId);
 
         return null;
@@ -173,10 +182,9 @@ export const remove = mutation({
 /**
  * Everything the editor opens with: the session's name, its scenarios in order and the host's
  * prop library. Read once, the editor holds the truth while it is open and saves it back.
- * Also the size of every stored file, for the storage meter in components/PropLibrary.tsx: each
- * prop's own, and the rest of the deployment's files together, maps and tokens and all.
- * ponytail: reads every file's metadata on each open. Keep a running total in a table if the
- * files ever number in the tens of thousands.
+ * Also the sizes for the storage meter in components/PropLibrary.tsx: each prop's own, and the
+ * rest of the deployment's kept files together, maps and tokens and all, see usage.ts.
+ * And the size of each of the session's map pictures, for the tip of the background button.
  */
 export const load = query({
     args: { sessionId: v.id('sessions') },
@@ -189,22 +197,29 @@ export const load = query({
             .query('pictures')
             .withIndex('by_ownerId', (q) => q.eq('ownerId', session.ownerId))
             .take(1000);
-        const files = await ctx.db.system.query('_storage').take(10000);
-        const sizes = new Map(files.map((file) => [file._id, file.size]));
         const library = pictures.map((picture) => ({
             id: picture._id,
             name: picture.name,
             src: picture.src,
             width: picture.width,
             height: picture.height,
-            bytes: sizes.get(picture.storageId) ?? 0,
+            bytes: picture.bytes ?? 0,
         }));
-        const total = files.reduce((sum, file) => sum + file.size, 0);
+        const total = await totalBytes(ctx);
+        const maps = await ctx.db
+            .query('mapPictures')
+            .withIndex('by_sessionId', (q) => q.eq('sessionId', sessionId))
+            .take(1000);
+        const backgrounds = [];
+
+        for (const { src, storageId } of maps)
+            backgrounds.push({ src, bytes: (await ctx.db.system.get('_storage', storageId))?.size ?? 0 });
 
         return {
             name: session.name,
             scenarios: session.order.flatMap((id) => byId.get(id) ?? []),
             library,
+            backgrounds,
             otherBytes: total - library.reduce((sum, picture) => sum + picture.bytes, 0),
         };
     },

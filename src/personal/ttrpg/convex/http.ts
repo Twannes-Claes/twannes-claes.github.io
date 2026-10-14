@@ -5,6 +5,7 @@ import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { httpAction } from './_generated/server';
 import { auth } from './auth';
+import { pictureTypes } from './pictures';
 import { maxAvatarBytes } from './play';
 
 /** The address Discord sends people back to after signing in, and the players' picture upload. */
@@ -40,7 +41,7 @@ http.route({
         if (!sessionId)
             return answer(400);
 
-        if (!request.headers.get('Content-Type')?.startsWith('image/'))
+        if (!pictureTypes.includes(request.headers.get('Content-Type') ?? ''))
             return answer(415);
 
         // Without a length the body is not read at all, so nothing big is taken in to find out.

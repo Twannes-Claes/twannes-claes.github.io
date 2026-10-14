@@ -4,7 +4,7 @@ import { ConvexError } from 'convex/values';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import type { Live, PropPicture, Scenario, Token } from '../types';
+import type { Live, PictureBytes, PropPicture, Scenario, Token } from '../types';
 
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
@@ -28,6 +28,7 @@ interface Opened
     library: PropPicture[];
     /** Every stored file that is not a prop, see load in convex/sessions.ts. */
     otherBytes: number;
+    backgrounds: PictureBytes[];
 }
 
 /** Waits for a call, and turns its failure into a message the editor can show. */
@@ -169,6 +170,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
                 initial={opened.scenarios}
                 library={opened.library}
                 otherBytes={opened.otherBytes}
+                backgrounds={opened.backgrounds}
                 store={store}
                 debug={debug}
                 live={live}

@@ -10,7 +10,7 @@ import { baseName } from './images';
 async function keep(picture: Blob): Promise<StoredPicture>
 {
     const bitmap = await createImageBitmap(picture);
-    const kept = { src: URL.createObjectURL(picture), width: bitmap.width, height: bitmap.height };
+    const kept = { src: URL.createObjectURL(picture), width: bitmap.width, height: bitmap.height, bytes: picture.size };
 
     bitmap.close();
 

@@ -121,7 +121,7 @@ export function sessionStore(sessionId: Id<'sessions'>): Store
             if (!src)
                 throw new Error(refused);
 
-            return { src, width, height };
+            return { src, width, height, bytes: blob.size };
         },
         save: async (scenarios, changed, held) =>
         {

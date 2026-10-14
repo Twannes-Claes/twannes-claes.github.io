@@ -241,6 +241,8 @@ GMs, so becoming one should not need the Convex dashboard.
   which keeps them the same user on that phone, so a reload keeps their character.
 - **The password is checked on the server.** Joining is a mutation that compares the password
   with the session's, which only the owner can read, and only then makes the player's token.
+  Wrong passwords are counted per session: after ten in a minute it takes no tries until the
+  minute is over, so guessing is too slow to matter.
 - **The server keeps monsters to what players may see.** Players get the map being played,
   walls and all, since the map picture shows the whole level anyway, but only the monsters a
   player can see right now and the GM has not hidden. The dev tools show no monster the table

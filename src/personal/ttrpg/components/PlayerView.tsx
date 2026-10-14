@@ -136,7 +136,7 @@ function JoinForm({ sessionId, name }: JoinFormProps)
             const typed = String(form.get('password'));
 
             return convex
-                .query(api.play.check, { sessionId, password: typed })
+                .mutation(api.play.check, { sessionId, password: typed })
                 .then((right) =>
                 {
                     if (!right)
@@ -146,7 +146,7 @@ function JoinForm({ sessionId, name }: JoinFormProps)
 
                     return '';
                 })
-                .catch(() => 'Could not check the password. Check the connection.');
+                .catch((reason: unknown) => explain(reason, 'Could not check the password. Check the connection.'));
         },
         '',
     );
@@ -168,8 +168,12 @@ function JoinForm({ sessionId, name }: JoinFormProps)
         return avatar.then(
             (blob) =>
                 join(character)
-                    .then(async () =>
+                    .then(async (tokenId) =>
                     {
+                        // The GM changed the password since it was checked, by starting again.
+                        if (!tokenId)
+                            return 'The password changed. Reload the page and type the new one.';
+
                         if (blob)
                             await uploadAvatar(sessionId, blob, authToken);
 
@@ -183,7 +187,7 @@ function JoinForm({ sessionId, name }: JoinFormProps)
     if (password === null)
     {
         return (
-            <main className="ttrpg-dashboard">
+            <main className="ttrpg-dashboard ttrpg-player">
                 <header className="ttrpg-dashboard__header">
                     <h1>{name}</h1>
                     <p>Join the table.</p>
@@ -203,7 +207,7 @@ function JoinForm({ sessionId, name }: JoinFormProps)
     }
 
     return (
-        <main className="ttrpg-dashboard">
+        <main className="ttrpg-dashboard ttrpg-player">
             <header className="ttrpg-dashboard__header">
                 <h1>Your character</h1>
                 <p>A name, a colour for the ring around your token, and a picture.</p>
@@ -304,7 +308,7 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
     };
 
     return (
-        <main>
+        <main className="ttrpg-player">
             <div className="ttrpg-panel ttrpg-modes">
                 <label className="ttrpg-segment" aria-disabled={uploading}>
                     <FontAwesomeIcon icon={faImage} />
