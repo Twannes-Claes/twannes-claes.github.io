@@ -3,10 +3,13 @@ import {
     faCompress,
     faDragon,
     faEye,
+    faEyeSlash,
     faExpand,
+    faCircle,
     faObjectGroup,
     faRulerHorizontal,
     faSnowflake,
+    faSquare,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect } from 'react';
@@ -17,7 +20,16 @@ import { typing } from './useKeys';
 import { useFullscreen } from './useScreen';
 
 /** What a press on the map does in play mode, besides drawing paths and dragging monsters. */
-export type PlayTool = 'open-doors' | 'measure' | 'reveal';
+export type PlayTool = 'open-doors' | 'measure' | 'reveal' | 'reveal-circle' | 'hide' | 'hide-circle';
+
+/** Reveal's tool for a choice in its pop-out: uncover or hide, with a box or a circle. */
+function fogTool(hide: boolean, circle: boolean): PlayTool
+{
+    if (hide)
+        return circle ? 'hide-circle' : 'hide';
+
+    return circle ? 'reveal-circle' : 'reveal';
+}
 
 interface PlayDockProps
 {
@@ -44,7 +56,8 @@ interface PlayDockProps
  * The game master's controls in play mode, at the bottom: the map, the ruler, Reveal area, Peek,
  * Freeze, the fog and full screen. Peek works while held, the button or the space bar, so the fog
  * never stays open on the table screen by accident. Ruler and Reveal toggle, and pressing the
- * one that is on goes back to opening doors with a click.
+ * one that is on goes back to opening doors with a click. While Reveal is on, a pop-out above it
+ * picks uncover or hide, and a box or a circle, for a torch thrown or a spell of light.
  */
 export function PlayDock({
     tool,
@@ -90,6 +103,9 @@ export function PlayDock({
     }, [onPeek]);
 
     const pick = (next: PlayTool) => onTool(tool === next ? 'open-doors' : next);
+    const hiding = tool === 'hide' || tool === 'hide-circle';
+    const circle = tool === 'reveal-circle' || tool === 'hide-circle';
+    const revealing = hiding || circle || tool === 'reveal';
 
     return (
         <div className={`ttrpg-panel ttrpg-dock${hidden ? ' ttrpg-hidden' : ''}`}>
@@ -120,16 +136,67 @@ export function PlayDock({
                     <FontAwesomeIcon icon={faRulerHorizontal} />
                     Ruler
                 </button>
-                <button
-                    type="button"
-                    className="ttrpg-segment"
-                    aria-pressed={tool === 'reveal'}
-                    title="Drag a box to uncover it"
-                    onClick={() => pick('reveal')}
-                >
-                    <FontAwesomeIcon icon={faObjectGroup} />
-                    Reveal
-                </button>
+                <span className="ttrpg-pop">
+                    <button
+                        type="button"
+                        className="ttrpg-segment"
+                        aria-pressed={revealing}
+                        aria-expanded={revealing}
+                        title="Drag over the map to uncover it"
+                        onClick={() => onTool(revealing ? 'open-doors' : 'reveal')}
+                    >
+                        <FontAwesomeIcon icon={faObjectGroup} />
+                        Reveal
+                    </button>
+                    {revealing && (
+                        <span className="ttrpg-panel ttrpg-pop__menu" role="group" aria-label="Reveal">
+                            <span className="ttrpg-pop__row">
+                                <button
+                                    type="button"
+                                    className="ttrpg-segment"
+                                    aria-pressed={!hiding}
+                                    title="What you drag over counts as seen"
+                                    onClick={() => onTool(fogTool(false, circle))}
+                                >
+                                    <FontAwesomeIcon icon={faEye} />
+                                    Uncover
+                                </button>
+                                <button
+                                    type="button"
+                                    className="ttrpg-segment ttrpg-segment--danger"
+                                    aria-pressed={hiding}
+                                    title="What you drag over is forgotten, unless a player sees it now"
+                                    onClick={() => onTool(fogTool(true, circle))}
+                                >
+                                    <FontAwesomeIcon icon={faEyeSlash} />
+                                    Hide
+                                </button>
+                            </span>
+                            <span className="ttrpg-pop__row">
+                                <button
+                                    type="button"
+                                    className="ttrpg-segment"
+                                    aria-pressed={!circle}
+                                    title="Drag a box"
+                                    onClick={() => onTool(fogTool(hiding, false))}
+                                >
+                                    <FontAwesomeIcon icon={faSquare} />
+                                    Box
+                                </button>
+                                <button
+                                    type="button"
+                                    className="ttrpg-segment"
+                                    aria-pressed={circle}
+                                    title={hiding ? 'Drag from the middle out' : 'Drag from where a light lands to how far it shines. Walls stop it.'}
+                                    onClick={() => onTool(fogTool(hiding, true))}
+                                >
+                                    <FontAwesomeIcon icon={faCircle} />
+                                    Circle
+                                </button>
+                            </span>
+                        </span>
+                    )}
+                </span>
                 <button
                     type="button"
                     className="ttrpg-segment"

@@ -42,6 +42,21 @@ export function sameCell(a: Cell, b: Cell): boolean
     return a.q === b.q && a.r === b.r;
 }
 
+/**
+ * The grid with its offset brought under one repeat of the grid, from 0 up to a cell across, or
+ * two rows down a pointy hex grid. The grid looks exactly the same, only the cells are numbered
+ * from another one, and nothing stored counts cells: tokens, walls and props are world pixels.
+ */
+export function wrapOffset(grid: Grid): Grid
+{
+    const hex = grid.type === 'hex';
+    const wide = hex && grid.hexOrientation === 'flat' ? sqrt3 : 1;
+    const tall = hex && grid.hexOrientation === 'pointy' ? sqrt3 : 1;
+    const wrap = (value: number, period: number) => ((value % period) + period) % period;
+
+    return { ...grid, offsetX: wrap(grid.offsetX, grid.size * wide), offsetY: wrap(grid.offsetY, grid.size * tall) };
+}
+
 /** From the centre of a hex to one of its corners. */
 export function hexRadius(grid: Grid): number
 {

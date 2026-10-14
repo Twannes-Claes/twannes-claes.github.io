@@ -57,6 +57,11 @@ export interface Wall
      * so the sight and movement maths never need to know about doors.
      */
     door?: { open: boolean };
+    /**
+     * Shared by the walls of one ring drawn round a tree or a pillar, so the eraser takes them
+     * together and the Doors tool leaves them alone, see ringTool in map/tools.ts.
+     */
+    ring?: string;
 }
 
 /** A picture placed on the map, like a tree or a barrel. Uploaded by game masters, see PLAN.md. */
@@ -185,8 +190,11 @@ export interface Live
     removeMonster: (tokenId: string) => Promise<void>;
     /** What the party has seen of the map being played, null until anything has been. */
     fog: SharedFog | null;
-    /** Adds what the table screen has seen to it. Only the game master's screen sends this. */
-    saveFog: (fog: SharedFog) => Promise<void>;
+    /**
+     * Adds what the table screen has seen to it. Only the game master's screen sends this. With
+     * forget it replaces it, as the game master hid some, and every screen starts over from it.
+     */
+    saveFog: (fog: SharedFog, forget?: boolean) => Promise<void>;
     /** Forgets what everyone has seen of the map being played. */
     resetFog: () => Promise<void>;
     /** How the fog looks on every screen, null until the game master changes it. */

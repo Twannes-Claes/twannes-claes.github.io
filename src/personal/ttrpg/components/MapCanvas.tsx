@@ -44,8 +44,11 @@ interface MapCanvasProps
     onPathCancel?: () => void;
     /** What the party has seen, from the server, see SharedFog. */
     shared?: SharedFog | null;
-    /** Hears what this screen has seen, to share. Only the game master's screen listens. */
-    onExplored?: (fog: SharedFog) => void;
+    /**
+     * Hears what this screen has seen, to share, with forget when the game master hid some. Only
+     * the game master's screen listens.
+     */
+    onExplored?: (fog: SharedFog, forget?: boolean) => void;
     /** How the fog looks, see FogSettings. */
     fogSettings?: FogSettings;
     /** Whose fog this is, see setFogSource in map/view.ts. A phone is always live. */
@@ -92,7 +95,7 @@ export function MapCanvas({
     const viewed = useEffectEvent((center: Point) => onView?.(center));
     const toolCancelled = useEffectEvent(() => onToolCancel?.());
     const pathCancelled = useEffectEvent(() => onPathCancel?.());
-    const explored = useEffectEvent((fog: SharedFog) => onExplored?.(fog));
+    const explored = useEffectEvent((fog: SharedFog, forget?: boolean) => onExplored?.(fog, forget));
 
     useEffect(() =>
     {
@@ -107,7 +110,7 @@ export function MapCanvas({
             onView: (center) => viewed(center),
             onToolCancel: () => toolCancelled(),
             onPathCancel: () => pathCancelled(),
-            onExplored: (fog) => explored(fog),
+            onExplored: (fog, forget) => explored(fog, forget),
         });
 
         view.current = created;

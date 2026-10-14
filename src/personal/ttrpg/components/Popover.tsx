@@ -16,6 +16,8 @@ interface PopoverProps
      * map with, like the fog and the monsters, where a press on the map pans or drags.
      */
     dismissOnOutside?: boolean;
+    /** Off where Esc and a press beside it are enough, like the settings. */
+    closeButton?: boolean;
     children: ReactNode;
 }
 
@@ -24,7 +26,7 @@ interface PopoverProps
  * opens one carries aria-expanded, which tells screen readers it is open and keeps a press on it
  * from counting as outside, so it can close the panel again.
  */
-export function Popover({ title, onClose, className, dismissOnOutside = false, children }: PopoverProps)
+export function Popover({ title, onClose, className, dismissOnOutside = false, closeButton = true, children }: PopoverProps)
 {
     const panel = useRef<HTMLElement>(null);
 
@@ -63,17 +65,19 @@ export function Popover({ title, onClose, className, dismissOnOutside = false, c
         <section ref={panel} className={`ttrpg-panel ttrpg-popover ${className}`} aria-label={title}>
             <header className="ttrpg-popover__header">
                 <h2>{title}</h2>
-                <button
-                    type="button"
-                    className="ttrpg-icon-button ttrpg-icon-button--small"
-                    aria-label="Close"
-                    title="Close (Esc)"
-                    onClick={onClose}
-                >
-                    <FontAwesomeIcon icon={faXmark} />
-                </button>
+                {closeButton && (
+                    <button
+                        type="button"
+                        className="ttrpg-icon-button ttrpg-icon-button--small"
+                        aria-label="Close"
+                        title="Close (Esc)"
+                        onClick={onClose}
+                    >
+                        <FontAwesomeIcon icon={faXmark} />
+                    </button>
+                )}
             </header>
-            {children}
+            <div className="ttrpg-popover__scroll">{children}</div>
         </section>,
         document.querySelector('.ttrpg') ?? document.body,
     );

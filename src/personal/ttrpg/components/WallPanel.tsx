@@ -1,11 +1,15 @@
-import { faDoorClosed, faDrawPolygon, type IconDefinition } from '@fortawesome/free-solid-svg-icons';
+import { faCircle, faDoorClosed, faDrawPolygon, type IconDefinition } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
-/** What the walls tool does: draw walls, or step the wall clicked through door and back. */
-export type WallKind = 'wall' | 'change';
+/**
+ * What the walls tool does: draw walls, drag round ones for trees and pillars, or step the wall
+ * clicked through door and back.
+ */
+export type WallKind = 'wall' | 'ring' | 'change';
 
 const kinds: { id: WallKind; label: string; title: string; icon: IconDefinition }[] = [
     { id: 'wall', label: 'Draw', title: 'Click to chain walls', icon: faDrawPolygon },
+    { id: 'ring', label: 'Round', title: 'Drag from the middle out, for trees and pillars', icon: faCircle },
     {
         id: 'change',
         label: 'Doors',
@@ -33,8 +37,8 @@ interface WallPanelProps
 }
 
 /**
- * The walls tool's settings: draw walls, or turn a drawn wall into a door and back, and how
- * finely new walls snap to the grid. Alt still places freely.
+ * The walls tool's settings: draw walls, drag round ones, or turn a drawn wall into a door and
+ * back, and how finely new walls snap to the grid. Alt still places freely.
  */
 export function WallPanel({ kind, onKind, snap, onSnap }: WallPanelProps)
 {

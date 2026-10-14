@@ -6,6 +6,7 @@ import { cellAt, cellCenter, cellLine, snapPoint } from './grid.ts';
 import { lineFeet, pathFeet } from './path.ts';
 import { fromLocal, placedSize, propAt, propCorners, propHandles, snapCenter, snapSize } from './props.ts';
 import { drawPill, drawRoute } from './render.ts';
+import { sightSegments, visibilityPolygon } from './visibility.ts';
 
 import { confirmAction } from '../services/confirm.ts';
 
@@ -19,6 +20,7 @@ import { confirmAction } from '../services/confirm.ts';
 export type ToolId =
     | 'select'
     | 'walls'
+    | 'rings'
     | 'erase'
     | 'doors'
     | 'spawn'
@@ -26,13 +28,22 @@ export type ToolId =
     | 'props'
     | 'open-doors'
     | 'measure'
-    | 'reveal';
+    | 'reveal'
+    | 'reveal-circle'
+    | 'hide'
+    | 'hide-circle';
 
 /**
  * Hands a changed scenario back. A drag passes final false while it moves, which only shows
  * the change, and final true once on release, which keeps it as one step to undo.
  */
 export type Change = (next: Scenario, final?: boolean) => void;
+
+/**
+ * Hears what Reveal uncovers, a box or a circle, as a polygon in world pixels, and whether it hides
+ * it again instead.
+ */
+export type Reveal = (polygon: Point[], hide: boolean) => void;
 
 /** One pointer event, as a tool sees it. */
 export interface ToolPointer
@@ -326,6 +337,135 @@ function wallTool(change: Change, snap: number): MapTool
 }
 
 /**
+ * A ring's middle: the middle of the cell under the pointer or the nearest snap point, whichever
+ * is closer, so a tree sits in its cell or between four. The exact spot with Alt, with snapping
+ * off (0) or without a grid.
+ */
+function ringCenter(pointer: ToolPointer, steps: number): Point
+{
+    const { world, free, scenario } = pointer;
+    const { grid } = scenario;
+
+    if (free || steps === 0 || grid.type === 'none')
+        return onMap(scenario, world);
+
+    const middle = cellCenter(grid, cellAt(grid, world));
+    const corner = snapPoint(grid, world, steps);
+
+    return onMap(scenario, distance(middle, world) < distance(corner, world) ? middle : corner);
+}
+
+/** Evenly spaced points round a circle, the corners of the polygon that stands in for it. */
+function circlePoints(center: Point, radius: number, count: number): Point[]
+{
+    return Array.from({ length: count }, (_, index) =>
+    {
+        const angle = (index / count) * Math.PI * 2;
+
+        return { x: center.x + Math.cos(angle) * radius, y: center.y + Math.sin(angle) * radius };
+    });
+}
+
+/** A ring's walls, short enough that it reads as round: 12 for a small tree, up to 32. */
+function ringWalls(center: Point, radius: number, cell: number): Wall[]
+{
+    const ring = crypto.randomUUID();
+    const points = circlePoints(center, radius, Math.min(32, Math.max(12, Math.ceil((radius / cell) * 16))));
+
+    return points.map((a, index) =>
+    {
+        const b = points[(index + 1) % points.length];
+
+        return { id: crypto.randomUUID(), x1: a.x, y1: a.y, x2: b.x, y2: b.y, blocksSight: true, blocksMove: true, ring };
+    });
+}
+
+/**
+ * Round walls, for trees and pillars: press on the middle and drag out to the edge. The edge
+ * snaps to steps of half a cell side divided by the snap, so a one cell tree is one drag.
+ */
+function ringTool(change: Change, snap: number): MapTool
+{
+    let drag: { center: Point; radius: number } | null = null;
+    let hover: Point | null = null;
+
+    const radiusAt = ({ world, free, scenario }: ToolPointer, center: Point) =>
+    {
+        const raw = distance(center, world);
+
+        if (free || snap === 0 || scenario.grid.type === 'none')
+            return raw;
+
+        const step = scenario.grid.size / (2 * snap);
+
+        return Math.max(step, Math.round(raw / step) * step);
+    };
+
+    return {
+        cursor: 'crosshair',
+        down: (pointer) =>
+        {
+            const center = ringCenter(pointer, snap);
+
+            drag = { center, radius: radiusAt(pointer, center) };
+
+            return true;
+        },
+        move: (pointer, pressed) =>
+        {
+            hover = ringCenter(pointer, snap);
+
+            if (pressed && drag)
+                drag.radius = radiusAt(pointer, drag.center);
+
+        },
+        up: ({ scenario, zoom }) =>
+        {
+            // A ring too small to see on screen was a slip, not a tree.
+            if (drag && drag.radius * zoom >= 4)
+            {
+                const walls = ringWalls(drag.center, drag.radius, scenario.grid.size);
+
+                change({ ...scenario, walls: [...scenario.walls, ...walls] });
+            }
+
+            drag = null;
+        },
+        cancel: () =>
+        {
+            const had = drag !== null;
+
+            drag = null;
+
+            return had;
+        },
+        draw: (ctx, zoom) =>
+        {
+            if (drag)
+            {
+                ctx.beginPath();
+                ctx.arc(drag.center.x, drag.center.y, drag.radius, 0, Math.PI * 2);
+                ctx.setLineDash([8 / zoom, 6 / zoom]);
+                ctx.strokeStyle = highlight;
+                ctx.lineWidth = 3 / zoom;
+                ctx.stroke();
+                ctx.setLineDash([]);
+                dot(ctx, drag.center, 5 / zoom, highlight);
+            }
+            else if (hover)
+                dot(ctx, hover, 4 / zoom, ink);
+
+        },
+    };
+}
+
+/** The walls a wall goes with: its whole ring, or only itself. */
+function withRing(walls: Wall[], wall: Wall): Wall[]
+{
+    return wall.ring ? walls.filter((other) => other.ring === wall.ring) : [wall];
+}
+
+/**
  * Whether the players see a wall, or saw it. Tested just off either side of its middle, as sight
  * stops right at a closed door, so the door itself sits on the edge of what is seen.
  */
@@ -492,8 +632,11 @@ function measureTool(): MapTool
     };
 }
 
-/** The game master's Reveal area: drag a box and everything in it counts as seen before. */
-function revealTool(reveal: (area: Area) => void): MapTool
+/**
+ * The game master's Reveal area: drag a box and everything in it counts as seen before, or, hiding,
+ * as never seen. The box shows red while it hides.
+ */
+function revealTool(reveal: Reveal, hide: boolean): MapTool
 {
     let drag: Drag | null = null;
 
@@ -514,7 +657,16 @@ function revealTool(reveal: (area: Area) => void): MapTool
         up: () =>
         {
             if (drag)
-                reveal(boxOf(drag.start, drag.end));
+            {
+                const { left, top, right, bottom } = boxOf(drag.start, drag.end);
+
+                reveal([
+                    { x: left, y: top },
+                    { x: right, y: top },
+                    { x: right, y: bottom },
+                    { x: left, y: bottom },
+                ], hide);
+            }
 
             drag = null;
         },
@@ -529,11 +681,88 @@ function revealTool(reveal: (area: Area) => void): MapTool
         draw: (ctx, zoom) =>
         {
             if (drag)
-                drawBox(ctx, drag, zoom, highlight, true);
+                drawBox(ctx, drag, zoom, hide ? danger : highlight, true);
 
         },
     };
 }
+
+/**
+ * Reveal as a circle, for a torch thrown or a spell of light: drag from where it lands out to how
+ * far it shines, in whole cells unless Alt is held. What it lights counts as seen before, stopped
+ * by walls like a player's sight. Hiding forgets the whole circle, red while it is dragged.
+ */
+function revealCircleTool(reveal: Reveal, hide: boolean): MapTool
+{
+    let drag: { center: Point; radius: number } | null = null;
+
+    const radiusAt = ({ world, free, scenario }: ToolPointer, center: Point) =>
+    {
+        const { grid } = scenario;
+        const raw = distance(center, world);
+
+        return free || grid.type === 'none' ? raw : Math.max(1, Math.round(raw / grid.size)) * grid.size;
+    };
+
+    return {
+        cursor: 'crosshair',
+        down: (pointer) =>
+        {
+            drag = { center: pointer.world, radius: radiusAt(pointer, pointer.world) };
+
+            return true;
+        },
+        move: (pointer, pressed) =>
+        {
+            if (pressed && drag)
+                drag.radius = radiusAt(pointer, drag.center);
+
+        },
+        up: ({ scenario }) =>
+        {
+            if (drag)
+            {
+                const { center, radius } = drag;
+                const points = circlePoints(center, radius, 64);
+                const edge = points.map((a, index) => ({ a, b: points[(index + 1) % points.length] }));
+
+                // Hiding forgets the whole circle, walls or not.
+                reveal(hide ? points : visibilityPolygon(center, [...sightSegments(scenario), ...edge]), hide);
+            }
+
+            drag = null;
+        },
+        cancel: () =>
+        {
+            const had = drag !== null;
+
+            drag = null;
+
+            return had;
+        },
+        draw: (ctx, zoom, { grid }) =>
+        {
+            if (!drag)
+                return;
+
+            const feet = Math.round((drag.radius / grid.size) * grid.feetPerCell);
+
+            ctx.beginPath();
+            ctx.arc(drag.center.x, drag.center.y, drag.radius, 0, Math.PI * 2);
+            const colour = hide ? danger : highlight;
+
+            ctx.fillStyle = faded(colour, 0.14);
+            ctx.fill();
+            ctx.setLineDash([6 / zoom, 4 / zoom]);
+            ctx.strokeStyle = colour;
+            ctx.lineWidth = 2 / zoom;
+            ctx.stroke();
+            ctx.setLineDash([]);
+            drawPill(ctx, `${feet} ft`, drag.center, zoom, faded(ground, 0.9));
+        },
+    };
+}
+
 
 /** Whether a wall lies in a box or crosses into it. */
 export function wallInBox(wall: Wall, { left, top, right, bottom }: Area): boolean
@@ -591,8 +820,11 @@ function eraseTool(change: Change): MapTool
         const box = boxOf(drag.start, drag.end);
         const inside = ({ x, y }: Point) => x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
 
+        // A ring the box touches goes whole.
+        const rings = new Set(scenario.walls.filter((wall) => wall.ring && wallInBox(wall, box)).map((wall) => wall.ring));
+
         return {
-            walls: scenario.walls.filter((wall) => wallInBox(wall, box)),
+            walls: scenario.walls.filter((wall) => wallInBox(wall, box) || rings.has(wall.ring)),
             props: scenario.props.filter(inside),
         };
     };
@@ -610,7 +842,11 @@ function eraseTool(change: Change): MapTool
             hover = {};
 
             if (wall)
-                change({ ...scenario, walls: scenario.walls.filter((other) => other.id !== wall.id) });
+            {
+                const gone = withRing(scenario.walls, wall);
+
+                change({ ...scenario, walls: scenario.walls.filter((other) => !gone.includes(other)) });
+            }
             else if (prop)
                 change(withoutProp(scenario, prop.id));
             else
@@ -662,7 +898,10 @@ function eraseTool(change: Change): MapTool
         draw: (ctx, zoom, scenario) =>
         {
             if (hover.wall)
-                strokeWall(ctx, hover.wall, danger, 7 / zoom);
+            {
+                for (const wall of withRing(scenario.walls, hover.wall))
+                    strokeWall(ctx, wall, danger, 7 / zoom);
+            }
 
             if (hover.prop)
                 strokeProp(ctx, hover.prop, danger, 3 / zoom);
@@ -933,14 +1172,14 @@ function propTool(change: Change, placing: PropPicture | null): MapTool
 /**
  * The tool for an id, or null for plain panning and token dragging. placing is the library
  * picture the props tool places with each click, null to select and edit placed props. reveal
- * hears the boxes of Reveal area, which change what was seen rather than the scenario. snap is
+ * hears what Reveal uncovers or hides, which changes what was seen, not the scenario. snap is
  * how many points per cell side walls snap to, 0 for none.
  */
 export function createTool(
     id: ToolId,
     change: Change,
     placing: PropPicture | null = null,
-    reveal: (area: Area) => void = () => {},
+    reveal: Reveal = () => {},
     snap = 1,
 ): MapTool | null
 {
@@ -948,11 +1187,14 @@ export function createTool(
     {
         case 'walls':
             return wallTool(change, snap);
+        case 'rings':
+            return ringTool(change, snap);
         case 'erase':
             return eraseTool(change);
         case 'doors':
+            // A ring is no door.
             return wallClickTool(
-                () => true,
+                (wall) => !wall.ring,
                 (scenario, wall) => replaceWall(scenario, nextDoor(wall)),
                 nextDoorLabel,
                 change,
@@ -972,7 +1214,11 @@ export function createTool(
         case 'measure':
             return measureTool();
         case 'reveal':
-            return revealTool(reveal);
+        case 'hide':
+            return revealTool(reveal, id === 'hide');
+        case 'reveal-circle':
+        case 'hide-circle':
+            return revealCircleTool(reveal, id === 'hide-circle');
         case 'select':
         case 'align':
             return null;

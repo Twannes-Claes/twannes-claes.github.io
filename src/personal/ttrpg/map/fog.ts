@@ -1,6 +1,5 @@
 import type { FogSettings, Point, Scenario, Wall } from '../types';
 
-import type { Area } from './geometry.ts';
 import { inSight, insidePolygon, visibilityPolygon, type Segment } from './visibility.ts';
 
 /*
@@ -120,8 +119,11 @@ export function wasSeen({ columns, rows, sample, seen }: Explored, { x, y }: Poi
     return column >= 0 && column < columns && row >= 0 && row < rows && seen[row * columns + column] === 1;
 }
 
-/** Marks every sample whose centre lies in the polygon as seen. True when any was new. */
-export function markSeen(explored: Explored, polygon: Point[]): boolean
+/**
+ * Marks every sample whose centre lies in the polygon as seen, or as unseen again when the game
+ * master hides it. True when any changed.
+ */
+export function markSeen(explored: Explored, polygon: Point[], flag = 1): boolean
 {
     const { columns, rows, sample, seen } = explored;
     const xs = polygon.map((point) => point.x);
@@ -139,9 +141,9 @@ export function markSeen(explored: Explored, polygon: Point[]): boolean
             const index = row * columns + column;
             const center = { x: (column + 0.5) * sample, y: (row + 0.5) * sample };
 
-            if (seen[index] === 0 && insidePolygon(center, polygon))
+            if (seen[index] !== flag && insidePolygon(center, polygon))
             {
-                seen[index] = 1;
+                seen[index] = flag;
                 changed = true;
             }
         }
@@ -150,25 +152,7 @@ export function markSeen(explored: Explored, polygon: Point[]): boolean
     return changed;
 }
 
-/** Marks every sample whose centre lies in a box as seen, for the game master's Reveal area. */
-export function markArea(
-    explored: Explored,
-    area: Area,
-)
-{
-    const { columns, rows, sample, seen } = explored;
-    // A sample counts once the box reaches its centre, the same rule markSeen uses.
-    const firstColumn = Math.max(0, Math.ceil(area.left / sample - 0.5));
-    const lastColumn = Math.min(columns - 1, Math.floor(area.right / sample - 0.5));
-    const firstRow = Math.max(0, Math.ceil(area.top / sample - 0.5));
-    const lastRow = Math.min(rows - 1, Math.floor(area.bottom / sample - 0.5));
-
-    for (let row = firstRow; row <= lastRow; row++)
-        seen.fill(1, row * columns + firstColumn, row * columns + lastColumn + 1);
-
-}
-
-/** Area is world pixels, like markArea's. */
+/** Draws on the sharp shape in world pixels. */
 function shapeContext(layers: FogLayers): CanvasRenderingContext2D
 {
     const ctx = context(layers.shape);
@@ -212,10 +196,19 @@ function keepSide(polygon: Point[], wall: Wall, point: Point): Point[]
     return kept;
 }
 
-/** Adds the game master's Reveal area box to the sharp shape. */
-export function shapeArea(layers: FogLayers, area: Area)
+/** Adds what the game master reveals, a box or a circle, to the sharp shape, or cuts it out. */
+export function shapePolygon(layers: FogLayers, polygon: Point[], hide = false)
 {
-    shapeContext(layers).fillRect(area.left, area.top, area.right - area.left, area.bottom - area.top);
+    const ctx = shapeContext(layers);
+
+    ctx.globalCompositeOperation = hide ? 'destination-out' : 'source-over';
+
+    ctx.beginPath();
+
+    for (const point of polygon)
+        ctx.lineTo(point.x, point.y);
+
+    ctx.fill();
 }
 
 /**

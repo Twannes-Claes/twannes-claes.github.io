@@ -684,6 +684,9 @@ parts: the engine and the fog).
   and autosaving the changed scenarios, maps from a plain picture, and map and prop pictures
   shrunk to WebP and uploaded, with the prop library kept per game master. Tried on the dev
   deployment: signing in, owner approval and a saved session that survives a reload.
+- **Since then:** round walls for trees and pillars (Round in the walls panel), erased as one;
+  the grid offset kept under one cell, as more only renumbers the cells; and the gear beside the
+  modes, with every shortcut and the size of the controls on this screen (`components/Settings.tsx`).
 - **Done when:** a session with two scenarios can be built and survives a reload.
 
 ### Phase 3: Fog of war
@@ -744,6 +747,10 @@ parts: the engine and the fog).
   in the dock opens how the fog looks (`components/FogPanel.tsx`): how fast it clears, softness,
   how much of seen rooms shows, far haze and smoke, saved per session (`play.setFogLook`) so
   every screen looks the same.
+- **Reveal's pop-out:** uncover or hide, with a box or a circle. The circle is for a thrown torch
+  or a light spell: drag from where it lands out to how far it shines, in whole cells, stopped by
+  walls. Hiding forgets what was seen there on every screen, by raising the fog's epoch like a
+  reset (`forget` in `play.saveFog`); what a player sees right now stays seen.
 
 ---
 

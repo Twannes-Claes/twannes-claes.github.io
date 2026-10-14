@@ -7,16 +7,15 @@ import {
     createExplored,
     createFogLayers,
     defaultFogSettings,
-    markArea,
     markSeen,
-    shapeArea,
+    shapePolygon,
     shapeSamples,
     wasSeen,
     type Explored,
     type FogLayers,
 } from './fog.ts';
 import { accent, tooFar } from './colours.ts';
-import { distance, midpoint, onMap, type Area } from './geometry.ts';
+import { distance, midpoint, onMap } from './geometry.ts';
 import { extendPath, lineFeet, pathBlocked, pathFeet } from './path.ts';
 import { drawPill, drawRoute, drawUnknownStep, render, tokenRadius, type Lifted, type Viewport } from './render.ts';
 import { anchorAt, footprintCenter, footprintKeys } from './size.ts';
@@ -65,8 +64,11 @@ export interface MapViewOptions
     onToolCancel?: () => void;
     /** The path waiting for its Move or Cancel was dropped, by a right click or a new path. */
     onPathCancel?: () => void;
-    /** A while after more of the map was seen, what has been seen in all, to share, see SharedFog. */
-    onExplored?: (fog: SharedFog) => void;
+    /**
+     * A while after more of the map was seen, what has been seen in all, to share, see SharedFog.
+     * At once with forget when the game master hid some, so every screen forgets it too.
+     */
+    onExplored?: (fog: SharedFog, forget?: boolean) => void;
 }
 
 /** How the drawing keeps up, measured on this device. */
@@ -303,8 +305,11 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     const seenByPlayers = (token: Token) =>
         token.kind === 'player' || (!token.hidden && lit.some((polygon) => insidePolygon(token, polygon)));
 
-    /** Hands what has been seen on to be shared, once it has stopped changing for a moment. */
-    const shareExplored = () =>
+    /**
+     * Hands what has been seen on to be shared, once it has stopped changing for a moment, or at
+     * once when the game master hid some.
+     */
+    const shareExplored = (forget = false) =>
     {
         const { onExplored } = options;
 
@@ -314,11 +319,15 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         const { id } = scenario;
         const { columns, rows, seen } = explored;
 
+        const send = () => onExplored({ scenarioId: id, epoch: sharedEpoch ?? 0, columns, rows, seen: seen.slice().buffer }, forget);
+
         clearTimeout(exploredTimer);
-        exploredTimer = window.setTimeout(
-            () => onExplored({ scenarioId: id, epoch: sharedEpoch ?? 0, columns, rows, seen: seen.slice().buffer }),
-            exploredDelay,
-        );
+
+        if (forget)
+            send();
+        else
+            exploredTimer = window.setTimeout(send, exploredDelay);
+
     };
 
     /** Takes in the shared fog for this map, when it fits the explored mask. */
@@ -537,18 +546,21 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
     };
 
-    /** The game master's Reveal area: the box counts as seen before. */
-    const revealArea = (area: Area) =>
+    /**
+     * The game master's Reveal, a box or a circle: what it covers counts as seen before, or,
+     * hidden, as never seen. What a player sees right now stays seen.
+     */
+    const reveal = (polygon: Point[], hide: boolean) =>
     {
         if (!explored)
             return;
 
-        markArea(explored, area);
+        markSeen(explored, polygon, hide ? 0 : 1);
 
         if (layers)
-            shapeArea(layers, area);
+            shapePolygon(layers, polygon, hide);
 
-        shareExplored();
+        shareExplored(hide);
         refreshFog();
     };
 
@@ -1095,6 +1107,9 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
                 layers = null;
                 sharedEpoch = null;
                 walks.clear();
+                // The old map's tokens do not stand on this one. Lit from where they stood, a token
+                // past this map's edge would uncover half of it; setTokens brings the new ones.
+                tokens = [];
                 // The new map's tokens fade in, the old map's do not fade out over it.
                 lastShown = new Map();
                 fading.clear();
@@ -1143,7 +1158,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         },
         setTool: (id, placing = null, snap = 1) =>
         {
-            tool = createTool(id, changeScenario, placing, revealArea, snap);
+            tool = createTool(id, changeScenario, placing, reveal, snap);
             toolPointerId = null;
             // The tool's cursor, or the stylesheet's grab hand when there is no tool.
             canvas.style.cursor = tool ? tool.cursor : '';

@@ -22,13 +22,18 @@ import { MoveSheet } from './MoveSheet';
 import { PlayDock, type PlayTool } from './PlayDock';
 import { PropLibrary } from './PropLibrary';
 import { ScenarioList } from './ScenarioList';
+import { Settings } from './Settings';
 import { ToolRail } from './ToolRail';
 import { useHistory } from './useHistory';
 import { useMessage } from './useMessage';
+import { useScreenSettings } from './useScreenSettings';
 import { useIdle, useWakeLock } from './useScreen';
 import { WallPanel, type WallKind } from './WallPanel';
 
 type Mode = 'edit' | 'play';
+
+/** The map tool behind each kind of the walls tool, see WallPanel. */
+const wallTools: Record<WallKind, ToolId> = { wall: 'walls', ring: 'rings', change: 'doors' };
 
 /** How long the editor waits after the last change before it saves. */
 const saveDelay = 1000;
@@ -74,7 +79,7 @@ interface MapEditorProps
     backgrounds?: PictureBytes[];
     /** Where pictures go and changes are saved, see Store in types.ts. */
     store: Store;
-    /** Shows the frame rate, see pages/Editor.tsx. */
+    /** Shows the frame rate, see pages/Editor.tsx. The settings can show it too. */
     debug: boolean;
     /** A saved session's live play: starting it, and the players' tokens. Not in the demo. */
     live?: Live;
@@ -119,9 +124,11 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     // The middle of the screen, where a new monster goes. A ref: it changes every frame.
     const viewCenter = useRef<Point | null>(null);
     const [stats, setStats] = useState<FrameStats | null>(null);
-    // The table screen stays on, and the controls step aside once the mouse rests, unless a
-    // move is waiting on its sheet.
-    const idle = useIdle(3000, mode === 'play' && !pending);
+    const [screen, setScreen] = useScreenSettings();
+    // The table screen stays on, and the controls step aside once the mouse rests as long as this
+    // screen's settings say, unless a move is waiting on its sheet.
+    const idle = useIdle(screen.hideAfter, mode === 'play' && !pending && screen.hideAfter > 0);
+    const showStats = debug || screen.frameRate;
     const unsaved = Boolean(store.save) && scenarios !== saved;
 
     useWakeLock(mode === 'play');
@@ -515,7 +522,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 scenario={active}
                 tokens={shown}
                 mode={mode}
-                tool={mode === 'edit' ? (tool === 'walls' && wallKind === 'change' ? 'doors' : tool) : playTool}
+                tool={mode === 'edit' ? (tool === 'walls' ? wallTools[wallKind] : tool) : playTool}
                 placing={mode === 'edit' ? placing : null}
                 wallSnap={wallSnap}
                 fogEpoch={fogEpoch}
@@ -526,14 +533,14 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 onPathEnd={setPending}
                 onPathCancel={() => setPending(null)}
                 onScenarioChange={changeScenario}
-                onStats={debug ? setStats : undefined}
+                onStats={showStats ? setStats : undefined}
                 onView={(center) =>
                 {
                     viewCenter.current = center;
                 }}
                 onToolCancel={putToolAway}
                 shared={liveMap ? liveMap.fog : null}
-                onExplored={liveMap ? (fog) => fail(liveMap.saveFog(fog)) : undefined}
+                onExplored={liveMap ? (fog, forget) => fail(liveMap.saveFog(fog, forget)) : undefined}
                 fogSettings={fogSettings}
                 fogSource={liveMap ? 'live' : 'preview'}
             />
@@ -581,6 +588,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                         onError={message.error}
                     />
                 )}
+                <Settings settings={screen} onChange={setScreen} />
             </div>
 
             <Toasts>
@@ -690,7 +698,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 />
             )}
 
-            {debug && stats && (
+            {showStats && stats && (
                 <p className="ttrpg-panel ttrpg-stats" aria-hidden="true">
                     {`${stats.fps} fps · ${stats.frameMs.toFixed(1)} ms · worst ${stats.worstMs.toFixed(1)} ms`}
                 </p>

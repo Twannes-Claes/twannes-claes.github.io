@@ -103,6 +103,44 @@ html:has(.ttrpg) {
     gap: 4px;
 }
 
+/* A dock button's choices, floating above it while it is on, like Reveal's shape. */
+.ttrpg-pop {
+    position: relative;
+    display: flex;
+}
+
+.ttrpg-pop__menu {
+    position: absolute;
+    bottom: calc(100% + 12px);
+    left: 50%;
+    display: grid;
+    gap: 4px;
+    padding: 4px;
+    translate: -50% 0;
+    animation: ttrpg-rise 150ms var(--ttrpg-ease);
+}
+
+/* One choice per row, split by the same thin line as the dock's groups. */
+.ttrpg-pop__row {
+    display: flex;
+    gap: 4px;
+}
+
+.ttrpg-pop__row + .ttrpg-pop__row {
+    padding-top: 4px;
+    border-top: 1px solid var(--ttrpg-edge);
+}
+
+.ttrpg-pop__row .ttrpg-segment {
+    flex: 1;
+    justify-content: center;
+}
+
+/* A choice that takes something away, red when on, like the box it drags on the map. */
+.ttrpg-segment.ttrpg-segment--danger[aria-pressed='true'] {
+    background: #8c2f2b;
+}
+
 /* A thin line between groups that share a row. */
 .ttrpg-dock__group + .ttrpg-dock__group {
     padding-left: 4px;
@@ -429,6 +467,47 @@ html:has(.ttrpg) {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+}
+
+/* The settings' sections: the control size, then every shortcut, keys on the left. */
+.ttrpg-shortcuts dl {
+    display: grid;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+}
+
+.ttrpg-shortcuts :is(.ttrpg-settings__line, .ttrpg-settings__choices) {
+    margin-top: 0.5rem;
+}
+
+.ttrpg-shortcuts dl > div {
+    display: grid;
+    grid-template-columns: 7rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.ttrpg-shortcuts dt {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.ttrpg-shortcuts dd {
+    color: var(--ttrpg-muted);
+}
+
+/*
+ * The control size from the settings, see Settings.tsx: every control zooms, the map never does,
+ * so the canvas keeps its pixels and pointer maths. The tip is placed in zoomed pixels, see
+ * TooltipHost.
+ */
+.ttrpg-home,
+.ttrpg-editor > :not(.ttrpg-map),
+.ttrpg-popover,
+.ttrpg-tip,
+.ttrpg-confirm {
+    zoom: var(--ttrpg-ui, 1);
 }
 
 /* A key cap, with a thicker bottom edge so it reads as a key rather than a tag. Every key the app
@@ -1004,6 +1083,7 @@ html:has(.ttrpg) {
 
     .ttrpg-sheet,
     .ttrpg-popover,
+    .ttrpg-pop__menu,
     .ttrpg-toast,
     .ttrpg-tip,
     .ttrpg-confirm[open] {
@@ -1060,7 +1140,7 @@ html:has(.ttrpg) {
     display: grid;
     /* Just wide enough for the three new map buttons in one row. */
     width: 17rem;
-    max-height: calc(100svh - 48px);
+    max-height: calc(100svh / var(--ttrpg-ui, 1) - 48px);
     padding: 1rem;
     overflow: hidden auto;
 }
@@ -1226,7 +1306,7 @@ html:has(.ttrpg) {
 @media (width < 820px) {
     .ttrpg-scenarios {
         top: 72px;
-        max-height: calc(100svh - 104px);
+        max-height: calc(100svh / var(--ttrpg-ui, 1) - 104px);
     }
 }
 
@@ -1416,30 +1496,43 @@ html:has(.ttrpg) {
 
 /*
  * A floating panel with a title and a close button, see components/Popover.tsx. The same surface,
- * padding and rhythm as the tool panels beside the rail, and it scrolls when it gets long.
+ * padding and rhythm as the tool panels beside the rail. When it gets long, what is under the
+ * title scrolls, so the title stays and the bar keeps clear of the rounded corners.
  */
 .ttrpg-popover {
     position: fixed;
     left: 50%;
     z-index: 20;
-    display: grid;
-    align-content: start;
+    display: flex;
+    flex-direction: column;
     gap: 0.875rem;
     width: min(21.5rem, calc(100% - 32px));
     padding: 1rem;
-    overflow-y: auto;
     font-size: 0.875rem;
     translate: -50% 0;
     animation: ttrpg-rise 150ms var(--ttrpg-ease);
 }
 
-/* The close button hangs into the padding, so the title sits where a tool panel's does. */
 .ttrpg-popover__header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
+}
+
+/* A close button hangs into the padding, so the title sits where a tool panel's does. */
+.ttrpg-popover__header:has(button) {
     margin: -0.5rem -0.5rem 0 0;
+}
+
+/* The scrollbar sits in the right padding, between the corners rather than over them. */
+.ttrpg-popover__scroll {
+    display: grid;
+    gap: 0.875rem;
+    min-height: 0;
+    margin-right: -0.75rem;
+    padding-right: 0.75rem;
+    overflow-y: auto;
 }
 
 .ttrpg-popover__body {
@@ -1456,13 +1549,14 @@ html:has(.ttrpg) {
 /* Under the mode switch: starting the session, the players at the table. */
 .ttrpg-start {
     top: 72px;
-    max-height: calc(100dvh - 96px);
+    /* Viewport units do not zoom with the control size, so the screen is divided by it. */
+    max-height: calc(100dvh / var(--ttrpg-ui, 1) - 96px);
 }
 
 /* Above the play dock: the monsters or the fog. */
 .ttrpg-dock-panel {
     bottom: calc(max(16px, env(safe-area-inset-bottom)) + 72px);
-    max-height: calc(100dvh - 180px);
+    max-height: calc(100dvh / var(--ttrpg-ui, 1) - 180px);
 }
 
 /* An empty list with what to do about it, like nobody at the table yet. */

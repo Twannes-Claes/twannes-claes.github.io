@@ -651,7 +651,8 @@ export const fog = query({
 /**
  * The host's table screen adds what it has seen, merged with what was seen before, so a save
  * never takes anything away. A save from before a reset, with an older epoch, is dropped. A map
- * whose grid changed starts over with the new size.
+ * whose grid changed starts over with the new size. With forget, the host hid some again: it
+ * replaces what was seen and raises the epoch, so every screen starts over from it.
  */
 export const saveFog = mutation({
     args: {
@@ -661,8 +662,9 @@ export const saveFog = mutation({
         columns: v.number(),
         rows: v.number(),
         seen: v.bytes(),
+        forget: v.optional(v.boolean()),
     },
-    handler: async (ctx, { sessionId, scenarioId, epoch, columns, rows, seen }) =>
+    handler: async (ctx, { sessionId, scenarioId, epoch, columns, rows, seen, forget }) =>
     {
         await requireSession(ctx, sessionId);
 
@@ -687,6 +689,13 @@ export const saveFog = mutation({
         if (doc.columns !== columns || doc.rows !== rows)
         {
             await ctx.db.patch('fog', doc._id, { columns, rows, seen });
+
+            return null;
+        }
+
+        if (forget)
+        {
+            await ctx.db.patch('fog', doc._id, { seen, epoch: doc.epoch + 1 });
 
             return null;
         }

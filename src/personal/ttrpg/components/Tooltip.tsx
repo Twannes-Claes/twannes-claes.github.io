@@ -116,15 +116,19 @@ export function TooltipHost()
             // Laid out from the left edge first, so the text wraps the same wherever it ends up.
             style={{ left: 0, top: tip.y }}
             aria-hidden="true"
-            // Centred on the element, but slid along to stay on screen, which needs its width.
+            // Centred on the element, but slid along to stay on screen, which needs its width. The
+            // control size zooms the tip, its place included, so the place is divided back.
             ref={(node) =>
             {
-                const half = node ? node.offsetWidth / 2 : 0;
+                if (!node)
+                    return;
+
+                const zoom = parseFloat(getComputedStyle(node).zoom) || 1;
+                const half = node.getBoundingClientRect().width / 2;
                 const x = tip.side === 'right' ? tip.x : Math.min(Math.max(tip.x, half + 8), window.innerWidth - half - 8);
 
-                if (node)
-                    node.style.left = `${x}px`;
-
+                node.style.left = `${x / zoom}px`;
+                node.style.top = `${tip.y / zoom}px`;
             }}
         >
             {words}

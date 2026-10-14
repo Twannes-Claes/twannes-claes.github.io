@@ -156,7 +156,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
             hide: (tokenId, hidden) => friendly(hideNpc({ tokenId: tokenId as Id<'tokens'>, hidden })),
             removeMonster: (tokenId) => friendly(removeNpc({ tokenId: tokenId as Id<'tokens'> })),
             fog: fog ?? null,
-            saveFog: (shared) => friendly(saveFog({ sessionId: id, ...shared })),
+            saveFog: (shared, forget) => friendly(saveFog({ sessionId: id, ...shared, forget })),
             resetFog: () => friendly(resetFog({ sessionId: id })),
             fogLook: status.fogLook,
             setFogLook: (look) => friendly(setFogLook({ sessionId: id, look })),

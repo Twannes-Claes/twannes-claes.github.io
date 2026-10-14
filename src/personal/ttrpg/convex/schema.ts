@@ -65,6 +65,7 @@ export const scenarioValidator = v.object({
             blocksSight: v.boolean(),
             blocksMove: v.boolean(),
             door: v.optional(v.object({ open: v.boolean() })),
+            ring: v.optional(v.string()),
         }),
     ),
     spawn: v.object({ x: v.number(), y: v.number() }),

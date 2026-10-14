@@ -12,6 +12,7 @@ import { useRef, type ChangeEvent, type CSSProperties } from 'react';
 import type { Grid } from '../types';
 
 import { defaultGrid } from '../content/scenarios';
+import { wrapOffset } from '../map/grid';
 
 type GridKind = 'none' | 'square' | 'pointy' | 'flat';
 
@@ -142,7 +143,8 @@ interface GridPanelProps
 /** The grid's settings, shown with the Grid tool. Size and offset line it up with the picture. */
 export function GridPanel({ grid, onChange }: GridPanelProps)
 {
-    const set = (change: Partial<Grid>, merge = false) => onChange({ ...grid, ...change }, merge);
+    // Kept under one repeat of the grid, so an offset never grows past what lines it up.
+    const set = (change: Partial<Grid>, merge = false) => onChange(wrapOffset({ ...grid, ...change }), merge);
     // True while the Lines slider is held, so one slide, or one held arrow key, undoes as one.
     const sliding = useRef(false);
     const letGo = () =>
@@ -166,7 +168,7 @@ export function GridPanel({ grid, onChange }: GridPanelProps)
                             aria-label={choice.title}
                             title={choice.title}
                             // The type already on is no change, so it adds no step to undo.
-                            onClick={() => kindOf(grid) !== choice.id && onChange(withKind(grid, choice.id))}
+                            onClick={() => kindOf(grid) !== choice.id && onChange(wrapOffset(withKind(grid, choice.id)))}
                         >
                             <FontAwesomeIcon icon={choice.icon} rotation={choice.turned ? 90 : undefined} />
                         </button>

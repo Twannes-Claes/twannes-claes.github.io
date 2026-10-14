@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 
-import type { Cell, Grid, Scenario, Wall } from '../types';
+import type { Cell, Grid, Point, Scenario, Wall } from '../types';
 
 import { toScreen, toWorld, zoomAt } from './camera.ts';
-import { createExplored, markArea, markSeen, wasSeen } from './fog.ts';
+import { createExplored, markSeen, wasSeen } from './fog.ts';
 import { distance } from './geometry.ts';
 import {
     cellAt,
@@ -15,6 +15,7 @@ import {
     nearestCorner,
     neighbours,
     snapPoint,
+    wrapOffset,
 } from './grid.ts';
 import { extendPath, pathBlocked, pathFeet } from './path.ts';
 import { placedSize, propAt, snapCenter, snapSize } from './props.ts';
@@ -259,12 +260,37 @@ assert.deepEqual([{ x: 125, y: 525 }, { x: 775, y: 525 }, { x: -10, y: 525 }].ma
 
 // Reveal area marks the samples whose centres the box reaches, and nothing outside it.
 const revealed = createExplored(walled);
+const press = (x: number, y: number): ToolPointer => ({ world: { x, y }, free: false, zoom: 1, scenario: walled, seen: () => true });
+const uncover = (polygon: Point[]) => void markSeen(revealed, polygon);
+const revealTool = createTool('reveal', () => {}, null, uncover);
 
-markArea(revealed, { left: 600, top: 100, right: 700, bottom: 150 });
+assert.ok(revealTool);
+revealTool.down(press(600, 100));
+revealTool.move(press(700, 150), true);
+revealTool.up?.(press(700, 150));
 assert.deepEqual(
     [...revealed.seen.keys()].filter((index) => revealed.seen[index] === 1),
     [2 * revealed.columns + 12, 2 * revealed.columns + 13],
 );
+
+// A circle reveals whole cells round where it lands, 2.5 rounding to 3, and the wall stops it.
+const circleTool = createTool('reveal-circle', () => {}, null, uncover);
+
+assert.ok(circleTool);
+revealed.seen.fill(0);
+circleTool.down(press(400, 500));
+circleTool.move(press(650, 500), true);
+circleTool.up?.(press(650, 500));
+assert.deepEqual([425, 575, 125, 75].map((x) => wasSeen(revealed, { x, y: 525 })), [true, false, true, false]);
+
+// Hiding a box forgets what it covers, and nothing else.
+const hideTool = createTool('hide', () => {}, null, (polygon, hide) => void markSeen(revealed, polygon, hide ? 0 : 1));
+
+assert.ok(hideTool);
+hideTool.down(press(400, 500));
+hideTool.move(press(450, 550), true);
+hideTool.up?.(press(450, 550));
+assert.deepEqual([425, 125].map((x) => wasSeen(revealed, { x, y: 525 })), [false, true]);
 
 // A Universal VTT file: cells become pixels from the map's origin, every stretch of a line of
 // sight is a wall, and a closed door blocks while an open one does not.
@@ -321,6 +347,17 @@ for (const grid of grids.slice(1))
     const corner = nearestCorner(grid, center);
 
     assert.ok(Math.abs(Math.hypot(corner.x - center.x, corner.y - center.y) - 100 / Math.sqrt(3)) < 1e-9);
+}
+
+// An offset past a whole repeat of the grid wraps back under it, and every cell stays where it was.
+for (const grid of grids)
+{
+    const far = { ...grid, offsetX: 1013, offsetY: -707 };
+    const wrapped = wrapOffset(far);
+    const spot = { x: 333, y: 444 };
+
+    assert.ok(wrapped.offsetX >= 0 && wrapped.offsetX < 200 && wrapped.offsetY >= 0 && wrapped.offsetY < 200);
+    assert.ok(distance(cellCenter(far, cellAt(far, spot)), cellCenter(wrapped, cellAt(wrapped, spot))) < 1e-6);
 }
 
 // The tools, clicked the way a person would, on an empty map with the grid at the origin.
@@ -400,6 +437,21 @@ assert.equal(edited.walls.length, 1);
 edited = { ...edited, props: [{ id: 'crate', src: '', x: 600, y: 600, width: 100, height: 40, rotation: Math.PI / 2 }] };
 eraseTool.down(click(610, 560));
 assert.deepEqual([edited.props.length, edited.walls.length], [0, 1]);
+
+// A round wall: dragged from a cell's middle, its edge snaps to half cells, and the eraser takes
+// the whole ring. The Doors tool leaves it alone.
+const ringTool = createTool('rings', keep);
+const plain = edited.walls.length;
+
+assert.ok(ringTool);
+ringTool.down(click(845, 160));
+ringTool.move(click(895, 155), true);
+ringTool.up?.(click(895, 155));
+assert.equal(edited.walls.length, plain + 12);
+assert.ok(edited.walls.slice(plain).every((made) => Math.abs(distance({ x: made.x1, y: made.y1 }, { x: 850, y: 150 }) - 50) < 1e-9));
+assert.equal(createTool('doors', keep)?.down(click(900, 150)), false);
+eraseTool.down(click(900, 150));
+assert.equal(edited.walls.length, plain);
 
 // The spawn point lands in the middle of a cell, or exactly where clicked with Alt.
 const spawnTool = createTool('spawn', keep);
