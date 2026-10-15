@@ -4,7 +4,7 @@ import { ConvexError } from 'convex/values';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import type { Live, PictureBytes, PropPicture, Scenario, Token } from '../types';
+import type { Draft, Live, PictureBytes, PropPicture, Scenario, Token } from '../types';
 
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
@@ -57,6 +57,7 @@ function monsterPicture(picture: Blob | null): Promise<Id<'_storage'> | undefine
 
 /** Before the first tokens arrive, so the map gets the same empty list each time. */
 const noTokens: Token[] = [];
+const noDrafts: Draft[] = [];
 
 /**
  * A saved session in the editor: loaded once when it opens, then the editor holds it and saves
@@ -86,6 +87,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const tokens = useQuery(api.play.tokens, following ? { sessionId: id } : 'skip');
     const fog = useQuery(api.play.fog, following ? { sessionId: id } : 'skip');
     const ping = useQuery(api.play.ping, following ? { sessionId: id } : 'skip');
+    const drafts = useQuery(api.play.drafts, following ? { sessionId: id } : 'skip');
     const saveFog = useMutation(api.play.saveFog);
     const resetFog = useMutation(api.play.resetFog);
     const setFogLook = useMutation(api.play.setFogLook);
@@ -99,6 +101,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const hideNpc = useMutation(api.play.hide);
     const removeNpc = useMutation(api.play.removeMonster);
     const sendPing = useMutation(api.play.sendPing);
+    const draw = useMutation(api.play.draw);
 
     useEffect(() =>
     {
@@ -162,6 +165,8 @@ function Session({ sessionId, debug }: SessionEditorProps)
             resetFog: () => friendly(resetFog({ sessionId: id })),
             ping,
             sendPing: (at) => friendly(sendPing({ sessionId: id, ...at })),
+            drafts: drafts ?? noDrafts,
+            draw: (tokenId, points, feet) => friendly(draw({ tokenId: tokenId as Id<'tokens'>, points, feet })),
             fogLook: status.fogLook,
             setFogLook: (look) => friendly(setFogLook({ sessionId: id, look })),
         }

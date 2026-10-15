@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import type { Cell, Grid, Point, Scenario, Wall } from '../types';
 
 import { toScreen, toWorld, zoomAt } from './camera.ts';
-import { createExplored, markSeen, wasSeen } from './fog.ts';
+import { createExplored, markSeen, packedFlag, packSeen, wasSeen } from './fog.ts';
 import { distance } from './geometry.ts';
 import {
     cellAt,
@@ -612,3 +612,10 @@ assert.ok(!wallInBox(wall(4, 0, 4, 4), eraserBox));
 
 // The ruler counts like a path: two diagonals are 5 and 10 ft.
 assert.equal(measure({ ...open, grid: flatGrid }, { x: 50, y: 50 }, { x: 250, y: 250 }).feet, 15);
+
+// Shared fog packs eight samples to a byte and reads back the same, the ragged last byte too.
+const mask = Uint8Array.from([1, 0, 0, 1, 0, 0, 0, 0, 1, 1]);
+const packed = new Uint8Array(packSeen(mask));
+
+assert.equal(packed.length, 2);
+assert.deepEqual([...mask].map((_, index) => (packedFlag(packed, index) ? 1 : 0)), [...mask]);

@@ -110,6 +110,27 @@ export function createExplored(scenario: Scenario): Explored
     return { columns, rows, sample, seen: new Uint8Array(columns * rows) };
 }
 
+/** The explored mask as it is shared, eight samples to a byte, see SharedFog. */
+export function packSeen(seen: Uint8Array): ArrayBuffer
+{
+    const packed = new Uint8Array(Math.ceil(seen.length / 8));
+
+    seen.forEach((flag, index) =>
+    {
+        if (flag)
+            packed[index >> 3] |= 1 << (index & 7);
+
+    });
+
+    return packed.buffer;
+}
+
+/** Whether a sample is set in a shared mask, see packSeen. */
+export function packedFlag(packed: Uint8Array, index: number): boolean
+{
+    return (packed[index >> 3] & (1 << (index & 7))) !== 0;
+}
+
 /** Whether the party has seen a point, by the sample it falls in. Off the map counts as unseen. */
 export function wasSeen({ columns, rows, sample, seen }: Explored, { x, y }: Point): boolean
 {

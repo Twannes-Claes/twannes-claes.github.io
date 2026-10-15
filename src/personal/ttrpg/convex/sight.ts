@@ -13,6 +13,15 @@ export function tokensOf(ctx: QueryCtx, sessionId: Id<'sessions'>)
         .take(200);
 }
 
+/** The tokens on one map of a session, so a move re-reads only the map being played. */
+export function tokensOn(ctx: QueryCtx, sessionId: Id<'sessions'>, scenarioId: string)
+{
+    return ctx.db
+        .query('tokens')
+        .withIndex('by_sessionId_and_scenarioId', (q) => q.eq('sessionId', sessionId).eq('scenarioId', scenarioId))
+        .take(200);
+}
+
 /**
  * Marks which monsters on a scenario a player can see right now, so the players' tokens query
  * leaves out the rest without reading the map, see play.ts. Run by every write that changes
@@ -22,8 +31,7 @@ export function tokensOf(ctx: QueryCtx, sessionId: Id<'sessions'>)
  */
 export async function refreshSight(ctx: MutationCtx, sessionId: Id<'sessions'>, scenario: Scenario)
 {
-    const tokens = await tokensOf(ctx, sessionId);
-    const here = tokens.filter((token) => token.scenarioId === scenario.id);
+    const here = await tokensOn(ctx, sessionId, scenario.id);
     const eyes = here.filter((token) => token.kind === 'player');
 
     for (const token of here)

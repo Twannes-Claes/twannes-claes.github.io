@@ -201,6 +201,10 @@ export interface Live
     ping: Ping | null | undefined;
     /** Flashes a spot of the map being played on every screen. */
     sendPing: (at: Point) => Promise<void>;
+    /** The paths players are drawing on other screens, see Draft. */
+    drafts: Draft[];
+    /** Shares a player's path as it is drawn, or drops it with null. */
+    draw: (tokenId: string, points: Point[] | null, feet: number) => Promise<void>;
     /** How the fog looks on every screen, null until the game master changes it. */
     fogLook: FogSettings | null;
     setFogLook: (look: FogSettings) => Promise<void>;
@@ -226,7 +230,8 @@ export interface FogSettings
 
 /**
  * What the party has seen of the map being played, kept by the server so every screen and every
- * reload shares it, see convex/play.ts. One byte per sample of map/fog.ts's explored mask.
+ * reload shares it, see convex/play.ts. map/fog.ts's explored mask, eight
+ * samples to a byte, see packSeen, as every screen reads it again after each save.
  */
 export interface SharedFog
 {
@@ -249,6 +254,19 @@ export interface Ping
     /** A player's ring colour. Missing for the game master's, which take the app's own. */
     color?: string;
     at: number;
+}
+
+/**
+ * A player's path while it is drawn on another screen, and until it is walked or dropped, so the
+ * table sees where they mean to go, see drafts in convex/play.ts.
+ */
+export interface Draft
+{
+    /** The token it belongs to. */
+    id: string;
+    /** Centre to centre, from where the token stands. */
+    points: Point[];
+    feet: number;
 }
 
 /** What the game master fills in to add a monster, see components/Monsters.tsx. */

@@ -1,17 +1,18 @@
 import { getAuthUserId } from '@convex-dev/auth/server';
 import { ConvexError, v } from 'convex/values';
 
-import type { Point, Scenario, Token } from '../types';
+import type { Draft, Point, Scenario, Token } from '../types';
 import { distance } from '../map/geometry';
 import { pathBlocked } from '../map/path';
 import { anchorAt, footprintCenter, footprintKeys } from '../map/size';
 import { spawnCells } from '../map/spawn';
 
+import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireSession, requireUser } from './access';
 import { fogSettingsValidator, sizeValidator } from './schema';
-import { refreshSight, tokensOf } from './sight';
+import { refreshSight, tokensOf, tokensOn } from './sight';
 import { dropFile } from './usage';
 import { storedPicture } from './pictures';
 
@@ -32,8 +33,8 @@ const maxMonsters = 150;
 /** A 256 px WebP avatar from services/images.ts is about 20 KB. */
 export const maxAvatarBytes = 512 * 1024;
 const colourPattern = /^#[0-9a-f]{6}$/i;
-/** A 400 by 300 cell map at two samples per cell, one byte each. */
-const maxFogBytes = 512 * 1024;
+/** A 400 by 300 cell map at two samples per cell, eight samples to a byte, see packSeen in map/fog.ts. */
+const maxFogBytes = 64 * 1024;
 
 /**
  * Whether a point is on the scenario, give or take two cells: a big creature's middle can stand
@@ -212,10 +213,13 @@ export const tokens = query({
             return null;
 
         const host = session.ownerId === (await getAuthUserId(ctx));
-        const all = await tokensOf(ctx, sessionId);
 
-        return all
-            .filter((token) => token.scenarioId === session.activeScenarioId)
+        if (!session.activeScenarioId)
+            return [];
+
+        const here = await tokensOn(ctx, sessionId, session.activeScenarioId);
+
+        return here
             .filter((token) => host || token.kind === 'player' || (token.inSight === true && token.hidden !== true))
             .map(({ _id, kind, name, color, size, speed, avatar, x, y, path, movedAt, hidden }) => ({
                 id: _id,
@@ -443,6 +447,7 @@ export const move = mutation({
 
         await ctx.db.patch('tokens', tokenId, { x, y, path, movedAt: path ? Date.now() : undefined });
         await refreshSight(ctx, token.sessionId, scenario);
+        await dropDraftOf(ctx, tokenId);
 
         return null;
     },
@@ -487,6 +492,35 @@ export const start = mutation({
 });
 
 /**
+ * A player leaves the table: their token and its picture go. Unlike a kick they can join again
+ * with the password, as anyone else could.
+ */
+export const leave = mutation({
+    args: { sessionId: v.id('sessions') },
+    handler: async (ctx, { sessionId }) =>
+    {
+        const userId = await requireUser(ctx);
+        const token = await ownToken(ctx, sessionId, userId);
+
+        if (!token)
+            return null;
+
+        if (token.avatarId)
+            await dropFile(ctx, token.avatarId);
+
+        await ctx.db.delete('tokens', token._id);
+        await dropDraftOf(ctx, token._id);
+
+        const scenario = await scenarioOf(ctx, sessionId, token.scenarioId);
+
+        if (scenario)
+            await refreshSight(ctx, sessionId, scenario);
+
+        return null;
+    },
+});
+
+/**
  * The host removes a player from the table: their token and its picture go, and they cannot join
  * again until the session starts again, see start.
  */
@@ -508,6 +542,7 @@ export const kick = mutation({
             await dropFile(ctx, token.avatarId);
 
         await ctx.db.delete('tokens', tokenId);
+        await dropDraftOf(ctx, tokenId);
 
         const scenario = await scenarioOf(ctx, token.sessionId, token.scenarioId);
 
@@ -668,7 +703,7 @@ export const saveFog = mutation({
     {
         await requireSession(ctx, sessionId);
 
-        if (!Number.isInteger(columns) || !Number.isInteger(rows) || columns * rows !== seen.byteLength)
+        if (!Number.isInteger(columns) || !Number.isInteger(rows) || Math.ceil((columns * rows) / 8) !== seen.byteLength)
             throw new ConvexError('That fog does not fit the map.');
 
         if (seen.byteLength > maxFogBytes)
@@ -686,7 +721,7 @@ export const saveFog = mutation({
         if (doc.epoch !== epoch)
             return null;
 
-        if (doc.columns !== columns || doc.rows !== rows)
+        if (doc.columns !== columns || doc.rows !== rows || doc.seen.byteLength !== seen.byteLength)
         {
             await ctx.db.patch('fog', doc._id, { columns, rows, seen });
 
@@ -704,11 +739,11 @@ export const saveFog = mutation({
         const incoming = new Uint8Array(seen);
         let more = false;
 
-        incoming.forEach((flag, index) =>
+        incoming.forEach((bits, index) =>
         {
-            if (flag && !merged[index])
+            if ((bits | merged[index]) !== merged[index])
             {
-                merged[index] = 1;
+                merged[index] |= bits;
                 more = true;
             }
         });
@@ -761,13 +796,34 @@ export const setFogLook = mutation({
     },
 });
 
-/** The host ends the session: phones say so, and nobody joins or moves until it starts again. */
+/**
+ * The host ends the session: phones say so, and the players leave the table with their tokens and
+ * pictures, so the next start begins with nobody there. Monsters stay, they belong to the maps.
+ */
 export const end = mutation({
     args: { sessionId: v.id('sessions') },
     handler: async (ctx, { sessionId }) =>
     {
-        await requireSession(ctx, sessionId);
+        const session = await requireSession(ctx, sessionId);
+        const players = (await tokensOf(ctx, sessionId)).filter((token) => token.kind === 'player');
+
+        for (const player of players)
+        {
+            if (player.avatarId)
+                await dropFile(ctx, player.avatarId);
+
+            await ctx.db.delete('tokens', player._id);
+            await dropDraftOf(ctx, player._id);
+        }
+
         await ctx.db.patch('sessions', sessionId, { live: false, frozen: false });
+
+        const scenario = session.activeScenarioId ? await scenarioOf(ctx, sessionId, session.activeScenarioId) : null;
+
+        // With the players gone, no monster is in their sight any more.
+        if (scenario)
+            await refreshSight(ctx, sessionId, scenario);
+
 
         return null;
     },
@@ -853,6 +909,139 @@ export const sendPing = mutation({
             await ctx.db.insert('pings', ping);
         else if (at - doc.at >= pingGap)
             await ctx.db.replace('pings', doc._id, ping);
+
+        return null;
+    },
+});
+
+/** How long a path drawn but not walked shows without a change, so one left behind still goes. */
+const draftLife = 5 * 60 * 1000;
+
+function draftOf(ctx: QueryCtx, tokenId: Id<'tokens'>)
+{
+    return ctx.db
+        .query('drafts')
+        .withIndex('by_tokenId', (q) => q.eq('tokenId', tokenId))
+        .unique();
+}
+
+async function dropDraftOf(ctx: MutationCtx, tokenId: Id<'tokens'>)
+{
+    const doc = await draftOf(ctx, tokenId);
+
+    if (doc)
+        await ctx.db.delete('drafts', doc._id);
+
+}
+
+/**
+ * The paths players are drawing on the map being played, or waiting to walk, for everyone at the
+ * table but whoever draws each one, whose own screen shows it already. Only players' paths are
+ * shared: a monster's is the GM's plan, and the table screen shows it.
+ */
+export const drafts = query({
+    args: { sessionId: v.id('sessions') },
+    handler: async (ctx, { sessionId }): Promise<Draft[]> =>
+    {
+        const session = await memberOf(ctx, sessionId);
+        const userId = await getAuthUserId(ctx);
+
+        if (!session || !session.live)
+            return [];
+
+        const docs = await ctx.db
+            .query('drafts')
+            .withIndex('by_sessionId', (q) => q.eq('sessionId', sessionId))
+            .take(maxPlayers * 2);
+
+        return docs
+            .filter((doc) => doc.scenarioId === session.activeScenarioId && doc.userId !== userId)
+            .map(({ tokenId, points, feet }) => ({ id: tokenId, points, feet }));
+    },
+});
+
+/**
+ * A player's path as it is drawn, or null once it is walked or dropped. The host draws for any
+ * player, a player only for their own token, while the session is live and not frozen.
+ */
+export const draw = mutation({
+    args: {
+        tokenId: v.id('tokens'),
+        points: v.union(v.array(v.object({ x: v.number(), y: v.number() })), v.null()),
+        feet: v.number(),
+    },
+    handler: async (ctx, { tokenId, points, feet }) =>
+    {
+        const userId = await requireUser(ctx);
+        const token = await ctx.db.get('tokens', tokenId);
+
+        if (!token || token.kind !== 'player')
+            return null;
+
+        const session = await sessionOf(ctx, token.sessionId);
+        const host = session.ownerId === userId;
+
+        if (!host && token.userId !== userId)
+            throw new ConvexError('That is not your token.');
+
+        const allowed = session.live === true && token.scenarioId === session.activeScenarioId && (host || session.frozen !== true);
+        const scenario = points && allowed ? await scenarioOf(ctx, token.sessionId, token.scenarioId) : null;
+
+        if (!points || !scenario)
+        {
+            await dropDraftOf(ctx, tokenId);
+
+            return null;
+        }
+
+        if (points.length > maxPathPoints)
+            throw new ConvexError('That path is too long.');
+
+        if (!points.every((point) => onScenario(scenario, point)))
+            throw new ConvexError('That is off the map.');
+
+        const doc = await draftOf(ctx, tokenId);
+        const draft = {
+            sessionId: token.sessionId,
+            scenarioId: token.scenarioId,
+            tokenId,
+            userId,
+            points,
+            feet: Math.round(clamp(feet, 0, 100000)),
+            at: Date.now(),
+        };
+
+        if (doc)
+        {
+            await ctx.db.replace('drafts', doc._id, draft);
+
+            return null;
+        }
+
+        const draftId = await ctx.db.insert('drafts', draft);
+
+        await ctx.scheduler.runAfter(draftLife, internal.play.dropDraft, { draftId });
+
+        return null;
+    },
+});
+
+/** Drops a path nobody has changed in a while, or checks again when it last changed. */
+export const dropDraft = internalMutation({
+    args: { draftId: v.id('drafts') },
+    handler: async (ctx, { draftId }) =>
+    {
+        const doc = await ctx.db.get('drafts', draftId);
+
+        if (!doc)
+            return null;
+
+        const left = doc.at + draftLife - Date.now();
+
+        if (left > 0)
+            await ctx.scheduler.runAfter(left, internal.play.dropDraft, { draftId });
+        else
+            await ctx.db.delete('drafts', draftId);
 
         return null;
     },

@@ -1,4 +1,4 @@
-import { faImage, faSnowflake } from '@fortawesome/free-solid-svg-icons';
+import { faImage, faRightFromBracket, faSnowflake } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useAuthActions, useAuthToken, useConvexAuth } from '@convex-dev/auth/react';
 import { useConvex, useMutation, useQuery } from 'convex/react';
@@ -10,6 +10,7 @@ import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
 import { defaultFogSettings } from '../map/fog';
 import type { FrameStats, PendingMove } from '../map/view';
+import { confirmAction } from '../services/confirm';
 import { explain, uploadAvatar } from '../services/backend';
 import { toAvatar } from '../services/images';
 
@@ -92,7 +93,9 @@ function Player({ sessionId }: PlayerViewProps)
         return (
             <Note>
                 <h1>{status.name}</h1>
-                <p>{status.mine ? 'The session has ended. Thanks for playing!' : 'The session has not started yet.'}</p>
+                {/* Ending the session takes every player's token, so ended and not started yet
+                    look the same here, see end in convex/play.ts. */}
+                <p>No game right now. This page opens the table as soon as the GM starts.</p>
             </Note>
         );
     }
@@ -252,8 +255,11 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
     const tokens = useQuery(api.play.tokens, { sessionId });
     const fog = useQuery(api.play.fog, { sessionId });
     const ping = useQuery(api.play.ping, { sessionId });
+    const drafts = useQuery(api.play.drafts, { sessionId });
     const move = useMutation(api.play.move);
     const sendPing = useMutation(api.play.sendPing);
+    const leaveTable = useMutation(api.play.leave);
+    const draw = useMutation(api.play.draw);
     const authToken = useAuthToken();
     const [pending, setPending] = useState<PendingMove | null>(null);
     const message = useMessage();
@@ -284,6 +290,17 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
         move({ tokenId: mine, ...end, path: pending.points }).catch((reason: unknown) =>
             message.error(explain(reason, 'That move did not go through. Try again.')),
         );
+    };
+
+    // The token goes, and the page turns back to the join form, see Player.
+    const leave = () =>
+    {
+        void confirmAction('Leave the table? Your token goes, and you can join again with the password.', 'Leave').then((yes) =>
+        {
+            if (yes)
+                leaveTable({ sessionId }).catch((reason: unknown) => message.error(explain(reason, 'Leaving did not go through. Try again.')));
+
+        });
     };
 
     // A new picture for the token, or a first one for a player who joined without. The old one is
@@ -321,21 +338,27 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
                     <Settings settings={screen} onChange={setScreen} phone>
                         <section className="ttrpg-shortcuts" aria-label="Your token">
                             <h3 className="ttrpg-subhead">Your token</h3>
-                            <label className="ttrpg-segment ttrpg-segment--block" aria-disabled={uploading}>
-                                <FontAwesomeIcon icon={faImage} />
-                                {uploading ? 'Uploading' : 'Change picture'}
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    className="ttrpg-hidden-input"
-                                    disabled={uploading}
-                                    onChange={(event) =>
-                                    {
-                                        changePicture(event.target.files?.[0]);
-                                        event.target.value = '';
-                                    }}
-                                />
-                            </label>
+                            <div className="ttrpg-token-actions">
+                                <label className="ttrpg-segment ttrpg-segment--block" aria-disabled={uploading}>
+                                    <FontAwesomeIcon icon={faImage} />
+                                    {uploading ? 'Uploading' : 'Change picture'}
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="ttrpg-hidden-input"
+                                        disabled={uploading}
+                                        onChange={(event) =>
+                                        {
+                                            changePicture(event.target.files?.[0]);
+                                            event.target.value = '';
+                                        }}
+                                    />
+                                </label>
+                                <button type="button" className="ttrpg-segment ttrpg-segment--block" onClick={leave}>
+                                    <FontAwesomeIcon icon={faRightFromBracket} />
+                                    Leave table
+                                </button>
+                            </div>
                         </section>
                     </Settings>
                 </div>
@@ -357,6 +380,12 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
                 onPathEnd={setPending}
                 onPathCancel={() => setPending(null)}
                 onStats={screen.frameRate ? setStats : undefined}
+                drafts={drafts}
+                onDraft={(id, points, feet) =>
+                    void draw({ tokenId: id as Id<'tokens'>, points, feet }).catch(() =>
+                    {
+                        // Only a preview for the table: the move itself still checks and says what failed.
+                    })}
                 ping={ping}
                 onPing={(at) =>
                     void sendPing({ sessionId, ...at }).catch((reason: unknown) =>

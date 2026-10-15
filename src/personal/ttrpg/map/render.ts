@@ -139,25 +139,28 @@ export function drawPill(
     at: Point,
     zoom: number,
     colour: string,
+    scale = 1,
 )
 {
-    const fontSize = 14 / zoom;
-    const height = 26 / zoom;
+    // One screen pixel, times scale, so the pill keeps its size on screen at any zoom.
+    const unit = scale / zoom;
+    const fontSize = 14 * unit;
+    const height = 26 * unit;
 
     ctx.font = `600 ${fontSize}px 'JetBrains Mono Variable', ui-monospace, monospace`;
 
-    const width = ctx.measureText(text).width + 20 / zoom;
+    const width = ctx.measureText(text).width + 20 * unit;
     // Above and to the right of the point, so a finger on a phone does not cover it.
-    const left = at.x + 14 / zoom;
-    const top = at.y - height - 14 / zoom;
+    const left = at.x + 14 * unit;
+    const top = at.y - height - 14 * unit;
 
     // The look of the page's tooltips and messages, see .ttrpg-tip in styles/ttrpg.css.
     ctx.save();
     ctx.beginPath();
-    ctx.roundRect(left, top, width, height, 8 / zoom);
+    ctx.roundRect(left, top, width, height, 8 * unit);
     ctx.shadowColor = 'rgb(0 0 0 / 0.5)';
-    ctx.shadowBlur = 16 / zoom;
-    ctx.shadowOffsetY = 6 / zoom;
+    ctx.shadowBlur = 16 * unit;
+    ctx.shadowOffsetY = 6 * unit;
     ctx.fillStyle = colour;
     ctx.fill();
     ctx.restore();
@@ -167,7 +170,7 @@ export function drawPill(
     ctx.fillStyle = ink;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, left + width / 2, top + height / 2 + 1 / zoom);
+    ctx.fillText(text, left + width / 2, top + height / 2 + unit);
 }
 
 function drawSquareGrid(ctx: CanvasRenderingContext2D, grid: Grid, area: Area)

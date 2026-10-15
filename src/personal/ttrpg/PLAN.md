@@ -561,7 +561,8 @@ mouse:
 - Add NPC or monster token: just a name and a picture, shown round with a border like the
   players, hidden or not. Drag it, delete it. No HP or stats.
 - Ruler
-- **End session**: `live` goes false, phones show "The session has ended"
+- **End session**: `live` goes false and the players leave with their tokens, so the next start
+  begins with an empty table; phones wait for it
 
 The canvas renders at the screen's real pixel density, so a 4K screen is sharp.
 
@@ -595,7 +596,6 @@ Kept out on purpose so the first version ships. Each is a clean add-on.
 | -------------------- | ------------------------------------------------------------------------------------------- |
 | Initiative tracker   | Turn order, and unlocking movement only for whoever's turn it is (Freeze covers it for now) |
 | Lights               | The `.dd2vtt` light sources, for dark dungeons                                              |
-| Live path preview    | Show a player's path in play mode while they are still drawing it                           |
 | Lights, darkvision   | Per token vision ranges and light sources                                                   |
 | Dice, HP, conditions | Most tables already do this on paper or in a character app                                  |
 
@@ -754,6 +754,9 @@ parts: the engine and the fog).
   spread from it on every screen, in the player's colour or the GM's. One row per session in
   `pings`, the last ping, at most two a second; a screen only flashes pings that arrive while it
   is open (`ping` and `sendPing` in `convex/play.ts`).
+- **Live paths:** a player's path shows on every other screen while it is drawn and until it is
+  walked or dropped, in their ring colour with its feet. One row per token in `drafts`, gone after
+  five minutes without a change (`drafts` and `draw` in `convex/play.ts`).
 
 ---
 

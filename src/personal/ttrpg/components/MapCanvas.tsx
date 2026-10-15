@@ -1,11 +1,14 @@
 import { useEffect, useEffectEvent, useRef } from 'react';
 
-import type { FogSettings, Ping, Point, PropPicture, Scenario, SharedFog, Token } from '../types';
+import type { Draft, FogSettings, Ping, Point, PropPicture, Scenario, SharedFog, Token } from '../types';
 
 import { demoCredit, demoScenario } from '../content/scenarios';
 import { defaultFogSettings } from '../map/fog';
 import type { ToolId } from '../map/tools';
 import { createMapView, type FrameStats, type MapView, type PendingMove } from '../map/view';
+
+/** One empty list for screens without drafts, so its effect does not run on every render. */
+const noDrafts: Draft[] = [];
 
 interface MapCanvasProps
 {
@@ -56,6 +59,10 @@ interface MapCanvasProps
     ping?: Ping | null;
     /** A long press on an empty spot in play mode, to ping it. */
     onPing?: (at: Point) => void;
+    /** Other screens' paths, see Draft. */
+    drafts?: Draft[];
+    /** Hears this screen's path as it is drawn, to share, see onDraft in map/view.ts. */
+    onDraft?: (id: string, points: Point[] | null, feet: number) => void;
     /** How the fog looks, see FogSettings. */
     fogSettings?: FogSettings;
     /** Whose fog this is, see setFogSource in map/view.ts. A phone is always live. */
@@ -90,6 +97,8 @@ export function MapCanvas({
     onExplored,
     ping,
     onPing,
+    drafts = noDrafts,
+    onDraft,
     fogSettings = defaultFogSettings,
     fogSource = 'live',
 }: MapCanvasProps)
@@ -106,6 +115,7 @@ export function MapCanvas({
     const pathCancelled = useEffectEvent(() => onPathCancel?.());
     const explored = useEffectEvent((fog: SharedFog, forget?: boolean) => onExplored?.(fog, forget));
     const pinged = useEffectEvent((at: Point) => onPing?.(at));
+    const drafted = useEffectEvent((id: string, points: Point[] | null, feet: number) => onDraft?.(id, points, feet));
     // The last ping seen, to tell a new one from the one already there.
     const lastPing = useRef<Ping | null | undefined>(undefined);
 
@@ -124,6 +134,7 @@ export function MapCanvas({
             onPathCancel: () => pathCancelled(),
             onExplored: (fog, forget) => explored(fog, forget),
             onPing: (at) => pinged(at),
+            onDraft: (id, points, feet) => drafted(id, points, feet),
         });
 
         view.current = created;
@@ -199,6 +210,11 @@ export function MapCanvas({
 
         lastPing.current = ping;
     }, [ping]);
+
+    useEffect(() =>
+    {
+        view.current?.setDrafts(drafts);
+    }, [drafts]);
 
     useEffect(() =>
     {

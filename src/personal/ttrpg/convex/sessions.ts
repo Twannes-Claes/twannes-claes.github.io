@@ -180,6 +180,14 @@ export const remove = mutation({
         if (ping)
             await ctx.db.delete('pings', ping._id);
 
+        const drafts = await ctx.db
+            .query('drafts')
+            .withIndex('by_sessionId', (q) => q.eq('sessionId', sessionId))
+            .take(100);
+
+        for (const draft of drafts)
+            await ctx.db.delete('drafts', draft._id);
+
         await ctx.db.delete('sessions', sessionId);
 
         return null;
@@ -276,7 +284,14 @@ export const save = mutation({
 
         }
 
-        await ctx.db.patch('sessions', sessionId, { order, updatedAt: Date.now() });
+        // Every query at a live table reads the session, so a write to it makes each screen run
+        // them all again. Only a new order writes it, or the list's date going stale: the list
+        // shows the day, so once an hour keeps it true.
+        const now = Date.now();
+
+        if (order.join() !== session.order.join() || now - session.updatedAt > 60 * 60 * 1000)
+            await ctx.db.patch('sessions', sessionId, { order, updatedAt: now });
+
 
         // A picture that finished uploading while this save was on its way is not in it yet.
         const keep = new Set([...(await backgroundsOf(ctx, sessionId)), ...held]);

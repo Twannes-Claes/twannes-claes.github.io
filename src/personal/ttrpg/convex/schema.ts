@@ -130,6 +130,7 @@ export default defineSchema({
         inSight: v.optional(v.boolean()),
     })
         .index('by_sessionId_and_userId', ['sessionId', 'userId'])
+        .index('by_sessionId_and_scenarioId', ['sessionId', 'scenarioId'])
         .index('by_avatarId', ['avatarId']),
     /**
      * What the party has seen of each scenario of a session, see SharedFog in types.ts. Its own
@@ -156,6 +157,24 @@ export default defineSchema({
         color: v.optional(v.string()),
         at: v.number(),
     }).index('by_sessionId', ['sessionId']),
+    /**
+     * A player's path while it is drawn and until it is walked or dropped, one row per token, so
+     * every other screen shows it live, see drafts in convex/play.ts. Its own table, as it
+     * changes with every cell.
+     */
+    drafts: defineTable({
+        sessionId: v.id('sessions'),
+        scenarioId: v.string(),
+        tokenId: v.id('tokens'),
+        /** Who drew it, the player or the host, whose own screen already shows it. */
+        userId: v.id('users'),
+        points: v.array(v.object({ x: v.number(), y: v.number() })),
+        feet: v.number(),
+        /** The last change, so one left by a phone that closed mid path still goes, see dropDraft. */
+        at: v.number(),
+    })
+        .index('by_sessionId', ['sessionId'])
+        .index('by_tokenId', ['tokenId']),
     // One document per scenario, so saving a change to one map never rewrites the others.
     scenarios: defineTable({ sessionId: v.id('sessions'), scenario: scenarioValidator }).index(
         'by_sessionId_and_scenario_id',

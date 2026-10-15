@@ -1,11 +1,12 @@
 import { faDiscord } from '@fortawesome/free-brands-svg-icons';
-import { faHourglassHalf, faRightFromBracket } from '@fortawesome/free-solid-svg-icons';
+import { faArrowUpRightFromSquare, faChevronDown, faHourglassHalf, faRightFromBracket } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useAuthActions, useConvexAuth } from '@convex-dev/auth/react';
 import { useMutation, useQuery } from 'convex/react';
 import { useActionState, useState } from 'react';
 
 import { api } from '../convex/_generated/api';
+import { fileSize } from '../services/images';
 
 import { Backend } from './Backend';
 import { Loading, Spinner } from './Feedback';
@@ -52,7 +53,6 @@ function Home()
             </section>
 
             {hosting && <SessionList />}
-            {hosting && <Storage />}
             {me.role === 'owner' && <HostList />}
             {me.role === 'guest' && <AskToHost />}
             {me.role === 'asked' && (
@@ -64,18 +64,64 @@ function Home()
                     </p>
                 </section>
             )}
+            {hosting && <Storage owner={me.role === 'owner'} />}
         </>
     );
 }
 
-/** The whole plan's storage, shared by every host, with this host's props marked in it. */
-function Storage()
+/**
+ * What Convex's free plan allows besides file storage, from docs.convex.dev/production/state/limits.
+ * Past one, new writes start to fail rather than a bill arriving. Only the dashboard knows how much
+ * of each is used: counting them here would itself spend calls and bandwidth.
+ */
+const planLimits = [
+    { name: 'Function calls', limit: '1M a month', hint: 'Every query run, mutation and live update' },
+    { name: 'Database bandwidth', limit: '1 GB a month', hint: 'Everything read and written, fog and tokens most' },
+    { name: 'File bandwidth', limit: '1 GB a month', hint: 'Maps, props and token pictures downloaded' },
+    { name: 'Database storage', limit: '0.5 GB', hint: 'Sessions, maps, walls and tokens' },
+];
+
+/** The usage page of the team's Convex dashboard, the only place that counts everything. */
+const usagePage = 'https://dashboard.convex.dev/t/twannes-claes/settings/usage';
+
+/**
+ * The whole plan's storage, shared by every host, with this host's props marked in it. The owner
+ * also sees the free plan's other limits, with the way to their live numbers.
+ */
+function Storage({ owner }: { owner: boolean })
 {
     const usage = useQuery(api.pictures.usage);
 
     return (
-        <section className="ttrpg-panel ttrpg-card" aria-label="Storage">
-            {usage ? <StorageMeter {...usage} plan /> : <Loading>Adding up the files</Loading>}
+        <section className="ttrpg-panel ttrpg-card ttrpg-usage" aria-label="Storage">
+            {/* Last and folded: worth a look now and then, not every visit. */}
+            <details>
+                <summary>
+                    <h2>{owner ? 'Storage and limits' : 'Storage'}</h2>
+                    {usage && <span>{fileSize(usage.propBytes + usage.otherBytes)} used</span>}
+                    <FontAwesomeIcon icon={faChevronDown} className="ttrpg-usage__chevron" />
+                </summary>
+                <div className="ttrpg-usage__body">
+                    {usage ? <StorageMeter {...usage} plan /> : <Loading>Adding up the files</Loading>}
+                    {owner && (
+                        <div className="ttrpg-plan">
+                            <p className="ttrpg-storage__head">Free plan</p>
+                            <dl>
+                                {planLimits.map(({ name, limit, hint }) => (
+                                    <div key={name} title={hint}>
+                                        <dt>{name}</dt>
+                                        <dd>{limit}</dd>
+                                    </div>
+                                ))}
+                            </dl>
+                            <a href={usagePage} target="_blank" rel="noreferrer">
+                                See what is used on the Convex dashboard
+                                <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
+                            </a>
+                        </div>
+                    )}
+                </div>
+            </details>
         </section>
     );
 }

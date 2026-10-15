@@ -1,4 +1,4 @@
-import type { Cell, FogSettings, Point, PropPicture, Scenario, SharedFog, Token } from '../types';
+import type { Cell, Draft, FogSettings, Point, PropPicture, Scenario, SharedFog, Token } from '../types';
 
 import { centerOn, fitCamera, panBy, toWorld, zoomAt, type Camera } from './camera.ts';
 import {
@@ -8,13 +8,15 @@ import {
     createFogLayers,
     defaultFogSettings,
     markSeen,
+    packedFlag,
+    packSeen,
     shapePolygon,
     shapeSamples,
     wasSeen,
     type Explored,
     type FogLayers,
 } from './fog.ts';
-import { accent, tooFar } from './colours.ts';
+import { accent, ground, tooFar } from './colours.ts';
 import { distance, midpoint, onMap } from './geometry.ts';
 import { extendPath, lineFeet, pathBlocked, pathFeet } from './path.ts';
 import { drawPill, drawPing, drawRoute, drawUnknownStep, render, tokenRadius, type Lifted, type Viewport } from './render.ts';
@@ -40,6 +42,8 @@ const exploredDelay = 1500;
 const holdDelay = 450;
 /** How long a ping flashes. */
 const pingLife = 1600;
+/** At most this often a path being drawn goes to the server, so a fast drag sends a few updates, not one per cell. */
+const draftGap = 150;
 
 /** A path a player drew and let go of, waiting for Move or Cancel. */
 export interface PendingMove
@@ -70,6 +74,8 @@ export interface MapViewOptions
     onPathCancel?: () => void;
     /** A long press on an empty spot in play mode, to flash it on every screen, see ping. */
     onPing?: (at: Point) => void;
+    /** A player's path as it changes, to show on every other screen, or null once it goes, see Draft. */
+    onDraft?: (id: string, points: Point[] | null, feet: number) => void;
     /**
      * A while after more of the map was seen, what has been seen in all, to share, see SharedFog.
      * At once with forget when the game master hid some, so every screen forgets it too.
@@ -108,6 +114,8 @@ export interface MapView
     setPeek: (peek: boolean) => void;
     /** Flashes a spot: rings spread from it for a moment, in a player's colour or the GM's. */
     ping: (at: Point, color?: string) => void;
+    /** Other screens' paths, drawn faintly in their token's colour, see Draft. */
+    setDrafts: (drafts: Draft[]) => void;
     /**
      * On a player's phone, their own token: the only one they can draw a path from. Every other
      * press pans. Null is the game master's screen, where every token answers.
@@ -211,6 +219,14 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     let pings: { x: number; y: number; color?: string; start: number }[] = [];
     /** When the phone's own token last stopped walking, for its ring, see drawPulse in map/render.ts. */
     let ownRestedAt = performance.now();
+    /** Other screens' paths, see setDrafts. */
+    let drafts: Draft[] = [];
+    /** The token whose path this screen last shared, and how that path looked, see shareDraft. */
+    let drafted: string | null = null;
+    let draftKey = '';
+    /** When this screen last sent its path, and the send waiting for draftGap to pass. */
+    let draftSentAt = 0;
+    let draftTimer = 0;
 
     /** Drops a press that was on its way to a ping. */
     const letGo = () =>
@@ -347,7 +363,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         const { id } = scenario;
         const { columns, rows, seen } = explored;
 
-        const send = () => onExplored({ scenarioId: id, epoch: sharedEpoch ?? 0, columns, rows, seen: seen.slice().buffer }, forget);
+        const send = () => onExplored({ scenarioId: id, epoch: sharedEpoch ?? 0, columns, rows, seen: packSeen(seen) }, forget);
 
         clearTimeout(exploredTimer);
 
@@ -366,7 +382,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
         explored ??= createExplored(scenario);
 
-        if (shared.columns !== explored.columns || shared.rows !== explored.rows)
+        if (shared.columns !== explored.columns || shared.rows !== explored.rows || shared.seen.byteLength !== Math.ceil(explored.seen.length / 8))
             return;
 
         if (sharedEpoch !== null && shared.epoch !== sharedEpoch)
@@ -382,10 +398,11 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
         // What another screen saw, or this one before a reload, only comes as samples.
         const added: number[] = [];
+        const packed = new Uint8Array(shared.seen);
 
-        new Uint8Array(shared.seen).forEach((flag, index) =>
+        explored.seen.forEach((flag, index) =>
         {
-            if (flag && explored && !explored.seen[index])
+            if (!flag && explored && packedFlag(packed, index))
             {
                 explored.seen[index] = 1;
                 added.push(index);
@@ -428,16 +445,67 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         redraw();
     };
 
-    /** The path being drawn or waiting, and its colour, red past the token's speed. */
+    /** The path being drawn or waiting, in its token's ring colour, red past the token's speed. */
     const pathShown = (current: Scenario) =>
     {
         const shown = route
             ? { id: route.id, points: route.points, feet: routeFeet(current, route) }
             : pending;
-        const token = shown && tokens.find((candidate) => candidate.id === shown.id);
 
-        return shown && { ...shown, colour: token && shown.feet > token.speed ? tooFar : accent };
+        if (!shown)
+            return null;
+
+        const token = tokens.find((candidate) => candidate.id === shown.id);
+        const over = token !== undefined && shown.feet > token.speed;
+
+        return { ...shown, over, colour: over ? tooFar : (token?.color ?? accent) };
     };
+
+    /**
+     * Hands a player's path on whenever it changes, so other screens show it being drawn, and
+     * null once it goes. A monster's path stays on this screen, see drafts in convex/play.ts.
+     */
+    const shareDraft = (path: Draft | null) =>
+    {
+        const end = path?.points[path.points.length - 1];
+        const player = path && tokens.find((token) => token.id === path.id)?.kind === 'player';
+        const key = path && end && player && path.points.length > 1 ? `${path.id} ${path.points.length} ${end.x} ${end.y} ${path.feet}` : '';
+
+        if (!options.onDraft || key === draftKey)
+            return;
+
+        // A path growing waits its turn, and the latest one goes when it comes. Dropping it, or
+        // starting another token's, goes at once.
+        const wait = draftSentAt + draftGap - performance.now();
+
+        if (key && drafted === path?.id && wait > 0)
+        {
+            draftTimer ||= window.setTimeout(() =>
+            {
+                draftTimer = 0;
+                shareDraft(scenario ? pathShown(scenario) : null);
+            }, wait);
+
+            return;
+        }
+
+        draftSentAt = performance.now();
+
+        if (drafted && (!key || drafted !== path?.id))
+            options.onDraft(drafted, null, 0);
+
+        if (key && path)
+            options.onDraft(path.id, path.points, path.feet);
+
+        drafted = key && path ? path.id : null;
+        draftKey = key;
+    };
+
+    /**
+     * How big a path's feet pill is: full size until a cell is smaller on screen than the pill is
+     * tall, then shrinking with the cells, to two thirds at most, so it never hides the map zoomed out.
+     */
+    const pillScale = () => Math.min(1, Math.max(2 / 3, ((scenario?.grid.size ?? 0) * camera.zoom) / 40));
 
     /** The path's labels, over the tokens: its feet beside its end, or why it cannot go on. */
     const drawPathLabels = (shown: NonNullable<ReturnType<typeof pathShown>>) =>
@@ -448,7 +516,8 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             drawUnknownStep(context, end, route.unknown, camera.zoom);
 
         if (shown.points.length > 1)
-            drawPill(context, `${shown.feet} ft`, end, camera.zoom, shown.colour);
+            // The pill stays dark unless the path is too long: a light ring colour would hide its words.
+            drawPill(context, `${shown.feet} ft`, end, camera.zoom, shown.over ? tooFar : ground, pillScale());
 
     };
 
@@ -525,6 +594,21 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         const fog = fogEnabled ? layers : null;
         const background = scenario.background ? loaded(scenario.background) : null;
         const path = pathShown(scenario);
+        // Other screens' paths, for tokens this screen shows, never the one drawn here.
+        const others = drafts.flatMap((draft) =>
+        {
+            const token = shown.find((candidate) => candidate.id === draft.id);
+
+            if (!token || draft.id === path?.id)
+                return [];
+
+            const over = draft.feet > token.speed;
+
+            return [{ ...draft, over, colour: over ? tooFar : token.color }];
+        });
+
+        shareDraft(path);
+
         const scene = {
             scenario,
             background,
@@ -541,6 +625,9 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             // The path's line goes under the tokens, so it never covers the one walking it.
             beneath: () =>
             {
+                for (const draft of others)
+                    drawRoute(context, draft.points, camera.zoom, draft.colour);
+
                 if (path)
                     drawRoute(context, path.points, camera.zoom, path.colour);
 
@@ -553,6 +640,9 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         const scale = viewport.dpr * camera.zoom;
 
         context.setTransform(scale, 0, 0, scale, viewport.dpr * camera.x, viewport.dpr * camera.y);
+
+        for (const draft of others)
+            drawPill(context, `${draft.feet} ft`, draft.points[draft.points.length - 1], camera.zoom, draft.over ? tooFar : ground, pillScale());
 
         if (path)
             drawPathLabels(path);
@@ -1233,6 +1323,11 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             pending = move;
             redraw();
         },
+        setDrafts: (next) =>
+        {
+            drafts = next;
+            redraw();
+        },
         ping: (at, color) =>
         {
             pings.push({ ...at, color, start: performance.now() });
@@ -1299,6 +1394,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         destroy: () =>
         {
             letGo();
+            window.clearTimeout(draftTimer);
             observer.disconnect();
             canvas.removeEventListener('pointerdown', down);
             canvas.removeEventListener('pointermove', move);

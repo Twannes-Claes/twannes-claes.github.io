@@ -545,6 +545,8 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 onExplored={liveMap ? (fog, forget) => fail(liveMap.saveFog(fog, forget)) : undefined}
                 ping={liveMap ? liveMap.ping : localPing}
                 onPing={(at) => (liveMap ? fail(liveMap.sendPing(at)) : setLocalPing({ ...at, at: Date.now() }))}
+                drafts={liveMap ? liveMap.drafts : undefined}
+                onDraft={liveMap ? (id, points, feet) => fail(liveMap.draw(id, points, feet)) : undefined}
                 fogSettings={fogSettings}
                 fogSource={liveMap ? 'live' : 'preview'}
             />

@@ -1,4 +1,14 @@
-import { faCloud, faEye, faPlay, faQrcode, faStop, faUserXmark, faUsers } from '@fortawesome/free-solid-svg-icons';
+import {
+    faArrowUpRightFromSquare,
+    faCloud,
+    faEye,
+    faPlay,
+    faQrcode,
+    faStop,
+    faUserXmark,
+    faUsers,
+    faXmark,
+} from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useActionState, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -277,7 +287,17 @@ function QrCode({ path, password, onClose }: QrCodeProps)
     return createPortal(
         <div className="ttrpg-qr" role="dialog" aria-label="Join with this QR code" onClick={onClose}>
             <div className="ttrpg-panel ttrpg-qr__card">
-                <h2>Scan to join the table</h2>
+                <button
+                    type="button"
+                    className="ttrpg-icon-button ttrpg-icon-button--small ttrpg-qr__close"
+                    aria-label="Close"
+                    title="Close"
+                    onClick={onClose}
+                >
+                    <FontAwesomeIcon icon={faXmark} />
+                </button>
+                <p className="ttrpg-subhead">Join the table</p>
+                <h2>Scan with your phone camera</h2>
                 {/* The tile is there from the start, so the panel does not jump when the code arrives. */}
                 <div className="ttrpg-qr__code">
                     {code && (
@@ -286,10 +306,24 @@ function QrCode({ path, password, onClose }: QrCodeProps)
                         </svg>
                     )}
                 </div>
-                <p className="ttrpg-qr__next">Then type the password</p>
-                <p className="ttrpg-qr__password">{password}</p>
-                {code && <p className="ttrpg-qr__url">{code.url}</p>}
-                <p className="ttrpg-qr__close">Click anywhere or press <kbd>Esc</kbd> to close</p>
+                <div className="ttrpg-qr__password">
+                    <span className="ttrpg-subhead">Then type the password</span>
+                    <strong>{password}</strong>
+                </div>
+                {/* Opens the join page here too, to try it, without closing the code behind it. */}
+                {code && (
+                    <a
+                        className="ttrpg-qr__url"
+                        href={code.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        {code.url.replace(/^https?:\/\//, '')}
+                        <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
+                    </a>
+                )}
+                <p className="ttrpg-qr__hint">Click anywhere or press <kbd>Esc</kbd> to close</p>
             </div>
         </div>,
         document.querySelector('.ttrpg') ?? document.body,

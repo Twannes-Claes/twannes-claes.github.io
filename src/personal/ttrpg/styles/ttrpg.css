@@ -856,6 +856,98 @@ html:has(.ttrpg) {
     background: var(--ttrpg-accent);
 }
 
+/* The dashboard's storage and plan limits, folded to a line until opened. */
+.ttrpg-usage summary {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    list-style: none;
+}
+
+.ttrpg-usage summary::-webkit-details-marker {
+    display: none;
+}
+
+.ttrpg-usage summary h2 {
+    margin: 0;
+}
+
+.ttrpg-usage summary span {
+    flex: 1;
+    color: var(--ttrpg-muted);
+    font-family: var(--ttrpg-mono);
+    font-size: 0.75rem;
+    text-align: right;
+}
+
+.ttrpg-usage__chevron {
+    color: var(--ttrpg-muted);
+    transition: rotate 150ms var(--ttrpg-ease);
+}
+
+.ttrpg-usage summary:hover .ttrpg-usage__chevron {
+    color: var(--ttrpg-ink);
+}
+
+.ttrpg-usage details[open] .ttrpg-usage__chevron {
+    rotate: 180deg;
+}
+
+.ttrpg-usage__body {
+    margin-top: 1rem;
+}
+
+/* The free plan's other limits, under the storage bar, for the owner. */
+.ttrpg-plan {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--ttrpg-edge);
+    color: var(--ttrpg-muted);
+    font-size: 0.75rem;
+}
+
+.ttrpg-plan dl {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 0.5rem;
+}
+
+.ttrpg-plan dl > div {
+    display: grid;
+    gap: 0.125rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 10px;
+    background: var(--ttrpg-well);
+}
+
+.ttrpg-plan dd {
+    color: var(--ttrpg-ink);
+    font-family: var(--ttrpg-mono);
+}
+
+.ttrpg-plan a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    justify-self: start;
+    color: var(--ttrpg-ink);
+    text-decoration: underline;
+    text-decoration-color: var(--ttrpg-edge);
+    text-underline-offset: 3px;
+}
+
+.ttrpg-plan a:hover,
+.ttrpg-plan a:focus-visible {
+    text-decoration-color: currentColor;
+}
+
+.ttrpg-plan a svg {
+    font-size: 0.75em;
+}
+
 /* A file picker as a button, like uploading props. Beats the two columns every other label gets. */
 .ttrpg-settings label.ttrpg-segment {
     display: flex;
@@ -1621,15 +1713,24 @@ html:has(.ttrpg) {
 }
 
 .ttrpg-qr__card {
+    position: relative;
     display: grid;
     justify-items: center;
-    gap: 1rem;
-    max-width: 100%;
+    gap: 0.75rem;
+    width: min(100%, calc(min(60vmin, 640px) + 2 * clamp(1.25rem, 3vmin, 2.5rem)));
     padding: clamp(1.25rem, 3vmin, 2.5rem);
+    border-radius: 24px;
     text-align: center;
 }
 
+/* Headings here stand on their own, without the rule a panel's second heading has above it. */
+.ttrpg-qr .ttrpg-subhead {
+    padding-top: 0;
+    border-top: 0;
+}
+
 .ttrpg-qr__card h2 {
+    margin-top: -0.25rem;
     color: var(--ttrpg-ink);
     font-size: clamp(1.25rem, 2.6vmin, 2rem);
     font-weight: 600;
@@ -1637,10 +1738,16 @@ html:has(.ttrpg) {
 
 .ttrpg-qr__code {
     width: min(60vmin, 640px);
+    max-width: 100%;
     aspect-ratio: 1;
+    margin-top: 0.25rem;
     padding: clamp(10px, 2vmin, 24px);
     border-radius: 16px;
     background: #fcf8ec;
+    box-shadow:
+        0 0 0 1px var(--ttrpg-edge),
+        0 0 0 6px color-mix(in srgb, var(--ttrpg-accent) 35%, transparent),
+        0 16px 40px rgb(0 0 0 / 0.4);
 }
 
 .ttrpg-qr__code svg {
@@ -1649,13 +1756,19 @@ html:has(.ttrpg) {
     height: 100%;
 }
 
-.ttrpg-qr__next {
-    color: var(--ttrpg-ink);
-    font-size: clamp(1rem, 1.8vmin, 1.4rem);
+/* The password in a well, like a field already filled in, so it reads as what to type. */
+.ttrpg-qr__password {
+    display: grid;
+    gap: 0.25rem;
+    width: 100%;
+    margin-top: 0.75rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--ttrpg-edge);
+    border-radius: 14px;
+    background: var(--ttrpg-well);
 }
 
-.ttrpg-qr__password {
-    margin-top: -0.5rem;
+.ttrpg-qr__password strong {
     color: var(--ttrpg-ink);
     font-family: var(--ttrpg-mono);
     font-size: clamp(1.5rem, 4vmin, 3rem);
@@ -1665,14 +1778,42 @@ html:has(.ttrpg) {
 }
 
 .ttrpg-qr__url {
-    max-width: min(60vmin, 640px);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    max-width: 100%;
+    padding: 0.25rem 0.5rem;
+    border-radius: 8px;
     color: var(--ttrpg-muted);
     font-family: var(--ttrpg-mono);
     font-size: clamp(0.75rem, 1.2vmin, 1rem);
     overflow-wrap: anywhere;
+    text-decoration: underline;
+    text-decoration-color: var(--ttrpg-edge);
+    text-underline-offset: 3px;
+    transition:
+        color 150ms var(--ttrpg-ease),
+        text-decoration-color 150ms var(--ttrpg-ease);
+}
+
+.ttrpg-qr__url:hover,
+.ttrpg-qr__url:focus-visible {
+    color: var(--ttrpg-ink);
+    text-decoration-color: currentColor;
+}
+
+.ttrpg-qr__url svg {
+    flex: none;
+    font-size: 0.75em;
 }
 
 .ttrpg-qr__close {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+}
+
+.ttrpg-qr__hint {
     color: var(--ttrpg-muted);
     font-size: 0.8rem;
 }
@@ -1869,4 +2010,11 @@ a.ttrpg-row__main:focus-visible {
 .ttrpg-scenarios input:not([type]) {
     min-height: 32px;
     padding-block: 0.3rem;
+}
+
+/* The phone's own token, in its settings: change its picture or leave, side by side. */
+.ttrpg-token-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
 }
