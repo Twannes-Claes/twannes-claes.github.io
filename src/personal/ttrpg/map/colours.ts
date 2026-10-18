@@ -14,6 +14,8 @@ export const highlight = '#a77ee0';
 export const door = '#d8a657';
 /** What a tool is about to take away, like walls in the eraser's box. */
 export const danger = '#e0565b';
+/** Temp HP, the blue of a shield, which takes the hits first. */
+export const shield = '#3f7fd0';
 /** A path past the token's speed. */
 export const tooFar = '#b4443c';
 

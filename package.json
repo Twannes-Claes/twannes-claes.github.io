@@ -5,6 +5,7 @@
     "description": "Portfolio of Twannes Claes",
     "scripts": {
         "dev": "vite",
+        "dev:ttrpg": "node scripts/dev-ttrpg.ts",
         "build": "vite-react-ssg build",
         "preview": "vite preview",
         "typecheck": "tsc --noEmit",

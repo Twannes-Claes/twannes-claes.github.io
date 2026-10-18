@@ -6,7 +6,7 @@ import type { FogSettings, Live, PictureBytes, Ping, Point, PropPicture, Scenari
 
 import { blankScenario, demoTokens } from '../content/scenarios';
 import { defaultFogSettings } from '../map/fog';
-import { withoutNumbers } from '../map/health';
+import { cleanStats, withoutNumbers } from '../map/health';
 import { toggleDoor, type ToolId } from '../map/tools';
 import { scenarioFromUvtt } from '../map/uvtt';
 import type { FrameStats, PendingMove } from '../map/view';
@@ -17,7 +17,7 @@ import { listenForDoors, type DoorChange } from '../services/tableChannel';
 import { Spinner, Toast, Toasts } from './Feedback';
 import { FogPanel } from './FogPanel';
 import { GridPanel } from './GridPanel';
-import { LiveControls } from './LiveControls';
+import { LiveControls, Players } from './LiveControls';
 import { MapCanvas } from './MapCanvas';
 import { Monsters } from './Monsters';
 import { MoveSheet } from './MoveSheet';
@@ -656,6 +656,19 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                         Player view
                     </button>
                 )}
+                {/* Before going live, the test players' numbers, to try how hurt tokens look. */}
+                {!(live && live.live) && (
+                    <Players
+                        tokens={tokens}
+                        onSetStats={(id, stats) =>
+                        {
+                            setTokens((current) => current.map((token) => (token.id === id ? { ...token, ...cleanStats(stats) } : token)));
+
+                            return Promise.resolve();
+                        }}
+                        hidden={idle}
+                    />
+                )}
                 {live && (
                     <LiveControls
                         live={live}
@@ -758,7 +771,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
             {mode === 'players' && !pending && (
                 <div className={`ttrpg-panel ttrpg-corner ttrpg-corner--left${idle ? ' ttrpg-hidden' : ''}`}>
                     <RulerPicker
-                        measure={playTool === 'measure' || playTool === 'area' ? playTool : null}
+                        tool={playTool}
                         onMeasure={(next) => setPlayTool(next ?? 'open-doors')}
                         start
                     />

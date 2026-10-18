@@ -96,7 +96,7 @@ export function PlayDock({
             )}
             <div className="ttrpg-dock__group">
                 <RulerPicker
-                    measure={tool === 'measure' || tool === 'area' ? tool : null}
+                    tool={tool}
                     onMeasure={(next) => onTool(next ?? 'open-doors')}
                 />
                 <span className="ttrpg-pop">

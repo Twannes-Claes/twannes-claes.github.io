@@ -6,8 +6,8 @@ export type Measure = 'measure' | 'area';
 
 interface RulerPickerProps
 {
-    /** The one on, or null while the ruler is off. */
-    measure: Measure | null;
+    /** The tool on now, the ruler's or any other, which leaves the ruler off. */
+    tool: string;
     onMeasure: (next: Measure | null) => void;
     /** Opens its pop-out to the right rather than centred, for a button in a screen's corner. */
     start?: boolean;
@@ -18,8 +18,10 @@ interface RulerPickerProps
  * while it is on a pop-out above it picks a line or a circle, like Reveal's, see PlayDock.tsx.
  * Pressing it again puts it away.
  */
-export function RulerPicker({ measure, onMeasure, start = false }: RulerPickerProps)
+export function RulerPicker({ tool, onMeasure, start = false }: RulerPickerProps)
 {
+    const measure = tool === 'measure' || tool === 'area' ? tool : null;
+
     return (
         <span className="ttrpg-pop">
             <button

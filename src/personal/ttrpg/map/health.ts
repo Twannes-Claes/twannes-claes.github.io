@@ -34,17 +34,6 @@ export function withoutNumbers<T extends Token>(token: T): T
     return { ...token, ...hidden, state: stateOf(token) };
 }
 
-/** A token's numbers in one line, like 23+5/30 HP · AC 15 · PP 13. Empty for one without. */
-export function statsLine(token: Token): string
-{
-    if (token.hp === undefined || token.maxHp === undefined)
-        return '';
-
-    const temp = token.tempHp ? `+${token.tempHp}` : '';
-
-    return `${token.hp}${temp}/${token.maxHp} HP · AC ${token.ac ?? 0} · PP ${token.perception ?? 0}`;
-}
-
 /** The highest number each stat takes, past any creature in the common systems. HP stops at max. */
 const statLimits = { maxHp: 9999, tempHp: 999, ac: 50, perception: 50 };
 

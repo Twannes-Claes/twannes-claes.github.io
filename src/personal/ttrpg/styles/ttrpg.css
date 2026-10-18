@@ -1632,6 +1632,22 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
     grid-template-columns: none;
     align-items: start;
     gap: 0.35rem;
+    min-width: 0;
+}
+
+/* A number field is wide on its own, which pushed a narrow pop-out into scrolling sideways. No
+   spin arrows: they crowd a short field, and the keyboard's arrows still step it. */
+.ttrpg-fields input {
+    width: 100%;
+    min-width: 0;
+    font-family: var(--ttrpg-mono);
+    appearance: textfield;
+}
+
+.ttrpg-fields input::-webkit-inner-spin-button,
+.ttrpg-fields input::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
 }
 
 /* A token's numbers to change, under its row in a list or in the phone's settings. */
@@ -1641,13 +1657,59 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
     padding: 0.5rem 0 0.75rem;
 }
 
-/* A token's numbers in its row, quiet beside the name. */
-.ttrpg-row__stats {
-    margin-inline-start: auto;
+/* Two full rows on six columns: the three HP fields, then AC and Perception, half each. */
+.ttrpg-stats-form .ttrpg-fields {
+    grid-template-columns: repeat(6, 1fr);
+}
+
+.ttrpg-stats-form .ttrpg-field {
+    grid-column: span 2;
+}
+
+.ttrpg-stats-form .ttrpg-field:nth-child(n + 4) {
+    grid-column: span 3;
+}
+
+/* A token's numbers under its name in a list, see StatChips. They wrap as a whole, so none is cut
+   off. */
+.ttrpg-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.ttrpg-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.1rem 0.45rem;
+    border-radius: 6px;
+    background: var(--ttrpg-edge);
     color: var(--ttrpg-muted);
-    font-family: 'JetBrains Mono Variable', ui-monospace, monospace;
-    font-size: 0.75rem;
+    font-family: var(--ttrpg-mono);
+    font-size: 0.7rem;
     white-space: nowrap;
+}
+
+/* HP warms the more hurt it is, like the pill under a token, see healthText in map/render.ts. */
+.ttrpg-chip--unhurt {
+    color: var(--ttrpg-ink);
+}
+
+.ttrpg-chip--hurt {
+    color: #d8a657;
+}
+
+.ttrpg-chip--bloodied,
+.ttrpg-chip--critical {
+    background: color-mix(in srgb, var(--ttrpg-danger) 18%, transparent);
+    color: var(--ttrpg-danger);
+}
+
+.ttrpg-chip--temp {
+    background: #3f7fd0;
+    color: var(--ttrpg-ink);
 }
 
 .ttrpg-field input,
@@ -1952,6 +2014,28 @@ a.ttrpg-row__main:focus-visible {
     white-space: nowrap;
 }
 
+/* The name and a line under it, beside the swatch. */
+.ttrpg-row__text {
+    display: grid;
+    min-width: 0;
+}
+
+/* With numbers under the name, the swatch and the buttons line up with the name, not the middle
+   of both lines. */
+.ttrpg-row:has(.ttrpg-chips) {
+    align-items: flex-start;
+}
+
+.ttrpg-row:has(.ttrpg-chips) .ttrpg-swatch {
+    align-self: flex-start;
+    margin-top: calc((1lh - 12px) / 2);
+}
+
+/* The row's padding and half the name's line, less half the button. */
+.ttrpg-row:has(.ttrpg-chips) > .ttrpg-icon-button {
+    margin-top: calc(0.5rem + 10.5px - 16px);
+}
+
 .ttrpg-swatch {
     flex: none;
     width: 12px;
@@ -2053,6 +2137,11 @@ a.ttrpg-row__main:focus-visible {
     font-size: 0.875rem;
     pointer-events: none;
     animation: ttrpg-tip 120ms var(--ttrpg-ease);
+}
+
+/* A form field's warning, see TooltipHost. */
+.ttrpg-tip--invalid {
+    border-color: var(--ttrpg-danger);
 }
 
 .ttrpg-tip--above {

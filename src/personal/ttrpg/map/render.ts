@@ -1,9 +1,9 @@
-import { faSkull } from '@fortawesome/free-solid-svg-icons';
+import { faShieldHalved, faSkull, type IconDefinition } from '@fortawesome/free-solid-svg-icons';
 
 import type { CreatureSize, Grid, HealthState, Point, Scenario, Token } from '../types';
 
 import { toWorld, type Camera } from './camera.ts';
-import { danger, door as doorColour, faded, ground, highlight, ink } from './colours.ts';
+import { danger, door as doorColour, faded, ground, highlight, ink, shield } from './colours.ts';
 import { drawFog, type FogLayers, type FogLook } from './fog.ts';
 import type { Area } from './geometry.ts';
 import { cellAt, cellCenter, cellCorners, hexRadius } from './grid.ts';
@@ -152,9 +152,33 @@ export function drawPill(
     drawPillAt(ctx, text, { x: at.x + 14 * unit, y: at.y - 14 * unit - 26 * unit }, unit, colour);
 }
 
+/** Font Awesome's icons as Path2D, made when first needed, since only the browser has one. */
+const iconPaths = new Map<IconDefinition, Path2D>();
+
+/** An icon in the current fill, its longer side size across, centred on a point. */
+function drawIcon(ctx: CanvasRenderingContext2D, icon: IconDefinition, at: Point, size: number)
+{
+    const [width, height, , , path] = icon.icon;
+    const scale = size / Math.max(width, height);
+    let shape = iconPaths.get(icon);
+
+    if (!shape)
+    {
+        shape = new Path2D(Array.isArray(path) ? path.join(' ') : path);
+        iconPaths.set(icon, shape);
+    }
+
+    ctx.save();
+    ctx.translate(at.x - (width * scale) / 2, at.y - (height * scale) / 2);
+    ctx.scale(scale, scale);
+    ctx.fill(shape);
+    ctx.restore();
+}
+
 /**
- * A pill with its top left at a point, or its top middle with centred. unit is one screen pixel
- * in world pixels. The text is ink unless text says otherwise.
+ * A pill with its top left at a point, or its top middle with centred, and an icon before the
+ * label if given. unit is one screen pixel in world pixels. The text is ink unless text says
+ * otherwise. Hands back the pill's width, to set another beside it.
  */
 function drawPillAt(
     ctx: CanvasRenderingContext2D,
@@ -162,15 +186,17 @@ function drawPillAt(
     at: Point,
     unit: number,
     colour: string,
-    { centred = false, text = ink }: { centred?: boolean; text?: string } = {},
-)
+    { centred = false, text = ink, icon }: { centred?: boolean; text?: string; icon?: IconDefinition } = {},
+): number
 {
     const fontSize = 14 * unit;
     const height = 26 * unit;
+    // The icon and the gap after it.
+    const before = icon ? fontSize + 5 * unit : 0;
 
     ctx.font = `600 ${fontSize}px 'JetBrains Mono Variable', ui-monospace, monospace`;
 
-    const width = ctx.measureText(label).width + 20 * unit;
+    const width = ctx.measureText(label).width + before + 20 * unit;
     const left = centred ? at.x - width / 2 : at.x;
     const top = at.y;
 
@@ -188,9 +214,15 @@ function drawPillAt(
     ctx.strokeStyle = faded(ink, 0.2);
     ctx.stroke();
     ctx.fillStyle = text;
+
+    if (icon)
+        drawIcon(ctx, icon, { x: left + 10 * unit + fontSize / 2, y: top + height / 2 }, fontSize);
+
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(label, left + width / 2, top + height / 2 + unit);
+    ctx.fillText(label, left + (width + before) / 2, top + height / 2 + unit);
+
+    return width;
 }
 
 /** The colour of a token's HP under it: warmer and redder the more hurt it is. */
@@ -203,7 +235,7 @@ const healthText: Record<HealthState, string> = {
 };
 
 /**
- * A token's HP in a pill under it, like 23+5/30, for the screens that have its numbers: the GM
+ * A token's HP in a pill under it, like 23/30, for the screens that have its numbers: the GM
  * view for every token, a phone for its own. Nothing for a token without them.
  */
 export function drawHealth(ctx: CanvasRenderingContext2D, token: Lifted, radius: number, zoom: number, scale = 1)
@@ -212,13 +244,14 @@ export function drawHealth(ctx: CanvasRenderingContext2D, token: Lifted, radius:
         return;
 
     const unit = scale / zoom;
-    const temp = token.tempHp ? `+${token.tempHp}` : '';
     const state = healthState(token.hp, token.maxHp);
 
-    drawPillAt(ctx, `${token.hp}${temp}/${token.maxHp}`, { x: token.x, y: token.y + radius + 4 * unit }, unit, ground, {
-        centred: true,
-        text: healthText[state],
-    });
+    const at = { x: token.x, y: token.y + radius + 4 * unit };
+    const width = drawPillAt(ctx, `${token.hp}/${token.maxHp}`, at, unit, ground, { centred: true, text: healthText[state] });
+
+    // Temp HP rides beside it as a blue shield, and goes once spent.
+    if (token.tempHp)
+        drawPillAt(ctx, String(token.tempHp), { x: at.x + width / 2 + 3 * unit, y: at.y }, unit, shield, { icon: faShieldHalved });
 }
 
 /**
@@ -230,9 +263,6 @@ const woundLook: Record<Exclude<HealthState, 'unhurt' | 'down'>, { reach: number
     bloodied: { reach: 0.7, alpha: 0.55 },
     critical: { reach: 1.3, alpha: 0.7 },
 };
-
-/** Font Awesome's skull as a Path2D, made when first needed, since only the browser has one. */
-let skull: Path2D | null = null;
 
 /**
  * How hurt a token looks, over its picture: red rising from the bottom as it gets hurt, and a
@@ -252,16 +282,10 @@ function drawWound(ctx: CanvasRenderingContext2D, token: Lifted, inner: number)
 
     if (state === 'down')
     {
-        const [width, height, , , path] = faSkull.icon;
-        const size = inner * 1.1;
-
-        skull ??= new Path2D(Array.isArray(path) ? path.join(' ') : path);
         ctx.fillStyle = 'rgb(18 17 19 / 0.7)';
         ctx.fill();
-        ctx.translate(token.x - size / 2, token.y - (size * height) / width / 2);
-        ctx.scale(size / width, size / width);
         ctx.fillStyle = faded(ink, 0.85);
-        ctx.fill(skull);
+        drawIcon(ctx, faSkull, token, inner * 1.1);
         ctx.restore();
 
         return;

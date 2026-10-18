@@ -24,7 +24,8 @@ interface PopoverProps
 /**
  * A floating panel with its title and a close button, closed by Esc as well. The button that
  * opens one carries aria-expanded, which tells screen readers it is open and keeps a press on it
- * from counting as outside, so it can close the panel again.
+ * from counting as outside, so it can close the panel again. A press on a closed one, like Settings
+ * while Players is open, does count, so only one of them is open at a time.
  */
 export function Popover({ title, onClose, className, dismissOnOutside = false, closeButton = true, children }: PopoverProps)
 {
@@ -42,7 +43,7 @@ export function Popover({ title, onClose, className, dismissOnOutside = false, c
     {
         const target = event.target instanceof Element ? event.target : null;
 
-        if (target && !panel.current?.contains(target) && !target.closest('[aria-expanded], dialog'))
+        if (target && !panel.current?.contains(target) && !target.closest('[aria-expanded="true"], dialog'))
             onClose();
 
     });

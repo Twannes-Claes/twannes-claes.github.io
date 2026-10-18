@@ -10,6 +10,8 @@ interface Tip
      * tool rail, where above would cover the next tool up.
      */
     side: 'above' | 'below' | 'right';
+    /** A form field's warning rather than a title, drawn in the error colour. */
+    invalid?: boolean;
 }
 
 /** How long the pointer rests on an element before its tip shows, a little quicker than native. */
@@ -19,7 +21,9 @@ const delay = 400;
  * The tip of whatever `title` the mouse rests on, drawn in the app's own style, mounted once in
  * the Shell. The browser's tooltip cannot be styled, so the title is lifted off the element while
  * it is hovered, which keeps the browser from showing its own, and put back when the mouse leaves.
- * Every component keeps writing a plain `title`.
+ * Every component keeps writing a plain `title`. A form field that fails the browser's checks,
+ * like a number under its `min`, gets its warning here too, under the field, instead of the
+ * browser's bubble; it goes once the field is typed in.
  */
 export function TooltipHost()
 {
@@ -90,8 +94,31 @@ export function TooltipHost()
 
         };
 
+        // The browser's warning for a field, which only says so for the first one in the form.
+        const invalid = (event: Event) =>
+        {
+            const field = event.target;
+
+            if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement))
+                return;
+
+            event.preventDefault();
+
+            if (field.form && field.form.querySelector(':invalid') !== field)
+                return;
+
+            const box = field.getBoundingClientRect();
+
+            release();
+            field.focus();
+            setTip({ text: field.validationMessage, x: box.left + box.width / 2, y: box.bottom + 8, side: 'below', invalid: true });
+        };
+
         document.addEventListener('pointerover', over);
         document.addEventListener('pointerout', out);
+        // Invalid does not bubble, so it is caught on its way down.
+        document.addEventListener('invalid', invalid, true);
+        document.addEventListener('input', hide);
         // A click hides the tip until the mouse comes back, as the browser's own does.
         document.addEventListener('pointerdown', hide);
 
@@ -100,6 +127,8 @@ export function TooltipHost()
             release();
             document.removeEventListener('pointerover', over);
             document.removeEventListener('pointerout', out);
+            document.removeEventListener('invalid', invalid, true);
+            document.removeEventListener('input', hide);
             document.removeEventListener('pointerdown', hide);
         };
     }, []);
@@ -112,10 +141,12 @@ export function TooltipHost()
 
     return (
         <div
-            className={`ttrpg-tip ttrpg-tip--${tip.side}`}
+            className={`ttrpg-tip ttrpg-tip--${tip.side}${tip.invalid ? ' ttrpg-tip--invalid' : ''}`}
             // Laid out from the left edge first, so the text wraps the same wherever it ends up.
             style={{ left: 0, top: tip.y }}
-            aria-hidden="true"
+            // A warning is read out, as the browser's own would be; a title is already the label.
+            role={tip.invalid ? 'alert' : undefined}
+            aria-hidden={tip.invalid ? undefined : true}
             // Centred on the element, but slid along to stay on screen, which needs its width. The
             // control size zooms the tip, its place included, so the place is divided back.
             ref={(node) =>

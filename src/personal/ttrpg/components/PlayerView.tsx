@@ -248,7 +248,7 @@ function JoinForm({ sessionId, name }: JoinFormProps)
                     Picture, from the camera or your photos
                     <input name="picture" type="file" accept="image/*" />
                 </label>
-                {/* Only the GM sees these. The rest of the table sees how hurt you look. */}
+                {/* Only you and the GM see these. The rest of the table sees how hurt you look. */}
                 <div className="ttrpg-fields">
                     <label className="ttrpg-field">
                         Max HP
@@ -420,7 +420,7 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
             {!pending && (
                 <div className={`ttrpg-panel ttrpg-corner ttrpg-corner--left${idle ? ' ttrpg-hidden' : ''}`}>
                     <RulerPicker
-                        measure={tool === 'measure' || tool === 'area' ? tool : null}
+                        tool={tool}
                         onMeasure={(next) => setTool(next ?? resting)}
                         start
                     />

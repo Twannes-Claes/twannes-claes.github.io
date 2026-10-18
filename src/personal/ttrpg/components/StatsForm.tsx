@@ -1,8 +1,10 @@
-import { faCheck } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faShieldHalved } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useActionState } from 'react';
 
 import type { Stats, Token } from '../types';
+
+import { healthState } from '../map/health';
 
 import { Spinner } from './Feedback';
 
@@ -11,6 +13,36 @@ interface StatsFormProps
     token: Token;
     /** Fails with the message to show, see friendly in SessionEditor.tsx. */
     onSave: (stats: Stats) => Promise<void>;
+}
+
+/**
+ * A token's numbers as small chips under its name in a list: HP coloured by how hurt it is, temp HP
+ * as the blue shield the map shows, AC and Passive Perception. Nothing for a token without them.
+ */
+export function StatChips({ token }: { token: Token })
+{
+    if (token.hp === undefined || token.maxHp === undefined)
+        return null;
+
+    return (
+        <span className="ttrpg-chips">
+            <span className={`ttrpg-chip ttrpg-chip--${healthState(token.hp, token.maxHp)}`} title="Hit points">
+                {token.hp}/{token.maxHp}
+            </span>
+            {Boolean(token.tempHp) && (
+                <span className="ttrpg-chip ttrpg-chip--temp" title="Temp HP">
+                    <FontAwesomeIcon icon={faShieldHalved} />
+                    {token.tempHp}
+                </span>
+            )}
+            <span className="ttrpg-chip" title="Armour Class">
+                AC {token.ac ?? 0}
+            </span>
+            <span className="ttrpg-chip" title="Passive Perception">
+                PP {token.perception ?? 0}
+            </span>
+        </span>
+    );
 }
 
 /**

@@ -27,6 +27,7 @@ change the functions.
 
 - While working on `convex/`, keep `npx convex dev` running in the repo root. It pushes every
   save to the dev deployment and rewrites `convex/_generated/`, which is committed.
+  `npm run dev:ttrpg` runs it together with `npm run dev -- --host` in one terminal.
 - To put the functions live: `npx convex deploy`.
 
 ## One-time setup
@@ -65,7 +66,8 @@ terminal or the Convex dashboard, never into the repo or a chat.
 
 Phones on the same Wi-Fi can play against the dev deployment:
 
-1. Run `npm run dev -- --host`, so phones can reach the dev server.
+1. Run `npm run dev -- --host`, so phones can reach the dev server, or `npm run dev:ttrpg`
+   for that and `npx convex dev` at once.
 2. The GM stays on `http://localhost:5173`: sign in, start the session, show the QR code. Under
    `npm run dev` the code holds the laptop's own network address, found when the dev server
    starts (see `vite.config.ts`), so restart it after moving to another Wi-Fi.

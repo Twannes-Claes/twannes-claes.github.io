@@ -106,6 +106,7 @@ export function Settings({ settings, onChange, phone = false, children, hidden =
                 type="button"
                 className="ttrpg-segment"
                 aria-label="Settings and shortcuts"
+                aria-pressed={open}
                 aria-expanded={open}
                 title="Settings and shortcuts"
                 onClick={() => setOpen((shown) => !shown)}

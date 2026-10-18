@@ -14,14 +14,13 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useActionState, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import type { Live } from '../types';
+import type { Live, Stats, Token } from '../types';
 
-import { statsLine } from '../map/health';
 import { confirmAction } from '../services/confirm';
 
 import { Spinner } from './Feedback';
 import { Popover } from './Popover';
-import { StatsForm } from './StatsForm';
+import { StatChips, StatsForm } from './StatsForm';
 import { useKeydown } from './useKeys';
 
 /** The QR code maker, loaded when the code is first shown, see PLAN.md. */
@@ -47,6 +46,101 @@ interface LiveControlsProps
     hidden?: boolean;
 }
 
+interface PlayersProps
+{
+    /** Every token; the players among them are listed. */
+    tokens: Token[];
+    onSetStats: (tokenId: string, stats: Stats) => Promise<void>;
+    /** Removes one from the table, only in a live session. */
+    onKick?: (tokenId: string, name: string) => void;
+    /** Shows the QR code to join, only in a live session. */
+    onQr?: () => void;
+    /** See hidden on LiveControls. */
+    hidden?: boolean;
+}
+
+/**
+ * The Players button and its pop-out: who is at the table, with their numbers to change. Live
+ * it lists who joined; before that the GM view's two test players, see demoTokens.
+ */
+export function Players({ tokens, onSetStats, onKick, onQr, hidden = false }: PlayersProps)
+{
+    const [open, setOpen] = useState(false);
+    // The player whose numbers are open under their row.
+    const [editing, setEditing] = useState<string | null>(null);
+    const players = tokens.filter((token) => token.kind === 'player');
+
+    return (
+        <>
+            <button
+                type="button"
+                className="ttrpg-segment"
+                aria-pressed={open}
+                aria-expanded={open}
+                title={onQr ? 'Who has joined' : 'The test players'}
+                onClick={() => setOpen((was) => !was)}
+            >
+                <FontAwesomeIcon icon={faUsers} />
+                Players <span className="ttrpg-count">{players.length}</span>
+            </button>
+
+            {open && !hidden && (
+                <Popover title="Players" className="ttrpg-start" dismissOnOutside onClose={() => setOpen(false)}>
+                    {players.length === 0 ? (
+                        <p className="ttrpg-empty">Nobody has joined yet.</p>
+                    ) : (
+                        <ul className="ttrpg-rows">
+                            {players.map((player) => (
+                                <li key={player.id} className="ttrpg-row">
+                                    <span className="ttrpg-row__main ttrpg-row__main--swatch">
+                                        <span className="ttrpg-swatch" style={{ background: player.color }} />
+                                        {/* The name, with the numbers under it. */}
+                                        <span className="ttrpg-row__text">
+                                            <span className="ttrpg-row__name">{player.name}</span>
+                                            <StatChips token={player} />
+                                        </span>
+                                    </span>
+                                    <button
+                                        type="button"
+                                        className="ttrpg-icon-button ttrpg-icon-button--small"
+                                        aria-label={`Numbers of ${player.name}`}
+                                        aria-pressed={editing === player.id}
+                                        title="HP, AC and Perception"
+                                        onClick={() => setEditing((was) => (was === player.id ? null : player.id))}
+                                    >
+                                        <FontAwesomeIcon icon={faHeart} />
+                                    </button>
+                                    {onKick && (
+                                        <button
+                                            type="button"
+                                            className="ttrpg-icon-button ttrpg-icon-button--small"
+                                            aria-label={`Remove ${player.name}`}
+                                            title="Remove from the table"
+                                            onClick={() => onKick(player.id, player.name)}
+                                        >
+                                            <FontAwesomeIcon icon={faUserXmark} />
+                                        </button>
+                                    )}
+                                    {editing === player.id && (
+                                        <StatsForm token={player} onSave={(stats) => onSetStats(player.id, stats)} />
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                    {/* Always here live, the only way to the QR code, so late players can join. */}
+                    {onQr && (
+                        <button type="button" className="ttrpg-segment ttrpg-segment--block" onClick={onQr}>
+                            <FontAwesomeIcon icon={faQrcode} />
+                            Show the QR code
+                        </button>
+                    )}
+                </Popover>
+            )}
+        </>
+    );
+}
+
 /**
  * Starting and ending a saved session, beside the mode switch. Start asks for the password
  * players join with; while live, the players at the table, with the QR code that leads to the
@@ -56,11 +150,7 @@ export function LiveControls({ live, scenarioId, onStarted, onDone, onError, hid
 {
     const [asking, setAsking] = useState(false);
     const [showQr, setShowQr] = useState(false);
-    const [showPlayers, setShowPlayers] = useState(false);
-    // The player whose numbers are open under their row.
-    const [editing, setEditing] = useState<string | null>(null);
     const [freshFog, setFreshFog] = useState(true);
-    const players = live.tokens.filter((token) => token.kind === 'player');
 
     const [failure, start, starting] = useActionState(
         (_: string, form: FormData) =>
@@ -101,7 +191,6 @@ export function LiveControls({ live, scenarioId, onStarted, onDone, onError, hid
                     return;
 
                 await live.end();
-                setShowPlayers(false);
                 onDone('The session has ended.');
             })
             .catch((reason: Error) => onError(reason.message));
@@ -114,6 +203,7 @@ export function LiveControls({ live, scenarioId, onStarted, onDone, onError, hid
                 <button
                     type="button"
                     className="ttrpg-segment"
+                    aria-pressed={asking}
                     aria-expanded={asking}
                     title="Go live, so players can join with a password"
                     onClick={() => setAsking((open) => !open)}
@@ -177,68 +267,11 @@ export function LiveControls({ live, scenarioId, onStarted, onDone, onError, hid
 
     return (
         <>
-            <button
-                type="button"
-                className="ttrpg-segment"
-                aria-pressed={showPlayers}
-                aria-expanded={showPlayers}
-                title="Who has joined"
-                onClick={() => setShowPlayers((open) => !open)}
-            >
-                <FontAwesomeIcon icon={faUsers} />
-                Players <span className="ttrpg-count">{players.length}</span>
-            </button>
+            <Players tokens={live.tokens} onSetStats={live.setStats} onKick={kick} onQr={() => setShowQr(true)} hidden={hidden} />
             <button type="button" className="ttrpg-segment" title="End the session for everyone" onClick={end}>
                 <FontAwesomeIcon icon={faStop} />
                 End
             </button>
-
-            {showPlayers && !hidden && (
-                <Popover title="Players" className="ttrpg-start" dismissOnOutside onClose={() => setShowPlayers(false)}>
-                    {players.length === 0 ? (
-                        <p className="ttrpg-empty">Nobody has joined yet.</p>
-                    ) : (
-                        <ul className="ttrpg-rows">
-                            {players.map((player) => (
-                                <li key={player.id} className="ttrpg-row">
-                                    <span className="ttrpg-row__main ttrpg-row__main--swatch">
-                                        <span className="ttrpg-swatch" style={{ background: player.color }} />
-                                        {player.name}
-                                        <span className="ttrpg-row__stats">{statsLine(player)}</span>
-                                    </span>
-                                    <button
-                                        type="button"
-                                        className="ttrpg-icon-button ttrpg-icon-button--small"
-                                        aria-label={`Numbers of ${player.name}`}
-                                        aria-pressed={editing === player.id}
-                                        title="HP, AC and Perception"
-                                        onClick={() => setEditing((open) => (open === player.id ? null : player.id))}
-                                    >
-                                        <FontAwesomeIcon icon={faHeart} />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="ttrpg-icon-button ttrpg-icon-button--small"
-                                        aria-label={`Remove ${player.name}`}
-                                        title="Remove from the table"
-                                        onClick={() => kick(player.id, player.name)}
-                                    >
-                                        <FontAwesomeIcon icon={faUserXmark} />
-                                    </button>
-                                    {editing === player.id && (
-                                        <StatsForm token={player} onSave={(stats) => live.setStats(player.id, stats)} />
-                                    )}
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                    {/* Always here, the only way to the QR code, so late players can join. */}
-                    <button type="button" className="ttrpg-segment ttrpg-segment--block" onClick={() => setShowQr(true)}>
-                        <FontAwesomeIcon icon={faQrcode} />
-                        Show the QR code
-                    </button>
-                </Popover>
-            )}
 
             {showQr && <QrCode path={live.joinPath} password={live.password} onClose={() => setShowQr(false)} />}
         </>

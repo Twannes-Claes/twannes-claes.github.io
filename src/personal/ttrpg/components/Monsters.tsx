@@ -4,11 +4,10 @@ import { useActionState, useState } from 'react';
 
 import type { CreatureSize, Live, Point } from '../types';
 
-import { statsLine } from '../map/health';
 import { confirmAction } from '../services/confirm';
 
 import { Popover } from './Popover';
-import { StatsForm } from './StatsForm';
+import { StatChips, StatsForm } from './StatsForm';
 
 const sizes: CreatureSize[] = ['tiny', 'small', 'medium', 'large', 'huge', 'gargantuan'];
 
@@ -171,8 +170,11 @@ export function Monsters({ live, at, onClose, onDone, onError }: MonstersProps)
                             <li key={monster.id} className={`ttrpg-row${monster.hidden ? ' ttrpg-row--hidden' : ''}`}>
                                 <span className="ttrpg-row__main ttrpg-row__main--swatch">
                                     <span className="ttrpg-swatch" style={{ background: monster.color }} />
-                                    {monster.name}
-                                    <span className="ttrpg-row__stats">{statsLine(monster)}</span>
+                                    {/* The name, with the numbers under it. */}
+                                    <span className="ttrpg-row__text">
+                                        <span className="ttrpg-row__name">{monster.name}</span>
+                                        <StatChips token={monster} />
+                                    </span>
                                 </span>
                                 <button
                                     type="button"
