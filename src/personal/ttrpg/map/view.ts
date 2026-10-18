@@ -1,4 +1,4 @@
-import type { Cell, Draft, FogSettings, Mark, Point, PropPicture, Scenario, SharedFog, SharedMark, Token } from '../types';
+import type { Cell, Draft, FogSettings, Mark, Point, PropPicture, Scenario, SharedFog, SharedHit, SharedMark, Token } from '../types';
 
 import { centerOn, fitCamera, panBy, toWorld, zoomAt, type Camera } from './camera.ts';
 import {
@@ -19,7 +19,21 @@ import {
 import { accent, ground, highlight, tooFar } from './colours.ts';
 import { distance, midpoint, onMap } from './geometry.ts';
 import { extendPath, lineFeet, pathBlocked, pathFeet } from './path.ts';
-import { drawHealth, drawPill, drawPing, drawRoute, drawUnknownStep, render, tokenRadius, type Lifted, type Scene, type Viewport } from './render.ts';
+import {
+    drawHealth,
+    drawHit,
+    drawPill,
+    drawPing,
+    drawRoute,
+    drawTarget,
+    drawUnknownStep,
+    render,
+    tokenRadius,
+    type HitEffect,
+    type Lifted,
+    type Scene,
+    type Viewport,
+} from './render.ts';
 import { anchorAt, footprintCenter, footprintKeys } from './size.ts';
 import { createTool, drawMark, type MapTool, type ToolId, type ToolPointer } from './tools.ts';
 import { insidePolygon, sightSegments, visibilityPolygon, type Segment } from './visibility.ts';
@@ -42,6 +56,10 @@ const exploredDelay = 1500;
 const holdDelay = 450;
 /** How long a ping flashes. */
 const pingLife = 1600;
+/** How long an attack or a heal plays on its targets. */
+const hitLife = 900;
+/** How long past its end a walk still plays for a token that only now arrives, see setTokens. */
+const arrivalSlack = 2000;
 /** At most this often a path being drawn goes to the server, so a fast drag sends a few updates, not one per cell. */
 const draftGap = 150;
 
@@ -78,6 +96,8 @@ export interface MapViewOptions
     onDraft?: (id: string, points: Point[] | null, feet: number) => void;
     /** This screen's ruler or area as it is dragged, to show on every other screen, see Mark. */
     onMark?: (mark: Mark | null) => void;
+    /** A token pressed while picking targets, to add or take off, see setTargets. */
+    onTarget?: (id: string) => void;
     /**
      * A while after more of the map was seen, what has been seen in all, to share, see SharedFog.
      * At once with forget when the game master hid some, so every screen forgets it too.
@@ -116,6 +136,13 @@ export interface MapView
     setPeek: (peek: boolean) => void;
     /** Flashes a spot: rings spread from it for a moment, in a player's colour or the GM's. */
     ping: (at: Point, color?: string) => void;
+    /** Plays an attack or a heal on where its targets stood, see drawHit in map/render.ts. */
+    hit: (hit: SharedHit) => void;
+    /**
+     * Picking targets for an attack or a heal, with the ones picked so far ringed, or null when
+     * not. While picking, a press on a token goes to onTarget rather than moving it.
+     */
+    setTargets: (ids: string[] | null) => void;
     /** Other screens' paths, drawn faintly in their token's colour, see Draft. */
     setDrafts: (drafts: Draft[]) => void;
     /** Other screens' rulers and areas, in their player's colour, see Mark. */
@@ -222,6 +249,10 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     let hold: { pointerId: number; from: Point; timer: number } | null = null;
     /** The pings flashing now, with when each started on the clock frames are drawn with. */
     let pings: { x: number; y: number; color?: string; start: number }[] = [];
+    /** The attacks and heals playing now, like pings. */
+    let hits: (HitEffect & { start: number })[] = [];
+    /** The tokens picked as targets, or null when not picking, see setTargets. */
+    let targets: string[] | null = null;
     /** When the phone's own token last stopped walking, for its ring, see drawPulse in map/render.ts. */
     let ownRestedAt = performance.now();
     /** Other screens' paths, see setDrafts. */
@@ -596,8 +627,9 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
         // The fog or a token still fading in or out.
         pings = pings.filter((ping) => time - ping.start < pingLife);
+        hits = hits.filter((hit) => time - hit.start < hitLife);
 
-        const settling = fading.size > 0 || pings.length > 0 || (layers !== null && time - layers.changedAt < fogSettings.fade);
+        const settling = fading.size > 0 || pings.length > 0 || hits.length > 0 || (layers !== null && time - layers.changedAt < fogSettings.fade);
 
         // Only the smoke is moving: skip frames until its own rate comes round.
         if (!urgent && !walking && !settling && time - drawnAt < 1000 / smokeFps)
@@ -701,6 +733,16 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             context.globalAlpha = 1;
         }
 
+        if (targets)
+        {
+            for (const token of scene.tokens)
+            {
+                if (targets.includes(token.id))
+                    drawTarget(context, token, tokenRadius(scenario.grid, token.size), camera.zoom);
+
+            }
+        }
+
         for (const draft of others)
             drawPill(context, `${draft.feet} ft`, draft.points[draft.points.length - 1], camera.zoom, draft.over ? tooFar : ground, pillScale());
 
@@ -715,11 +757,14 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         for (const ping of pings)
             drawPing(context, ping, (time - ping.start) / pingLife, camera.zoom, !calm.matches);
 
+        for (const hit of hits)
+            drawHit(context, hit, (time - hit.start) / hitLife, camera.zoom, !calm.matches);
+
         // The smoke drifts, walking tokens move, fog changes and tokens fade, so they ask for
         // the next frame. Reduced motion keeps the smoke still and skips the fades; a walk still
         // plays. Only once: the fog refreshed above may already have asked, and two would draw
         // every frame twice.
-        if ((walking || fading.size > 0 || pings.length > 0 || (fog && !calm.matches)) && frame === 0)
+        if ((walking || fading.size > 0 || pings.length > 0 || hits.length > 0 || (fog && !calm.matches)) && frame === 0)
             frame = requestAnimationFrame(draw);
 
         measure(time, performance.now() - started);
@@ -814,11 +859,11 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         return { x: event.clientX - box.left, y: event.clientY - box.top };
     };
 
-    /** The topmost token under a screen point that this screen shows. */
+    /** The topmost token under a screen point that this screen shows: every one in the GM view. */
     const tokenAt = (screen: Point, current: Scenario): Token | undefined =>
     {
         const world = toWorld(camera, screen);
-        const shown = fogEnabled ? tokens.filter(seenByPlayers) : tokens;
+        const shown = fogEnabled && !peek ? tokens.filter(seenByPlayers) : tokens;
 
         // Last drawn is on top. The project targets ES2022, which has no findLast. A press reaches
         // a bit past the token's edge, as tokens leave room in their cell and fingers are wide.
@@ -870,8 +915,10 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             return;
 
         const { grid, walls } = current;
+        // In the GM view a monster's path goes anywhere, fog or not: the players see nothing of it.
+        const open = (point: Point) => (peek && token.kind !== 'player') || seenGround(point);
 
-        route = { ...route, unknown: seenGround(world) ? undefined : world };
+        route = { ...route, unknown: open(world) ? undefined : world };
 
         if (grid.type !== 'none')
         {
@@ -887,7 +934,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             // Never into ground the party has not seen, or the walls stopping a path drawn there
             // would map it out.
             const unseen = grown.findIndex(
-                (cell, index) => index >= before && !seenGround(footprintCenter(grid, cell, token.size)),
+                (cell, index) => index >= before && !open(footprintCenter(grid, cell, token.size)),
             );
             const cells = unseen === -1 ? grown : grown.slice(0, unseen);
 
@@ -899,7 +946,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         // Without a grid, a new point every quarter cell of finger travel, unless a wall is in the way.
         const last = route.points[route.points.length - 1];
 
-        if (!pathBlocked(walls, [last, world]) && seenGround(world) && distance(last, world) > grid.size / 4)
+        if (!pathBlocked(walls, [last, world]) && open(world) && distance(last, world) > grid.size / 4)
             route = { ...route, points: [...route.points, world] };
 
     };
@@ -980,6 +1027,16 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         }
 
         const idle = pointers.size === 0 && !dragging && !route && toolPointerId === null;
+        const target = idle && targets && scenario ? tokenAt(local(event), scenario) : undefined;
+
+        // Picking targets, a press on a token picks it or lets it go; anywhere else pans.
+        if (target)
+        {
+            options.onTarget?.(target.id);
+            pointers.set(event.pointerId, local(event));
+
+            return;
+        }
 
         if (idle && tool && scenario && tool.down(toolPointer(event, scenario)))
         {
@@ -993,10 +1050,10 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         const pressed = idle && scenario ? tokenAt(point, scenario) : undefined;
         const token = own === null || pressed?.id === own ? pressed : undefined;
 
-        // In play mode a token draws a path, a player's unless the game master froze movement. A
-        // monster nobody sees drags freely, as a path could not go into the fog it stands in, and
-        // so does one with Alt held. Everything in edit mode drags: that is the game master's hand.
-        const walksPath = token?.kind === 'player' || (token !== undefined && !event.altKey && seenByPlayers(token));
+        // In play mode a token draws a path, a player's unless the game master froze movement, so
+        // the GM sees how far a monster gets too. A monster with Alt held drags freely. Everything
+        // in edit mode drags: that is the game master's hand.
+        const walksPath = token?.kind === 'player' || (token !== undefined && !event.altKey);
 
         if (token && fogEnabled && walksPath)
         {
@@ -1350,10 +1407,18 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             for (const token of next)
             {
                 const previous = before.get(token.id);
-                const walked = previous && token.movedAt && token.movedAt !== previous.movedAt;
 
-                if (walked && token.path && token.path.length > 1 && scenario)
-                    walks.set(token.id, startWalk(token.path, performance.now(), scenario.grid.size));
+                if (!token.movedAt || token.movedAt === previous?.movedAt || !token.path || token.path.length < 2 || !scenario)
+                    continue;
+
+                const walk = startWalk(token.path, performance.now(), scenario.grid.size);
+
+                // One that only now arrives still walks if its walk has not long ended: a monster
+                // walking out of the fog reaches a phone once it stands in sight, and comes out of
+                // the fog as it walks, see seenByPlayers. ponytail: trusts this screen's clock to
+                // within arrivalSlack of the server's; one far ahead shows it standing there.
+                if (previous || Date.now() - token.movedAt < walk.duration + arrivalSlack)
+                    walks.set(token.id, walk);
 
             }
 
@@ -1403,6 +1468,24 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         ping: (at, color) =>
         {
             pings.push({ ...at, color, start: performance.now() });
+            redraw();
+        },
+        hit: ({ kind, targets: struck }) =>
+        {
+            const start = performance.now();
+            const grid = scenario?.grid;
+
+            if (!grid)
+                return;
+
+            for (const { x, y, size, died } of struck)
+                hits.push({ x, y, radius: tokenRadius(grid, size), kind: died ? 'death' : kind, start });
+
+            redraw();
+        },
+        setTargets: (ids) =>
+        {
+            targets = ids;
             redraw();
         },
         setPeek: (next) =>

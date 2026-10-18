@@ -3,7 +3,7 @@ import { faShieldHalved, faSkull, type IconDefinition } from '@fortawesome/free-
 import type { CreatureSize, Grid, HealthState, Point, Scenario, Token } from '../types';
 
 import { toWorld, type Camera } from './camera.ts';
-import { danger, door as doorColour, faded, ground, highlight, ink, shield } from './colours.ts';
+import { danger, door as doorColour, faded, ground, heal, highlight, ink, shield } from './colours.ts';
 import { drawFog, type FogLayers, type FogLook } from './fog.ts';
 import type { Area } from './geometry.ts';
 import { cellAt, cellCenter, cellCorners, hexRadius } from './grid.ts';
@@ -133,6 +133,142 @@ export function drawPing(ctx: CanvasRenderingContext2D, at: Point & { color?: st
     ctx.arc(at.x, at.y, 6 / zoom, 0, Math.PI * 2);
     ctx.fillStyle = faded(colour, fade);
     ctx.fill();
+}
+
+/** One target's part of an attack or a heal, where it stood, see SharedHit. */
+export interface HitEffect extends Point
+{
+    radius: number;
+    /** Death is an attack that brought a monster to 0. */
+    kind: 'attack' | 'heal' | 'death';
+}
+
+/**
+ * An attack or a heal on a token, progress 0 to 1 through its life. An attack flashes red with
+ * three claw slashes drawn across it, a death adds a skull rising from it, and a heal is a soft
+ * green glow with pluses floating up. With motion reduced, only the flash or the glow, fading.
+ */
+export function drawHit(ctx: CanvasRenderingContext2D, hit: HitEffect, progress: number, zoom: number, motion: boolean)
+{
+    const { x, y, radius } = hit;
+    const fade = 1 - progress;
+
+    ctx.save();
+
+    if (hit.kind === 'heal')
+    {
+        const glow = ctx.createRadialGradient(x, y, radius * 0.2, x, y, radius * (motion ? 1 + progress * 0.6 : 1.3));
+
+        glow.addColorStop(0, faded(heal, 0.6 * fade));
+        glow.addColorStop(1, faded(heal, 0));
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(x, y, radius * 1.6, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (motion)
+        {
+            const arm = 5 / zoom;
+
+            ctx.strokeStyle = heal;
+            ctx.lineWidth = 3 / zoom;
+            ctx.lineCap = 'round';
+
+            // Each plus starts a little after the one before, and rises as it fades.
+            for (const [across, delay] of [[-0.5, 0], [0.15, 0.15], [0.55, 0.3]])
+            {
+                const step = (progress - delay) / (1 - delay);
+
+                if (step <= 0)
+                    continue;
+
+                const px = x + across * radius;
+                const py = y + radius * 0.4 - step * radius * 1.4;
+
+                ctx.globalAlpha = 1 - step;
+                ctx.beginPath();
+                ctx.moveTo(px - arm, py);
+                ctx.lineTo(px + arm, py);
+                ctx.moveTo(px, py - arm);
+                ctx.lineTo(px, py + arm);
+                ctx.stroke();
+            }
+        }
+
+        ctx.restore();
+
+        return;
+    }
+
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 1.1, 0, Math.PI * 2);
+    ctx.fillStyle = faded(danger, 0.4 * fade);
+    ctx.fill();
+
+    if (motion)
+    {
+        ctx.lineCap = 'round';
+
+        // Three slashes, each drawn across in a fifth of the life, a little after the one before.
+        for (const [index, offset] of [-0.35, 0, 0.35].entries())
+        {
+            const drawn = Math.min(1, Math.max(0, (progress - index * 0.08) / 0.2));
+
+            if (drawn === 0)
+                continue;
+
+            const from = { x: x - radius * 0.7 + offset * radius, y: y - radius * 0.8 };
+            const to = { x: from.x + radius * 0.7 * drawn, y: from.y + radius * 1.6 * drawn };
+
+            ctx.beginPath();
+            ctx.moveTo(from.x, from.y);
+            ctx.lineTo(to.x, to.y);
+            ctx.lineWidth = 6 / zoom;
+            ctx.strokeStyle = faded(danger, fade);
+            ctx.stroke();
+            ctx.lineWidth = 2 / zoom;
+            ctx.strokeStyle = faded(ink, fade);
+            ctx.stroke();
+        }
+    }
+
+    if (hit.kind === 'death')
+    {
+        ctx.fillStyle = faded(ink, fade);
+        drawIcon(ctx, faSkull, { x, y: y - (motion ? progress * radius : 0) }, radius);
+    }
+
+    ctx.restore();
+}
+
+/**
+ * A token picked as a target for an attack or a heal: a red ring around it with four ticks, like
+ * a sight, the same width on screen at any zoom.
+ */
+export function drawTarget(ctx: CanvasRenderingContext2D, at: Point, radius: number, zoom: number)
+{
+    const ring = radius + 6 / zoom;
+
+    ctx.save();
+    ctx.strokeStyle = danger;
+    ctx.lineWidth = 3 / zoom;
+    ctx.beginPath();
+    ctx.arc(at.x, at.y, ring, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+
+    for (const angle of [0, 0.5, 1, 1.5])
+    {
+        const dx = Math.cos(angle * Math.PI);
+        const dy = Math.sin(angle * Math.PI);
+
+        ctx.moveTo(at.x + dx * (ring - 4 / zoom), at.y + dy * (ring - 4 / zoom));
+        ctx.lineTo(at.x + dx * (ring + 6 / zoom), at.y + dy * (ring + 6 / zoom));
+    }
+
+    ctx.stroke();
+    ctx.restore();
 }
 
 /** A small rounded label, such as the feet a path costs, the same size at any zoom. */

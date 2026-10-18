@@ -14,6 +14,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 import type { Scenario } from '../types';
 
+import { AttackButton } from './HitSheet';
 import { RulerPicker } from './RulerPicker';
 import { useFullscreen } from './useScreen';
 
@@ -47,6 +48,8 @@ interface PlayDockProps
     /** Opens or closes the fog: how it looks, and resetting it, see FogPanel.tsx. */
     onFog: () => void;
     fogOpen: boolean;
+    /** Starts picking targets for an attack or a heal, see HitSheet.tsx. */
+    onAttack: () => void;
 }
 
 /**
@@ -69,6 +72,7 @@ export function PlayDock({
     monstersOpen = false,
     onFog,
     fogOpen,
+    onAttack,
 }: PlayDockProps)
 {
     const { fullscreen, toggle } = useFullscreen();
@@ -99,6 +103,7 @@ export function PlayDock({
                     tool={tool}
                     onMeasure={(next) => onTool(next ?? 'open-doors')}
                 />
+                <AttackButton onClick={onAttack} />
                 <span className="ttrpg-pop">
                     <button
                         type="button"

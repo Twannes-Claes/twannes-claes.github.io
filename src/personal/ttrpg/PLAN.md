@@ -653,6 +653,14 @@ A player at 0 is down and stays on the map. Death saves are kept at the table, s
   attack, a soft green glow for a heal.
 - A monster brought to 0 plays a death animation instead and disappears from the map.
 - Freeze locks every player's moves and attacks.
+- **Built.** An **Attack** button in the GM view's dock and next to the ruler on phones and in both
+  Player views starts picking: a press on a token rings it in red, a second press lets it go, and
+  a sheet at the bottom (`components/HitSheet.tsx`) takes the amount with **Damage** or **Heal**
+  for all of them at once. `play.hit` applies it with `hitOn` in `map/health.ts`: damage takes
+  temp HP first, healing stops at max and never adds temp HP. A player only reaches tokens they
+  can see and heals players only. The last hit is one row per session in `hits`, like pings, and
+  `play.lastHit` leaves out targets the players could not see, so a hit on a hidden monster gives
+  nothing away. Off a live map the demo applies hits locally the same way.
 
 ### 4. Damage effects
 

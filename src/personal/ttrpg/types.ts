@@ -154,6 +154,20 @@ export interface SharedMark extends Mark
 /** How hurt a token looks to everyone who may not see its numbers, see map/health.ts. */
 export type HealthState = 'unhurt' | 'hurt' | 'bloodied' | 'critical' | 'down';
 
+/** Damage or healing dealt to tokens, see applyHit in map/health.ts. */
+export type HitKind = 'attack' | 'heal';
+
+/**
+ * The last attack or heal on the map being played, for the animation every screen plays, see
+ * lastHit in convex/play.ts. Where each target stood, so one that died of it still shows.
+ */
+export interface SharedHit
+{
+    at: number;
+    kind: HitKind;
+    targets: { x: number; y: number; size: CreatureSize; died: boolean }[];
+}
+
 /** A token's numbers as the game master or its player sets them, see components/StatsForm.tsx. */
 export interface Stats
 {
@@ -237,6 +251,10 @@ export interface Live
     removeMonster: (tokenId: string) => Promise<void>;
     /** Sets any token's HP, AC and Perception. */
     setStats: (tokenId: string, stats: Stats) => Promise<void>;
+    /** The last attack or heal, null before any, see SharedHit. */
+    lastHit: SharedHit | null;
+    /** Deals damage to tokens, or heals them, see hit in convex/play.ts. */
+    hit: (tokenIds: string[], kind: HitKind, amount: number) => Promise<void>;
     /** What the party has seen of the map being played, null until anything has been. */
     fog: SharedFog | null;
     /**

@@ -88,6 +88,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const tokens = useQuery(api.play.tokens, following ? { sessionId: id } : 'skip');
     const fog = useQuery(api.play.fog, following ? { sessionId: id } : 'skip');
     const ping = useQuery(api.play.ping, following ? { sessionId: id } : 'skip');
+    const lastHit = useQuery(api.play.lastHit, following ? { sessionId: id } : 'skip');
     const drafts = useQuery(api.play.drafts, following ? { sessionId: id } : 'skip');
     const marks = useQuery(api.play.marks, following ? { sessionId: id } : 'skip');
     const saveFog = useMutation(api.play.saveFog);
@@ -103,6 +104,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const hideNpc = useMutation(api.play.hide);
     const removeNpc = useMutation(api.play.removeMonster);
     const setStats = useMutation(api.play.setStats);
+    const hit = useMutation(api.play.hit);
     const sendPing = useMutation(api.play.sendPing);
     const draw = useMutation(api.play.draw);
     const mark = useMutation(api.play.mark);
@@ -166,6 +168,8 @@ function Session({ sessionId, debug }: SessionEditorProps)
             hide: (tokenId, hidden) => friendly(hideNpc({ tokenId: tokenId as Id<'tokens'>, hidden })),
             removeMonster: (tokenId) => friendly(removeNpc({ tokenId: tokenId as Id<'tokens'> })),
             setStats: (tokenId, stats) => friendly(setStats({ tokenId: tokenId as Id<'tokens'>, ...stats })),
+            lastHit: lastHit ?? null,
+            hit: (tokenIds, kind, amount) => friendly(hit({ sessionId: id, tokenIds: tokenIds as Id<'tokens'>[], kind, amount })),
             fog: fog ?? null,
             saveFog: (shared, forget) => friendly(saveFog({ sessionId: id, ...shared, forget })),
             resetFog: () => friendly(resetFog({ sessionId: id })),

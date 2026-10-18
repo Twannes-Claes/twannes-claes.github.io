@@ -1014,6 +1014,7 @@ html:has(.ttrpg) {
     bottom: max(16px, env(safe-area-inset-bottom));
     z-index: 10;
     display: flex;
+    gap: 4px;
     padding: 4px;
 }
 
@@ -1109,6 +1110,47 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
     width: 100%;
     height: 100%;
     object-fit: cover;
+}
+
+/* Cancel, Heal and Damage in one row. */
+.ttrpg-hit .ttrpg-popover__foot {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+/* Who an attack or a heal goes to, see HitSheet.tsx. */
+.ttrpg-hit__targets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ttrpg-hit__targets li {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    background: var(--ttrpg-edge);
+    font-size: 0.85rem;
+}
+
+.ttrpg-hit__hint {
+    margin: 0;
+    color: var(--ttrpg-muted);
+}
+
+/* Damage, red like a wound, beside Heal's green. */
+.ttrpg-segment--hit {
+    border-color: transparent;
+    background: #8c2f2b;
+    color: var(--ttrpg-ink);
+}
+
+.ttrpg-segment--hit:is(:hover, :focus-visible):not(:disabled) {
+    filter: brightness(1.2);
 }
 
 /* The share of the token's speed the path uses. */

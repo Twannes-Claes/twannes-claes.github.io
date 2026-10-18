@@ -2,11 +2,11 @@ import { faCheck, faHatWizard, faPen, faSnowflake, faTriangleExclamation, faTv }
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useEffectEvent, useRef, useState, type DragEvent, type MouseEvent } from 'react';
 
-import type { FogSettings, Live, PictureBytes, Ping, Point, PropPicture, Scenario, Store } from '../types';
+import type { FogSettings, HitKind, Live, PictureBytes, Ping, Point, PropPicture, Scenario, SharedHit, Store } from '../types';
 
 import { blankScenario, demoTokens } from '../content/scenarios';
 import { defaultFogSettings } from '../map/fog';
-import { cleanStats, withoutNumbers } from '../map/health';
+import { cleanStats, hitOn, withoutNumbers } from '../map/health';
 import { toggleDoor, type ToolId } from '../map/tools';
 import { scenarioFromUvtt } from '../map/uvtt';
 import type { FrameStats, PendingMove } from '../map/view';
@@ -16,6 +16,7 @@ import { listenForDoors, type DoorChange } from '../services/tableChannel';
 
 import { Spinner, Toast, Toasts } from './Feedback';
 import { FogPanel } from './FogPanel';
+import { AttackButton, HitSheet } from './HitSheet';
 import { GridPanel } from './GridPanel';
 import { LiveControls, Players } from './LiveControls';
 import { MapCanvas } from './MapCanvas';
@@ -126,8 +127,11 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     // The fog's look: the session's when it is saved, this screen's in the demo. While a slider
     // moves, the draft shows here only, and letting go saves it, see FogPanel.
     const [demoFog, setDemoFog] = useState<FogSettings>(defaultFogSettings);
-    // Pings off a live map stay on this screen.
+    // Pings and hits off a live map stay on this screen.
     const [localPing, setLocalPing] = useState<Ping | null>(null);
+    const [localHit, setLocalHit] = useState<SharedHit | null>(null);
+    // The tokens picked for an attack or a heal, or null when not picking, see HitSheet.
+    const [targets, setTargets] = useState<string[] | null>(null);
     const [fogDraft, setFogDraft] = useState<FogSettings | null>(null);
     // The middle of the screen, where a new monster goes. A ref: it changes every frame.
     const viewCenter = useRef<Point | null>(null);
@@ -331,10 +335,55 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
     };
 
-    // A right click with nothing half done: stop placing a picture, or go back to no tool.
+    // Off a live map, a hit lands here, as the server would land it, see hit in convex/play.ts.
+    const hitHere = (ids: string[], kind: HitKind, amount: number) =>
+    {
+        const struck = tokens.filter((token) => ids.includes(token.id));
+
+        setLocalHit({
+            at: Date.now(),
+            kind,
+            targets: struck.map((token) => ({ x: token.x, y: token.y, size: token.size, died: hitOn(token, kind, amount).died })),
+        });
+        setTokens((current) =>
+            current.flatMap((token) =>
+            {
+                const { after, died } = ids.includes(token.id) ? hitOn(token, kind, amount) : { after: null, died: false };
+
+                return died ? [] : [{ ...token, ...after }];
+            }),
+        );
+    };
+
+    const dealHit = (kind: HitKind, amount: number) =>
+    {
+        const ids = targets ?? [];
+
+        if (liveMap)
+            return liveMap.hit(ids, kind, amount).then(() => setTargets(null));
+
+        hitHere(ids, kind, amount);
+        setTargets(null);
+
+        return Promise.resolve();
+    };
+
+    const pickTarget = (id: string) =>
+        setTargets((picked) => picked && (picked.includes(id) ? picked.filter((other) => other !== id) : [...picked, id]));
+
+    const startTargets = () =>
+    {
+        setPlayTool('open-doors');
+        setTargets([]);
+    };
+
+    // A right click with nothing half done: stop picking targets or placing a picture, or go back
+    // to no tool.
     const putToolAway = () =>
     {
-        if (playing)
+        if (targets)
+            setTargets(null);
+        else if (playing)
             setPlayTool('open-doors');
         else if (placing)
             setPlacing(null);
@@ -378,6 +427,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     {
         setMode(next);
         setPending(null);
+        setTargets(null);
         // A GM tool like Reveal has no button in the Player view to put it away with.
         setPlayTool('open-doors');
 
@@ -412,6 +462,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
         setActiveId(scenario.id);
         setTokens(demoTokens(scenario));
         setPending(null);
+        setTargets(null);
 
         if (playing && live && live.live)
             fail(live.open(scenario.id));
@@ -595,6 +646,9 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 fogSource={liveMap ? 'live' : 'preview'}
                 // Only the demo has no session, see credit in MapCanvas.tsx.
                 credit={!live}
+                hit={liveMap ? liveMap.lastHit : localHit}
+                targets={targets}
+                onTarget={pickTarget}
             />
 
             <div
@@ -703,6 +757,16 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 onCancel={() => setPending(null)}
             />
 
+            {/* In the place of the controls at the bottom, which make way while picking. */}
+            {playing && targets && (
+                <HitSheet
+                    targets={shown.filter((token) => targets.includes(token.id))}
+                    canHeal
+                    onApply={dealHit}
+                    onCancel={() => setTargets(null)}
+                />
+            )}
+
             {mode === 'edit' ? (
                 <>
                     <ToolRail
@@ -749,7 +813,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                     {store.save && <SaveState unsaved={unsaved} failed={saveFailed} />}
                 </>
             ) : (
-                mode === 'gm' && !pending && (
+                mode === 'gm' && !pending && !targets && (
                     <PlayDock
                         tool={playTool}
                         onTool={setPlayTool}
@@ -763,18 +827,20 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                         monstersOpen={panel === 'monsters'}
                         onFog={() => togglePanel('fog')}
                         fogOpen={panel === 'fog'}
+                        onAttack={startTargets}
                     />
                 )
             )}
 
             {/* The Player view has a phone's ruler and nothing more, so it stays the map. */}
-            {mode === 'players' && !pending && (
+            {mode === 'players' && !pending && !targets && (
                 <div className={`ttrpg-panel ttrpg-corner ttrpg-corner--left${idle ? ' ttrpg-hidden' : ''}`}>
                     <RulerPicker
                         tool={playTool}
                         onMeasure={(next) => setPlayTool(next ?? 'open-doors')}
                         start
                     />
+                    <AttackButton onClick={startTargets} />
                 </div>
             )}
 

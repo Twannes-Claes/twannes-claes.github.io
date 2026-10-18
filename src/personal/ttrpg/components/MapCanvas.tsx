@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useRef } from 'react';
 
-import type { Draft, FogSettings, Mark, Ping, Point, PropPicture, Scenario, SharedFog, SharedMark, Token } from '../types';
+import type { Draft, FogSettings, Mark, Ping, Point, PropPicture, Scenario, SharedFog, SharedHit, SharedMark, Token } from '../types';
 
 import { demoCredit, demoScenario } from '../content/scenarios';
 import { defaultFogSettings } from '../map/fog';
@@ -74,6 +74,12 @@ interface MapCanvasProps
     fogSource?: 'preview' | 'live';
     /** Credits the demo map's maker when it shows. Only the public demo does, see demoCredit. */
     credit?: boolean;
+    /** The last attack or heal. Each new one plays, like a ping, see SharedHit. */
+    hit?: SharedHit | null;
+    /** The tokens picked for an attack or a heal, or null when not picking, see setTargets. */
+    targets?: string[] | null;
+    /** Hears a token pressed while picking targets. */
+    onTarget?: (id: string) => void;
 }
 
 /**
@@ -111,6 +117,9 @@ export function MapCanvas({
     fogSettings = defaultFogSettings,
     fogSource = 'live',
     credit = false,
+    hit,
+    targets = null,
+    onTarget,
 }: MapCanvasProps)
 {
     const canvas = useRef<HTMLCanvasElement>(null);
@@ -127,8 +136,10 @@ export function MapCanvas({
     const pinged = useEffectEvent((at: Point) => onPing?.(at));
     const drafted = useEffectEvent((id: string, points: Point[] | null, feet: number) => onDraft?.(id, points, feet));
     const markedOut = useEffectEvent((mark: Mark | null) => onMark?.(mark));
-    // The last ping seen, to tell a new one from the one already there.
+    const targeted = useEffectEvent((id: string) => onTarget?.(id));
+    // The last ping and hit seen, to tell a new one from the one already there.
     const lastPing = useRef<Ping | null | undefined>(undefined);
+    const lastHit = useRef<SharedHit | null | undefined>(undefined);
 
     useEffect(() =>
     {
@@ -147,6 +158,7 @@ export function MapCanvas({
             onPing: (at) => pinged(at),
             onDraft: (id, points, feet) => drafted(id, points, feet),
             onMark: (mark) => markedOut(mark),
+            onTarget: (id) => targeted(id),
         });
 
         view.current = created;
@@ -163,6 +175,15 @@ export function MapCanvas({
     {
         view.current?.setScenario(scenario);
     }, [scenario]);
+
+    // Another map: the server keeps only the last ping and hit, and sends them while their map is
+    // played, so coming back would bring an old one back as if new. What is there then is old
+    // news. Before the ping and hit effects, which may take a new value in the same render.
+    useEffect(() =>
+    {
+        lastPing.current = undefined;
+        lastHit.current = undefined;
+    }, [scenario.id]);
 
     useEffect(() =>
     {
@@ -200,11 +221,12 @@ export function MapCanvas({
     }, [own]);
 
     // Before the shared fog: a switch to live forgets the preview first, then takes the party's.
-    // The ping there then is old news too, so the next one seen is where counting starts again.
+    // The ping and hit there then are old news too, so the next ones seen are where counting starts.
     useEffect(() =>
     {
         view.current?.setFogSource(fogSource);
         lastPing.current = undefined;
+        lastHit.current = undefined;
     }, [fogSource]);
 
     useEffect(() =>
@@ -222,6 +244,22 @@ export function MapCanvas({
 
         lastPing.current = ping;
     }, [ping]);
+
+    useEffect(() =>
+    {
+        if (hit === undefined)
+            return;
+
+        if (lastHit.current !== undefined && hit && hit.at !== lastHit.current?.at)
+            view.current?.hit(hit);
+
+        lastHit.current = hit;
+    }, [hit]);
+
+    useEffect(() =>
+    {
+        view.current?.setTargets(targets);
+    }, [targets]);
 
     useEffect(() =>
     {

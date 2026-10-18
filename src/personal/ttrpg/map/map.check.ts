@@ -17,7 +17,7 @@ import {
     snapPoint,
     wrapOffset,
 } from './grid.ts';
-import { cleanStats, healthState, withoutNumbers } from './health.ts';
+import { applyHit, cleanStats, healthState, withoutNumbers } from './health.ts';
 import { extendPath, pathBlocked, pathFeet } from './path.ts';
 import { placedSize, propAt, snapCenter, snapSize } from './props.ts';
 import { anchorAt, footprint, footprintCenter } from './size.ts';
@@ -629,3 +629,9 @@ const hidden = withoutNumbers<Token>({ id: 'a', kind: 'player', name: 'A', color
 assert.equal(hidden.state, 'critical');
 assert.deepEqual([hidden.hp, hidden.maxHp, hidden.tempHp, hidden.ac, hidden.perception], [undefined, undefined, undefined, undefined, undefined]);
 assert.deepEqual(cleanStats({ hp: 50, maxHp: 30.4, tempHp: -2, ac: Number.NaN, perception: 99 }), { hp: 30, maxHp: 30, tempHp: 0, ac: 0, perception: 50 });
+
+// Damage takes temp HP first and stops at 0; healing stops at max and never adds temp HP.
+assert.deepEqual(applyHit({ hp: 20, maxHp: 30, tempHp: 5 }, 'attack', 8), { hp: 17, tempHp: 0 });
+assert.deepEqual(applyHit({ hp: 20, maxHp: 30, tempHp: 5 }, 'attack', 3), { hp: 20, tempHp: 2 });
+assert.deepEqual(applyHit({ hp: 4, maxHp: 30 }, 'attack', 50), { hp: 0, tempHp: 0 });
+assert.deepEqual(applyHit({ hp: 25, maxHp: 30, tempHp: 2 }, 'heal', 10), { hp: 30, tempHp: 2 });

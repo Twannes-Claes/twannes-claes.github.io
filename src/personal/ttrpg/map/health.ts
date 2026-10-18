@@ -1,4 +1,4 @@
-import type { HealthState, Stats, Token } from '../types';
+import type { HealthState, HitKind, Stats, Token } from '../types';
 
 /*
  * Hit points, shared by the server and every screen, see "Health and stats" in PLAN.md. The game
@@ -18,6 +18,34 @@ export function healthState(hp: number, maxHp: number): HealthState
         return 'critical';
 
     return hp * 2 <= maxHp ? 'bloodied' : 'hurt';
+}
+
+/**
+ * HP after an attack or a heal of amount. Damage takes temp HP first, then HP down to 0. Healing
+ * raises HP up to max and never touches temp HP, as in 5e.
+ */
+export function applyHit(stats: { hp: number; maxHp: number; tempHp?: number }, kind: HitKind, amount: number)
+{
+    const { hp, maxHp, tempHp = 0 } = stats;
+
+    if (kind === 'heal')
+        return { hp: Math.min(maxHp, hp + amount), tempHp };
+
+    const absorbed = Math.min(tempHp, amount);
+
+    return { hp: Math.max(0, hp - (amount - absorbed)), tempHp: tempHp - absorbed };
+}
+
+/**
+ * What a hit does to a token: its HP after, null for one without numbers, which takes nothing, and
+ * whether it dies of it, a monster brought to 0. A player at 0 is down and stays.
+ */
+export function hitOn(token: Pick<Token, 'kind' | 'hp' | 'maxHp' | 'tempHp'>, kind: HitKind, amount: number)
+{
+    const { hp, maxHp, tempHp } = token;
+    const after = hp !== undefined && maxHp !== undefined ? applyHit({ hp, maxHp, tempHp }, kind, amount) : null;
+
+    return { after, died: after !== null && after.hp === 0 && token.kind === 'npc' };
 }
 
 /** How hurt a token looks, from its numbers or, without them, what the server said. */

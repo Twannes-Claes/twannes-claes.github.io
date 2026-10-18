@@ -10,7 +10,7 @@ import { useAuthActions, useAuthToken, useConvexAuth } from '@convex-dev/auth/re
 import { useConvex, useMutation, useQuery } from 'convex/react';
 import { useActionState, useEffect, useState, type ReactNode } from 'react';
 
-import type { FogSettings, Scenario } from '../types';
+import type { FogSettings, HitKind, Scenario } from '../types';
 
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
@@ -24,6 +24,7 @@ import { sendDoor } from '../services/tableChannel';
 import { Backend } from './Backend';
 import { Loading, Toast, Toasts } from './Feedback';
 import { MapCanvas } from './MapCanvas';
+import { AttackButton, HitSheet } from './HitSheet';
 import { MoveSheet } from './MoveSheet';
 import { RulerPicker, type Measure } from './RulerPicker';
 import { Settings } from './Settings';
@@ -299,6 +300,10 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
     const tokens = useQuery(api.play.tokens, { sessionId, asPlayer: onTable });
     const fog = useQuery(api.play.fog, { sessionId });
     const ping = useQuery(api.play.ping, { sessionId });
+    const lastHit = useQuery(api.play.lastHit, { sessionId, asPlayer: onTable });
+    const hit = useMutation(api.play.hit);
+    // The tokens picked for an attack or a heal, or null when not picking, see HitSheet.
+    const [targets, setTargets] = useState<string[] | null>(null);
     const drafts = useQuery(api.play.drafts, { sessionId, asPlayer: onTable });
     const marks = useQuery(api.play.marks, { sessionId, asPlayer: onTable });
     const mark = useMutation(api.play.mark);
@@ -314,6 +319,17 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
     const saveStats = useMutation(api.play.setStats);
     const authToken = useAuthToken();
     const [pending, setPending] = useState<PendingMove | null>(null);
+    // The map the path and targets were made on. When the GM opens another, they go: confirmed,
+    // the old map's path would move the token on the new one.
+    const [mapId, setMapId] = useState(scenario?.id);
+
+    if (scenario && scenario.id !== mapId)
+    {
+        setMapId(scenario.id);
+        setPending(null);
+        setTargets(null);
+    }
+
     const message = useMessage();
     const [screen, setScreen] = useScreenSettings();
     const [stats, setStats] = useState<FrameStats | null>(null);
@@ -338,6 +354,26 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
     const shown = doorMoved && doorMoved.from === scenario ? doorMoved.to : scenario;
 
     const failed = (reason: unknown) => message.error(explain(reason, 'That move did not go through. Try again.'));
+
+    const picked = targets ? tokens.filter((candidate) => targets.includes(candidate.id)) : [];
+
+    const dealHit = (kind: HitKind, amount: number) =>
+        hit({ sessionId, tokenIds: picked.map((target) => target.id as Id<'tokens'>), kind, amount }).then(
+            () => setTargets(null),
+            (reason: unknown) =>
+            {
+                throw new Error(explain(reason, 'That did not go through. Try again.'));
+            },
+        );
+
+    const pickTarget = (id: string) =>
+        setTargets((current) => current && (current.includes(id) ? current.filter((other) => other !== id) : [...current, id]));
+
+    const startTargets = () =>
+    {
+        setTool(resting);
+        setTargets([]);
+    };
 
     const confirm = () =>
     {
@@ -417,18 +453,20 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
                 </div>
             )}
 
-            {!pending && (
+            {/* Both corners make way for the move sheet and the hit sheet at the bottom. */}
+            {!pending && !targets && (
                 <div className={`ttrpg-panel ttrpg-corner ttrpg-corner--left${idle ? ' ttrpg-hidden' : ''}`}>
                     <RulerPicker
                         tool={tool}
                         onMeasure={(next) => setTool(next ?? resting)}
                         start
                     />
+                    {/* Frozen, players cannot attack, see hit in convex/play.ts. */}
+                    <AttackButton onClick={startTargets} disabled={frozen && !onTable} />
                 </div>
             )}
 
-            {/* Out of the way of the move sheet, which slides up over the bottom of the screen. */}
-            {!onTable && !pending && (
+            {!onTable && !pending && !targets && (
                 <div className="ttrpg-panel ttrpg-corner">
                     <Settings settings={screen} onChange={setScreen} phone>
                         <section className="ttrpg-shortcuts" aria-label="Your token">
@@ -496,7 +534,10 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
                 onPathEnd={setPending}
                 onPathCancel={() => setPending(null)}
                 // A right click with nothing half done puts the ruler away, as in the editor.
-                onToolCancel={() => setTool(resting)}
+                onToolCancel={() => (targets ? setTargets(null) : setTool(resting))}
+                hit={lastHit}
+                targets={targets}
+                onTarget={pickTarget}
                 onStats={screen.frameRate ? setStats : undefined}
                 drafts={drafts}
                 marks={marks}
@@ -530,6 +571,16 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
             </Toasts>
 
             <MoveSheet move={pending} token={walker} onMove={confirm} onCancel={() => setPending(null)} />
+
+            {targets && (
+                <HitSheet
+                    targets={picked}
+                    // A player heals players only; the GM's table screen heals anyone.
+                    canHeal={onTable || picked.every((target) => target.kind === 'player')}
+                    onApply={dealHit}
+                    onCancel={() => setTargets(null)}
+                />
+            )}
 
             {screen.frameRate && stats && (
                 <p className="ttrpg-panel ttrpg-stats" aria-hidden="true">

@@ -1,12 +1,13 @@
 import { getAuthUserId } from '@convex-dev/auth/server';
 import { ConvexError, v } from 'convex/values';
 
-import type { Draft, Point, Scenario, SharedMark, Token } from '../types';
+import type { Draft, Point, Scenario, SharedHit, SharedMark, Token } from '../types';
 import { distance } from '../map/geometry';
-import { cleanStats, withoutNumbers } from '../map/health';
+import { cleanStats, hitOn, withoutNumbers } from '../map/health';
 import { pathBlocked } from '../map/path';
 import { anchorAt, footprintCenter, footprintKeys } from '../map/size';
 import { spawnCells } from '../map/spawn';
+import { startWalk } from '../map/walk';
 
 import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
@@ -506,9 +507,33 @@ export const move = mutation({
                 throw new ConvexError('A wall is in the way.');
         }
 
-        await ctx.db.patch('tokens', tokenId, { x, y, path, movedAt: path ? Date.now() : undefined });
+        const now = Date.now();
+        // A monster the players see, walking: it stays seen until it gets where it goes, and sight
+        // is judged again then, see settleSight. Out of sight by then, phones see it walk off.
+        const walk = token.kind === 'npc' && token.inSight === true && path ? startWalk(path, now, scenario.grid.size) : null;
+        const leavingUntil = walk ? now + walk.duration : undefined;
+
+        await ctx.db.patch('tokens', tokenId, { x, y, path, movedAt: path ? now : undefined, leavingUntil });
         await refreshSight(ctx, token.sessionId, scenario);
         await dropDraftOf(ctx, tokenId);
+
+        // A moment past leavingUntil, so the walk counts as over when sight is judged again.
+        if (walk)
+            await ctx.scheduler.runAfter(walk.duration + 200, internal.play.settleSight, { sessionId: token.sessionId, scenarioId: scenario.id });
+
+        return null;
+    },
+});
+
+/** Judges sight again once a monster's walk has ended, see leavingUntil in convex/schema.ts. */
+export const settleSight = internalMutation({
+    args: { sessionId: v.id('sessions'), scenarioId: v.string() },
+    handler: async (ctx, { sessionId, scenarioId }) =>
+    {
+        const scenario = await scenarioOf(ctx, sessionId, scenarioId);
+
+        if (scenario)
+            await refreshSight(ctx, sessionId, scenario);
 
         return null;
     },
@@ -976,6 +1001,117 @@ export const sendPing = mutation({
             await ctx.db.insert('pings', ping);
         else if (at - doc.at >= pingGap)
             await ctx.db.replace('pings', doc._id, ping);
+
+        return null;
+    },
+});
+
+/** The most tokens one attack or heal reaches, a whole party and then some. */
+const maxTargets = 20;
+
+/**
+ * The last attack or heal on the map being played, for everyone at the table. Players only get
+ * the targets they could see then, so a hit on a hidden monster gives nothing away. With asPlayer
+ * the host gets what players get, like tokens.
+ */
+export const lastHit = query({
+    args: { sessionId: v.id('sessions'), asPlayer: v.optional(v.boolean()) },
+    handler: async (ctx, { sessionId, asPlayer }): Promise<SharedHit | null> =>
+    {
+        const session = await memberOf(ctx, sessionId);
+        const userId = await getAuthUserId(ctx);
+        const doc = session
+            ? await ctx.db
+                .query('hits')
+                .withIndex('by_sessionId', (q) => q.eq('sessionId', sessionId))
+                .unique()
+            : null;
+
+        if (!session || !doc || !session.live || doc.scenarioId !== session.activeScenarioId)
+            return null;
+
+        const host = session.ownerId === userId && asPlayer !== true;
+        const targets = doc.targets.filter((target) => host || target.seen).map(({ x, y, size, died }) => ({ x, y, size, died }));
+
+        return targets.length > 0 ? { at: doc.at, kind: doc.kind, targets } : null;
+    },
+});
+
+/**
+ * Deals amount of damage to tokens, or heals them, see applyHit in map/health.ts. The game master
+ * reaches any token on the map being played. A player only tokens they can see, attacks monsters
+ * and players, heals players, and does nothing while the table is frozen. A monster brought to 0
+ * dies and leaves the map; a player is down and stays. A token without numbers takes nothing, but
+ * still shows the hit.
+ */
+export const hit = mutation({
+    args: {
+        sessionId: v.id('sessions'),
+        tokenIds: v.array(v.id('tokens')),
+        kind: v.union(v.literal('attack'), v.literal('heal')),
+        amount: v.number(),
+    },
+    handler: async (ctx, { sessionId, tokenIds, kind, amount }) =>
+    {
+        const userId = await requireUser(ctx);
+        const session = await sessionOf(ctx, sessionId);
+        const host = session.ownerId === userId;
+        const scenarioId = session.activeScenarioId;
+
+        if (!host && !(await ownToken(ctx, sessionId, userId)))
+            throw new ConvexError('Join the session to attack or heal.');
+
+        if (!session.live || !scenarioId)
+            throw new ConvexError('The session is not running.');
+
+        if (!host && session.frozen === true)
+            throw new ConvexError('The GM froze the table.');
+
+        const points = Number.isFinite(amount) ? Math.min(9999, Math.max(0, Math.round(amount))) : 0;
+        const targets = [];
+
+        for (const tokenId of new Set(tokenIds.slice(0, maxTargets)))
+        {
+            const token = await ctx.db.get('tokens', tokenId);
+
+            if (!token || token.sessionId !== sessionId || token.scenarioId !== scenarioId)
+                continue;
+
+            const seen = token.kind === 'player' || (token.inSight === true && token.hidden !== true);
+
+            if (!host && (!seen || (kind === 'heal' && token.kind !== 'player')))
+                continue;
+
+            const { after, died } = hitOn(token, kind, points);
+
+            targets.push({ x: token.x, y: token.y, size: token.size, seen, died });
+
+            if (died)
+            {
+                if (token.avatarId)
+                    await dropFile(ctx, token.avatarId);
+
+                await dropDraftOf(ctx, tokenId);
+                await ctx.db.delete('tokens', tokenId);
+            }
+            else if (after)
+                await ctx.db.patch('tokens', tokenId, after);
+
+        }
+
+        if (targets.length === 0)
+            return null;
+
+        const doc = await ctx.db
+            .query('hits')
+            .withIndex('by_sessionId', (q) => q.eq('sessionId', sessionId))
+            .unique();
+        const row = { sessionId, scenarioId, kind, at: Date.now(), targets };
+
+        if (doc)
+            await ctx.db.replace('hits', doc._id, row);
+        else
+            await ctx.db.insert('hits', row);
 
         return null;
     },

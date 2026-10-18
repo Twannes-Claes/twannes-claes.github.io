@@ -27,7 +27,8 @@ export function tokensOn(ctx: QueryCtx, sessionId: Id<'sessions'>, scenarioId: s
  * leaves out the rest without reading the map, see play.ts. Run by every write that changes
  * sight: a move, a join, a respawn, a new monster, a removed player, a door or wall saved.
  * ponytail: it judges from where tokens end up. A monster glimpsed only halfway along a walk is
- * not sent; check points along the path if that ever matters at the table.
+ * not sent; check points along the path if that ever matters at the table. One walking out of
+ * sight stays seen until its walk ends, see leavingUntil.
  */
 export async function refreshSight(ctx: MutationCtx, sessionId: Id<'sessions'>, scenario: Scenario)
 {
@@ -39,7 +40,7 @@ export async function refreshSight(ctx: MutationCtx, sessionId: Id<'sessions'>, 
         if (token.kind !== 'npc')
             continue;
 
-        const seen = eyes.some((eye) => inSight(scenario.walls, eye, token));
+        const seen = eyes.some((eye) => inSight(scenario.walls, eye, token)) || (token.leavingUntil ?? 0) > Date.now();
 
         if (seen !== (token.inSight === true))
             await ctx.db.patch('tokens', token._id, { inSight: seen });

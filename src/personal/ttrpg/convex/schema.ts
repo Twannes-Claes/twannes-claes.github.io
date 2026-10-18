@@ -128,6 +128,11 @@ export default defineSchema({
         hidden: v.optional(v.boolean()),
         /** A monster a player can see right now, kept by sight.ts. Others are not sent to players. */
         inSight: v.optional(v.boolean()),
+        /**
+         * A seen monster walking out of sight counts as seen until then, so phones see it walk
+         * into the fog rather than vanish where it set off, see move in convex/play.ts.
+         */
+        leavingUntil: v.optional(v.number()),
         /** Only for the host and the token's own player, see withoutNumbers in map/health.ts. */
         hp: v.optional(v.number()),
         maxHp: v.optional(v.number()),
@@ -163,6 +168,23 @@ export default defineSchema({
         /** A player's ring colour. Missing for the host, whose pings take the app's own. */
         color: v.optional(v.string()),
         at: v.number(),
+    }).index('by_sessionId', ['sessionId']),
+    /**
+     * The last attack or heal of a session, one row each, for the animation every screen plays,
+     * see hit in convex/play.ts. Its own table, like pings.
+     */
+    hits: defineTable({
+        sessionId: v.id('sessions'),
+        scenarioId: v.string(),
+        kind: v.union(v.literal('attack'), v.literal('heal')),
+        at: v.number(),
+        /**
+         * Where each target stood, whether players could see it then, and whether it died of it.
+         * At most maxTargets, see convex/play.ts.
+         */
+        targets: v.array(
+            v.object({ x: v.number(), y: v.number(), size: sizeValidator, seen: v.boolean(), died: v.boolean() }),
+        ),
     }).index('by_sessionId', ['sessionId']),
     /**
      * A player's path while it is drawn and until it is walked or dropped, one row per token, so
