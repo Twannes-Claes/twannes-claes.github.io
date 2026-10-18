@@ -128,6 +128,13 @@ export default defineSchema({
         hidden: v.optional(v.boolean()),
         /** A monster a player can see right now, kept by sight.ts. Others are not sent to players. */
         inSight: v.optional(v.boolean()),
+        /** Only for the host and the token's own player, see withoutNumbers in map/health.ts. */
+        hp: v.optional(v.number()),
+        maxHp: v.optional(v.number()),
+        tempHp: v.optional(v.number()),
+        ac: v.optional(v.number()),
+        /** Passive Perception. */
+        perception: v.optional(v.number()),
     })
         .index('by_sessionId_and_userId', ['sessionId', 'userId'])
         .index('by_sessionId_and_scenarioId', ['sessionId', 'scenarioId'])
@@ -175,6 +182,23 @@ export default defineSchema({
     })
         .index('by_sessionId', ['sessionId'])
         .index('by_tokenId', ['tokenId']),
+    /**
+     * A ruler or an area of effect someone at the table is dragging out, one row per person, gone
+     * when they let go, see Mark in types.ts.
+     */
+    marks: defineTable({
+        sessionId: v.id('sessions'),
+        scenarioId: v.string(),
+        /** The player or the host, whose own screen draws it already. */
+        userId: v.id('users'),
+        kind: v.union(v.literal('ruler'), v.literal('area')),
+        from: v.object({ x: v.number(), y: v.number() }),
+        to: v.object({ x: v.number(), y: v.number() }),
+        /** The player's ring colour. Missing for the host, drawn in the GM's colour. */
+        color: v.optional(v.string()),
+        /** The last change, so one left by a closed phone still goes, see dropMark. */
+        at: v.number(),
+    }).index('by_sessionId_and_userId', ['sessionId', 'userId']),
     // One document per scenario, so saving a change to one map never rewrites the others.
     scenarios: defineTable({ sessionId: v.id('sessions'), scenario: scenarioValidator }).index(
         'by_sessionId_and_scenario_id',

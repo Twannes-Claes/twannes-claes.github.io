@@ -2,6 +2,7 @@ import {
     faArrowUpRightFromSquare,
     faCloud,
     faEye,
+    faHeart,
     faPlay,
     faQrcode,
     faStop,
@@ -15,10 +16,12 @@ import { createPortal } from 'react-dom';
 
 import type { Live } from '../types';
 
+import { statsLine } from '../map/health';
 import { confirmAction } from '../services/confirm';
 
 import { Spinner } from './Feedback';
 import { Popover } from './Popover';
+import { StatsForm } from './StatsForm';
 import { useKeydown } from './useKeys';
 
 /** The QR code maker, loaded when the code is first shown, see PLAN.md. */
@@ -37,6 +40,11 @@ interface LiveControlsProps
     /** Hears what worked, for the editor's toast. */
     onDone: (message: string) => void;
     onError: (message: string) => void;
+    /**
+     * The bar faded out after the mouse rested. Its pop-outs live outside it, so they hide here
+     * and come back as they were, like the settings, see Settings.tsx.
+     */
+    hidden?: boolean;
 }
 
 /**
@@ -44,11 +52,13 @@ interface LiveControlsProps
  * players join with; while live, the players at the table, with the QR code that leads to the
  * join page under them.
  */
-export function LiveControls({ live, scenarioId, onStarted, onDone, onError }: LiveControlsProps)
+export function LiveControls({ live, scenarioId, onStarted, onDone, onError, hidden = false }: LiveControlsProps)
 {
     const [asking, setAsking] = useState(false);
     const [showQr, setShowQr] = useState(false);
     const [showPlayers, setShowPlayers] = useState(false);
+    // The player whose numbers are open under their row.
+    const [editing, setEditing] = useState<string | null>(null);
     const [freshFog, setFreshFog] = useState(true);
     const players = live.tokens.filter((token) => token.kind === 'player');
 
@@ -112,7 +122,7 @@ export function LiveControls({ live, scenarioId, onStarted, onDone, onError }: L
                     Start
                 </button>
 
-                {asking && (
+                {asking && !hidden && (
                     <Popover title="Start the session" className="ttrpg-start" dismissOnOutside onClose={() => setAsking(false)}>
                         <form action={start} className="ttrpg-popover__body ttrpg-settings">
                             <label title="What the players type to join">
@@ -183,7 +193,7 @@ export function LiveControls({ live, scenarioId, onStarted, onDone, onError }: L
                 End
             </button>
 
-            {showPlayers && (
+            {showPlayers && !hidden && (
                 <Popover title="Players" className="ttrpg-start" dismissOnOutside onClose={() => setShowPlayers(false)}>
                     {players.length === 0 ? (
                         <p className="ttrpg-empty">Nobody has joined yet.</p>
@@ -194,7 +204,18 @@ export function LiveControls({ live, scenarioId, onStarted, onDone, onError }: L
                                     <span className="ttrpg-row__main ttrpg-row__main--swatch">
                                         <span className="ttrpg-swatch" style={{ background: player.color }} />
                                         {player.name}
+                                        <span className="ttrpg-row__stats">{statsLine(player)}</span>
                                     </span>
+                                    <button
+                                        type="button"
+                                        className="ttrpg-icon-button ttrpg-icon-button--small"
+                                        aria-label={`Numbers of ${player.name}`}
+                                        aria-pressed={editing === player.id}
+                                        title="HP, AC and Perception"
+                                        onClick={() => setEditing((open) => (open === player.id ? null : player.id))}
+                                    >
+                                        <FontAwesomeIcon icon={faHeart} />
+                                    </button>
                                     <button
                                         type="button"
                                         className="ttrpg-icon-button ttrpg-icon-button--small"
@@ -204,6 +225,9 @@ export function LiveControls({ live, scenarioId, onStarted, onDone, onError }: L
                                     >
                                         <FontAwesomeIcon icon={faUserXmark} />
                                     </button>
+                                    {editing === player.id && (
+                                        <StatsForm token={player} onSave={(stats) => live.setStats(player.id, stats)} />
+                                    )}
                                 </li>
                             ))}
                         </ul>
@@ -243,7 +267,7 @@ function QrCode({ path, password, onClose }: QrCodeProps)
     {
         // Testing with phones, the game master stays on localhost and the phones need the
         // laptop's address on the network instead, see README.md.
-        const url = `${import.meta.env.VITE_JOIN_ORIGIN || window.location.origin}${path}`;
+        const url = `${__JOIN_ORIGIN__ ?? window.location.origin}${path}`;
         let cancelled = false;
 
         loadQr().then(({ encode }) =>

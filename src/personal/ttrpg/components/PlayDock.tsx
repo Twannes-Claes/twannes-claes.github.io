@@ -7,7 +7,6 @@ import {
     faExpand,
     faCircle,
     faObjectGroup,
-    faRulerHorizontal,
     faSnowflake,
     faSquare,
 } from '@fortawesome/free-solid-svg-icons';
@@ -15,10 +14,11 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 import type { Scenario } from '../types';
 
+import { RulerPicker } from './RulerPicker';
 import { useFullscreen } from './useScreen';
 
 /** What a press on the map does in play mode, besides drawing paths and dragging monsters. */
-export type PlayTool = 'open-doors' | 'measure' | 'reveal' | 'reveal-circle' | 'hide' | 'hide-circle';
+export type PlayTool = 'open-doors' | 'measure' | 'area' | 'reveal' | 'reveal-circle' | 'hide' | 'hide-circle';
 
 /** Reveal's tool for a choice in its pop-out: uncover or hide, with a box or a circle. */
 function fogTool(hide: boolean, circle: boolean): PlayTool
@@ -52,8 +52,9 @@ interface PlayDockProps
 /**
  * The game master's controls in the GM view, at the bottom: the map, the ruler, Reveal area,
  * Freeze, the fog and full screen. Ruler and Reveal toggle, and pressing the one that is on goes
- * back to opening doors with a click. While Reveal is on, a pop-out above it picks uncover or
- * hide, and a box or a circle, for a torch thrown or a spell of light.
+ * back to opening doors with a click. While the ruler is on, a pop-out above it picks a line or a
+ * circle, see RulerPicker.tsx. While Reveal is on, its pop-out picks uncover or hide, and a box or
+ * a circle, for a torch thrown or a spell of light.
  */
 export function PlayDock({
     tool,
@@ -71,7 +72,6 @@ export function PlayDock({
 }: PlayDockProps)
 {
     const { fullscreen, toggle } = useFullscreen();
-    const pick = (next: PlayTool) => onTool(tool === next ? 'open-doors' : next);
     const hiding = tool === 'hide' || tool === 'hide-circle';
     const circle = tool === 'reveal-circle' || tool === 'hide-circle';
     const revealing = hiding || circle || tool === 'reveal';
@@ -95,16 +95,10 @@ export function PlayDock({
                 </div>
             )}
             <div className="ttrpg-dock__group">
-                <button
-                    type="button"
-                    className="ttrpg-segment"
-                    aria-pressed={tool === 'measure'}
-                    title="Drag to measure a distance"
-                    onClick={() => pick('measure')}
-                >
-                    <FontAwesomeIcon icon={faRulerHorizontal} />
-                    Ruler
-                </button>
+                <RulerPicker
+                    measure={tool === 'measure' || tool === 'area' ? tool : null}
+                    onMeasure={(next) => onTool(next ?? 'open-doors')}
+                />
                 <span className="ttrpg-pop">
                     <button
                         type="button"

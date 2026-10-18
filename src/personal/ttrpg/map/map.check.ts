@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import type { Cell, Grid, Point, Scenario, Wall } from '../types';
+import type { Cell, Grid, Point, Scenario, Token, Wall } from '../types';
 
 import { toScreen, toWorld, zoomAt } from './camera.ts';
 import { createExplored, markSeen, packedFlag, packSeen, wasSeen } from './fog.ts';
@@ -17,6 +17,7 @@ import {
     snapPoint,
     wrapOffset,
 } from './grid.ts';
+import { cleanStats, healthState, withoutNumbers } from './health.ts';
 import { extendPath, pathBlocked, pathFeet } from './path.ts';
 import { placedSize, propAt, snapCenter, snapSize } from './props.ts';
 import { anchorAt, footprint, footprintCenter } from './size.ts';
@@ -619,3 +620,12 @@ const packed = new Uint8Array(packSeen(mask));
 
 assert.equal(packed.length, 2);
 assert.deepEqual([...mask].map((_, index) => (packedFlag(packed, index) ? 1 : 0)), [...mask]);
+
+// How hurt looks: bloodied at half, critical at a quarter, down at 0, and the numbers stay home.
+assert.deepEqual([40, 39, 20, 11, 10, 0].map((hp) => healthState(hp, 40)), ['unhurt', 'hurt', 'bloodied', 'bloodied', 'critical', 'down']);
+
+const hidden = withoutNumbers<Token>({ id: 'a', kind: 'player', name: 'A', color: '#000000', size: 'medium', speed: 30, x: 0, y: 0, hp: 5, maxHp: 40, tempHp: 3, ac: 15, perception: 12 });
+
+assert.equal(hidden.state, 'critical');
+assert.deepEqual([hidden.hp, hidden.maxHp, hidden.tempHp, hidden.ac, hidden.perception], [undefined, undefined, undefined, undefined, undefined]);
+assert.deepEqual(cleanStats({ hp: 50, maxHp: 30.4, tempHp: -2, ac: Number.NaN, perception: 99 }), { hp: 30, maxHp: 30, tempHp: 0, ac: 0, perception: 50 });

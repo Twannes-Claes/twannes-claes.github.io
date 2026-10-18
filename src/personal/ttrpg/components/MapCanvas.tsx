@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useRef } from 'react';
 
-import type { Draft, FogSettings, Ping, Point, PropPicture, Scenario, SharedFog, Token } from '../types';
+import type { Draft, FogSettings, Mark, Ping, Point, PropPicture, Scenario, SharedFog, SharedMark, Token } from '../types';
 
 import { demoCredit, demoScenario } from '../content/scenarios';
 import { defaultFogSettings } from '../map/fog';
@@ -9,6 +9,7 @@ import { createMapView, type FrameStats, type MapView, type PendingMove } from '
 
 /** One empty list for screens without drafts, so its effect does not run on every render. */
 const noDrafts: Draft[] = [];
+const noMarks: SharedMark[] = [];
 
 interface MapCanvasProps
 {
@@ -63,10 +64,16 @@ interface MapCanvasProps
     drafts?: Draft[];
     /** Hears this screen's path as it is drawn, to share, see onDraft in map/view.ts. */
     onDraft?: (id: string, points: Point[] | null, feet: number) => void;
+    /** Other screens' rulers and areas, see Mark. */
+    marks?: SharedMark[];
+    /** Hears this screen's ruler or area as it is dragged, to share, see onMark in map/view.ts. */
+    onMark?: (mark: Mark | null) => void;
     /** How the fog looks, see FogSettings. */
     fogSettings?: FogSettings;
     /** Whose fog this is, see setFogSource in map/view.ts. A phone is always live. */
     fogSource?: 'preview' | 'live';
+    /** Credits the demo map's maker when it shows. Only the public demo does, see demoCredit. */
+    credit?: boolean;
 }
 
 /**
@@ -99,8 +106,11 @@ export function MapCanvas({
     onPing,
     drafts = noDrafts,
     onDraft,
+    marks = noMarks,
+    onMark,
     fogSettings = defaultFogSettings,
     fogSource = 'live',
+    credit = false,
 }: MapCanvasProps)
 {
     const canvas = useRef<HTMLCanvasElement>(null);
@@ -116,6 +126,7 @@ export function MapCanvas({
     const explored = useEffectEvent((fog: SharedFog, forget?: boolean) => onExplored?.(fog, forget));
     const pinged = useEffectEvent((at: Point) => onPing?.(at));
     const drafted = useEffectEvent((id: string, points: Point[] | null, feet: number) => onDraft?.(id, points, feet));
+    const markedOut = useEffectEvent((mark: Mark | null) => onMark?.(mark));
     // The last ping seen, to tell a new one from the one already there.
     const lastPing = useRef<Ping | null | undefined>(undefined);
 
@@ -135,6 +146,7 @@ export function MapCanvas({
             onExplored: (fog, forget) => explored(fog, forget),
             onPing: (at) => pinged(at),
             onDraft: (id, points, feet) => drafted(id, points, feet),
+            onMark: (mark) => markedOut(mark),
         });
 
         view.current = created;
@@ -218,6 +230,11 @@ export function MapCanvas({
 
     useEffect(() =>
     {
+        view.current?.setMarks(marks);
+    }, [marks]);
+
+    useEffect(() =>
+    {
         view.current?.setFogSettings(fogSettings);
     }, [fogSettings]);
 
@@ -231,10 +248,10 @@ export function MapCanvas({
     return (
         <>
             <canvas ref={canvas} className="ttrpg-map" aria-label={`Battle map: ${scenario.name}`} />
-            {/* The demo's picture is free to use with attribution, so every map showing it
-                credits its maker: the demo, the example session and its copies, for the GM and
-                players. */}
-            {scenario.background === demoScenario.background && (
+            {/* The demo's picture is free to use with attribution, so the public demo credits its
+                maker. Sessions are played in private, so the example session and its copies
+                show the map alone. */}
+            {credit && scenario.background === demoScenario.background && (
                 <a href={demoCredit.url} className="ttrpg-credit" target="_blank" rel="noreferrer">
                     {demoCredit.text}
                 </a>

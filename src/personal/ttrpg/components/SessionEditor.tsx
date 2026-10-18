@@ -4,7 +4,7 @@ import { ConvexError } from 'convex/values';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import type { Draft, Live, PictureBytes, PropPicture, Scenario, Token } from '../types';
+import type { Draft, Live, PictureBytes, PropPicture, Scenario, SharedMark, Token } from '../types';
 
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
@@ -58,6 +58,7 @@ function monsterPicture(picture: Blob | null): Promise<Id<'_storage'> | undefine
 /** Before the first tokens arrive, so the map gets the same empty list each time. */
 const noTokens: Token[] = [];
 const noDrafts: Draft[] = [];
+const noMarks: SharedMark[] = [];
 
 /**
  * A saved session in the editor: loaded once when it opens, then the editor holds it and saves
@@ -88,6 +89,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const fog = useQuery(api.play.fog, following ? { sessionId: id } : 'skip');
     const ping = useQuery(api.play.ping, following ? { sessionId: id } : 'skip');
     const drafts = useQuery(api.play.drafts, following ? { sessionId: id } : 'skip');
+    const marks = useQuery(api.play.marks, following ? { sessionId: id } : 'skip');
     const saveFog = useMutation(api.play.saveFog);
     const resetFog = useMutation(api.play.resetFog);
     const setFogLook = useMutation(api.play.setFogLook);
@@ -100,8 +102,10 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const addNpc = useMutation(api.play.addMonster);
     const hideNpc = useMutation(api.play.hide);
     const removeNpc = useMutation(api.play.removeMonster);
+    const setStats = useMutation(api.play.setStats);
     const sendPing = useMutation(api.play.sendPing);
     const draw = useMutation(api.play.draw);
+    const mark = useMutation(api.play.mark);
 
     useEffect(() =>
     {
@@ -133,6 +137,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
 
     const live: Live | undefined = status
         ? {
+            sessionId,
             live: status.live,
             frozen: status.frozen,
             password: status.password ?? '',
@@ -160,6 +165,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
                 ),
             hide: (tokenId, hidden) => friendly(hideNpc({ tokenId: tokenId as Id<'tokens'>, hidden })),
             removeMonster: (tokenId) => friendly(removeNpc({ tokenId: tokenId as Id<'tokens'> })),
+            setStats: (tokenId, stats) => friendly(setStats({ tokenId: tokenId as Id<'tokens'>, ...stats })),
             fog: fog ?? null,
             saveFog: (shared, forget) => friendly(saveFog({ sessionId: id, ...shared, forget })),
             resetFog: () => friendly(resetFog({ sessionId: id })),
@@ -167,6 +173,8 @@ function Session({ sessionId, debug }: SessionEditorProps)
             sendPing: (at) => friendly(sendPing({ sessionId: id, ...at })),
             drafts: drafts ?? noDrafts,
             draw: (tokenId, points, feet) => friendly(draw({ tokenId: tokenId as Id<'tokens'>, points, feet })),
+            marks: marks ?? noMarks,
+            mark: (next) => friendly(mark({ sessionId: id, mark: next })),
             fogLook: status.fogLook,
             setFogLook: (look) => friendly(setFogLook({ sessionId: id, look })),
         }

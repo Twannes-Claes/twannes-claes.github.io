@@ -1,8 +1,8 @@
-import type { Point, Prop, PropPicture, Scenario, Wall } from '../types';
+import type { Mark, Point, Prop, PropPicture, Scenario, Wall } from '../types';
 
 import { danger, door as doorColour, faded, ground, highlight, ink } from './colours.ts';
 import { boxOf, closestOnSegment, distance, distanceToSegment, onMap, segmentsTouch, type Area } from './geometry.ts';
-import { cellAt, cellCenter, cellLine, snapPoint } from './grid.ts';
+import { cellAt, cellCenter, cellLine, nearestCorner, snapPoint } from './grid.ts';
 import { lineFeet, pathFeet } from './path.ts';
 import { fromLocal, placedSize, propAt, propCorners, propHandles, snapCenter, snapSize } from './props.ts';
 import { drawPill, drawRoute } from './render.ts';
@@ -28,6 +28,7 @@ export type ToolId =
     | 'props'
     | 'open-doors'
     | 'measure'
+    | 'area'
     | 'reveal'
     | 'reveal-circle'
     | 'hide'
@@ -44,6 +45,9 @@ export type Change = (next: Scenario, final?: boolean) => void;
  * it again instead.
  */
 export type Reveal = (polygon: Point[], hide: boolean) => void;
+
+/** Hears a ruler or an area as it is dragged, to show on every screen, and null once let go. */
+export type ShareMark = (mark: Mark | null) => void;
 
 /** One pointer event, as a tool sees it. */
 export interface ToolPointer
@@ -588,48 +592,132 @@ export function measure(scenario: Scenario, a: Point, b: Point): { points: Point
     return { points: cells.map((cell) => cellCenter(grid, cell)), feet: pathFeet(grid, cells) };
 }
 
-/** The ruler: drag from one spot to another to see how far it is. Only this screen sees it. */
-function measureTool(): MapTool
+/**
+ * A ruler or an area of effect, in its colour: the line through the cells with its feet, or the
+ * circle with its radius in feet.
+ */
+export function drawMark(ctx: CanvasRenderingContext2D, mark: Mark, zoom: number, scenario: Scenario, colour: string)
 {
-    let drag: Drag | null = null;
+    if (mark.kind === 'ruler')
+    {
+        const { points, feet } = measure(scenario, mark.from, mark.to);
+
+        drawRoute(ctx, points, zoom, colour);
+        drawPill(ctx, `${feet} ft`, mark.to, zoom, faded(ground, 0.9));
+
+        return;
+    }
+
+    const { grid } = scenario;
+    const radius = distance(mark.from, mark.to);
+
+    ctx.beginPath();
+    ctx.arc(mark.from.x, mark.from.y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = faded(colour, 0.18);
+    ctx.fill();
+    ctx.setLineDash([6 / zoom, 4 / zoom]);
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = 2 / zoom;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    drawPill(ctx, `${Math.round((radius / grid.size) * grid.feetPerCell)} ft`, mark.from, zoom, faded(ground, 0.9));
+}
+
+/**
+ * A drag that shares itself while it lasts, for the ruler and the area tool: start makes the mark
+ * from the press, update follows the pointer. Every screen at the table sees it until let go.
+ */
+function markTool(share: ShareMark, start: (pointer: ToolPointer) => Mark, update: (mark: Mark, pointer: ToolPointer) => Mark): MapTool
+{
+    let mark: Mark | null = null;
+
+    const drop = () =>
+    {
+        const had = mark !== null;
+
+        mark = null;
+
+        if (had)
+            share(null);
+
+        return had;
+    };
 
     return {
         cursor: 'crosshair',
-        down: ({ world }) =>
+        down: (pointer) =>
         {
-            drag = { start: world, end: world };
+            mark = start(pointer);
 
             return true;
         },
-        move: ({ world }, pressed) =>
+        move: (pointer, pressed) =>
         {
-            if (pressed && drag)
-                drag.end = world;
-
-        },
-        up: () =>
-        {
-            drag = null;
-        },
-        cancel: () =>
-        {
-            const had = drag !== null;
-
-            drag = null;
-
-            return had;
-        },
-        draw: (ctx, zoom, scenario) =>
-        {
-            if (!drag)
+            if (!pressed || !mark)
                 return;
 
-            const { points, feet } = measure(scenario, drag.start, drag.end);
+            const next = update(mark, pointer);
 
-            drawRoute(ctx, points, zoom, ink);
-            drawPill(ctx, `${feet} ft`, drag.end, zoom, faded(ground, 0.9));
+            // Only a real change goes out: an area moves in whole cells, so most moves are none.
+            if (next.to.x !== mark.to.x || next.to.y !== mark.to.y)
+                share(next);
+
+            mark = next;
+        },
+        up: () => void drop(),
+        cancel: drop,
+        draw: (ctx, zoom, scenario) =>
+        {
+            if (mark)
+                drawMark(ctx, mark, zoom, scenario, ink);
+
         },
     };
+}
+
+/** The ruler: drag from one spot to another to see how far it is. */
+function measureTool(share: ShareMark): MapTool
+{
+    return markTool(
+        share,
+        ({ world }) => ({ kind: 'ruler', from: world, to: world }),
+        (mark, { world }) => ({ ...mark, to: world }),
+    );
+}
+
+/**
+ * An area of effect, like a fireball: drag from where it lands out to how far it reaches. On a
+ * grid it starts on whichever is nearer, a grid corner as spells are placed at the table or a
+ * cell's middle for an aura around a token, and grows in whole cells; Alt places it freely.
+ */
+function areaTool(share: ShareMark): MapTool
+{
+    const radiusAt = ({ world, free, scenario }: ToolPointer, center: Point) =>
+    {
+        const { grid } = scenario;
+        const raw = distance(center, world);
+
+        return free || grid.type === 'none' ? raw : Math.max(1, Math.round(raw / grid.size)) * grid.size;
+    };
+
+    // The radius goes as a point straight right of the middle, see Mark.
+    const reaching = (center: Point, radius: number): Mark => ({ kind: 'area', from: center, to: { x: center.x + radius, y: center.y } });
+
+    return markTool(
+        share,
+        (pointer) =>
+        {
+            const { world, free, scenario } = pointer;
+            const { grid } = scenario;
+            const corner = nearestCorner(grid, world);
+            const middle = cellCenter(grid, cellAt(grid, world));
+            const snapped = distance(corner, world) <= distance(middle, world) ? corner : middle;
+            const center = free || grid.type === 'none' ? world : snapped;
+
+            return reaching(center, radiusAt(pointer, center));
+        },
+        (mark, pointer) => reaching(mark.from, radiusAt(pointer, mark.from)),
+    );
 }
 
 /**
@@ -1173,7 +1261,8 @@ function propTool(change: Change, placing: PropPicture | null): MapTool
  * The tool for an id, or null for plain panning and token dragging. placing is the library
  * picture the props tool places with each click, null to select and edit placed props. reveal
  * hears what Reveal uncovers or hides, which changes what was seen, not the scenario. snap is
- * how many points per cell side walls snap to, 0 for none.
+ * how many points per cell side walls snap to, 0 for none. share hears the ruler and the area
+ * tool as they are dragged.
  */
 export function createTool(
     id: ToolId,
@@ -1181,6 +1270,7 @@ export function createTool(
     placing: PropPicture | null = null,
     reveal: Reveal = () => {},
     snap = 1,
+    share: ShareMark = () => {},
 ): MapTool | null
 {
     switch (id)
@@ -1212,7 +1302,9 @@ export function createTool(
         case 'props':
             return propTool(change, placing);
         case 'measure':
-            return measureTool();
+            return measureTool(share);
+        case 'area':
+            return areaTool(share);
         case 'reveal':
         case 'hide':
             return revealTool(reveal, id === 'hide');

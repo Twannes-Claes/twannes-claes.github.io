@@ -1,4 +1,4 @@
-import type { Cell, Draft, FogSettings, Point, PropPicture, Scenario, SharedFog, Token } from '../types';
+import type { Cell, Draft, FogSettings, Mark, Point, PropPicture, Scenario, SharedFog, SharedMark, Token } from '../types';
 
 import { centerOn, fitCamera, panBy, toWorld, zoomAt, type Camera } from './camera.ts';
 import {
@@ -16,12 +16,12 @@ import {
     type Explored,
     type FogLayers,
 } from './fog.ts';
-import { accent, ground, tooFar } from './colours.ts';
+import { accent, ground, highlight, tooFar } from './colours.ts';
 import { distance, midpoint, onMap } from './geometry.ts';
 import { extendPath, lineFeet, pathBlocked, pathFeet } from './path.ts';
-import { drawPill, drawPing, drawRoute, drawUnknownStep, render, tokenRadius, type Lifted, type Viewport } from './render.ts';
+import { drawHealth, drawPill, drawPing, drawRoute, drawUnknownStep, render, tokenRadius, type Lifted, type Scene, type Viewport } from './render.ts';
 import { anchorAt, footprintCenter, footprintKeys } from './size.ts';
-import { createTool, type MapTool, type ToolId, type ToolPointer } from './tools.ts';
+import { createTool, drawMark, type MapTool, type ToolId, type ToolPointer } from './tools.ts';
 import { insidePolygon, sightSegments, visibilityPolygon, type Segment } from './visibility.ts';
 import { startWalk, walkAt, type Walk } from './walk.ts';
 
@@ -76,6 +76,8 @@ export interface MapViewOptions
     onPing?: (at: Point) => void;
     /** A player's path as it changes, to show on every other screen, or null once it goes, see Draft. */
     onDraft?: (id: string, points: Point[] | null, feet: number) => void;
+    /** This screen's ruler or area as it is dragged, to show on every other screen, see Mark. */
+    onMark?: (mark: Mark | null) => void;
     /**
      * A while after more of the map was seen, what has been seen in all, to share, see SharedFog.
      * At once with forget when the game master hid some, so every screen forgets it too.
@@ -116,10 +118,12 @@ export interface MapView
     ping: (at: Point, color?: string) => void;
     /** Other screens' paths, drawn faintly in their token's colour, see Draft. */
     setDrafts: (drafts: Draft[]) => void;
+    /** Other screens' rulers and areas, in their player's colour, see Mark. */
+    setMarks: (marks: SharedMark[]) => void;
     /**
      * On a player's phone, their own token: the only one they can draw a path from. Every other
-     * press pans. Null is the game master's screen, where every token answers. An id no token has,
-     * like '', is the Player view on the table screen, where none does.
+     * press pans. Null is the game master's screen, where every token answers, the Player view on
+     * the table screen too.
      */
     setOwn: (id: string | null) => void;
     /** Forgets everything seen before. */
@@ -222,6 +226,13 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     let ownRestedAt = performance.now();
     /** Other screens' paths, see setDrafts. */
     let drafts: Draft[] = [];
+    /** Other screens' rulers and areas, see setMarks. */
+    let marks: SharedMark[] = [];
+    /** When this screen last sent its mark, the send waiting for draftGap to pass, and whether
+     * one is out, to take back when the tool changes mid drag. */
+    let markSentAt = 0;
+    let markTimer = 0;
+    let marked = false;
     /** The token whose path this screen last shared, and how that path looked, see shareDraft. */
     let drafted: string | null = null;
     let draftKey = '';
@@ -463,6 +474,33 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     };
 
     /**
+     * Hands this screen's ruler or area on as it is dragged, at most every draftGap like a path,
+     * the latest one once its turn comes. Letting go goes at once. Only in play: an edit tool never
+     * makes one, and the fog being on means the session's map is shown.
+     */
+    const shareMark = (mark: Mark | null) =>
+    {
+        if (!options.onMark || (mark && !fogEnabled))
+            return;
+
+        window.clearTimeout(markTimer);
+        markTimer = 0;
+
+        const wait = markSentAt + draftGap - performance.now();
+
+        if (mark && wait > 0)
+        {
+            markTimer = window.setTimeout(() => shareMark(mark), wait);
+
+            return;
+        }
+
+        markSentAt = performance.now();
+        marked = mark !== null;
+        options.onMark(mark);
+    };
+
+    /**
      * Hands a player's path on whenever it changes, so other screens show it being drawn, and
      * null once it goes. A monster's path stays on this screen, see drafts in convex/play.ts.
      */
@@ -610,13 +648,14 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
         shareDraft(path);
 
-        const scene = {
+        // Peeking, the GM view, the game master sees every monster too, and the fog at half
+        // strength: clear enough to see through, dark enough to tell what the players see.
+        const visible = fogEnabled && !peek ? shown.filter(seenByPlayers) : shown;
+        const scene: Scene = {
             scenario,
             background,
             picture: loaded,
-            // Peeking, the GM view, the game master sees every monster too, and the fog at half
-            // strength: clear enough to see through, dark enough to tell what the players see.
-            tokens: fadeTokens(fogEnabled && !peek ? shown.filter(seenByPlayers) : shown, time),
+            tokens: fadeTokens(visible, time),
             editing: !fogEnabled,
             own,
             ownRestedAt,
@@ -643,11 +682,33 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
         context.setTransform(scale, 0, 0, scale, viewport.dpr * camera.x, viewport.dpr * camera.y);
 
+        // The HP under each token whose numbers this screen has, over the fog so the GM view reads
+        // it. Only in play: in edit mode it would be in the way. Not on a token fading out, which
+        // keeps how it was last shown, numbers and all, see fadeTokens.
+        if (fogEnabled)
+        {
+            const staying = new Set(visible.map((token) => token.id));
+
+            for (const token of scene.tokens)
+            {
+                if (!staying.has(token.id))
+                    continue;
+
+                context.globalAlpha = token.alpha ?? 1;
+                drawHealth(context, token, tokenRadius(scenario.grid, token.size), camera.zoom, pillScale());
+            }
+
+            context.globalAlpha = 1;
+        }
+
         for (const draft of others)
             drawPill(context, `${draft.feet} ft`, draft.points[draft.points.length - 1], camera.zoom, draft.over ? tooFar : ground, pillScale());
 
         if (path)
             drawPathLabels(path);
+
+        for (const mark of marks)
+            drawMark(context, mark, camera.zoom, scenario, mark.color ?? highlight);
 
         tool?.draw(context, camera.zoom, scenario);
 
@@ -1314,7 +1375,11 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         },
         setTool: (id, placing = null, snap = 1) =>
         {
-            tool = createTool(id, changeScenario, placing, reveal, snap);
+            // A ruler or area still out goes with the tool that drew it.
+            if (marked || markTimer)
+                shareMark(null);
+
+            tool = createTool(id, changeScenario, placing, reveal, snap, shareMark);
             toolPointerId = null;
             // The tool's cursor, or the stylesheet's grab hand when there is no tool.
             canvas.style.cursor = tool ? tool.cursor : '';
@@ -1328,6 +1393,11 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         setDrafts: (next) =>
         {
             drafts = next;
+            redraw();
+        },
+        setMarks: (next) =>
+        {
+            marks = next;
             redraw();
         },
         ping: (at, color) =>

@@ -1,10 +1,16 @@
-import { faCompress, faExpand, faImage, faRightFromBracket, faSnowflake } from '@fortawesome/free-solid-svg-icons';
+import {
+    faCompress,
+    faExpand,
+    faImage,
+    faRightFromBracket,
+    faSnowflake,
+} from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useAuthActions, useAuthToken, useConvexAuth } from '@convex-dev/auth/react';
 import { useConvex, useMutation, useQuery } from 'convex/react';
 import { useActionState, useEffect, useState, type ReactNode } from 'react';
 
-import type { FogSettings } from '../types';
+import type { FogSettings, Scenario } from '../types';
 
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
@@ -13,12 +19,15 @@ import type { FrameStats, PendingMove } from '../map/view';
 import { confirmAction } from '../services/confirm';
 import { explain, uploadAvatar } from '../services/backend';
 import { toAvatar } from '../services/images';
+import { sendDoor } from '../services/tableChannel';
 
 import { Backend } from './Backend';
 import { Loading, Toast, Toasts } from './Feedback';
 import { MapCanvas } from './MapCanvas';
 import { MoveSheet } from './MoveSheet';
+import { RulerPicker, type Measure } from './RulerPicker';
 import { Settings } from './Settings';
+import { StatsForm } from './StatsForm';
 import { useMessage } from './useMessage';
 import { useFullscreen, useIdle, useWakeLock } from './useScreen';
 import { useScreenSettings } from './useScreenSettings';
@@ -174,6 +183,9 @@ function JoinForm({ sessionId, name }: JoinFormProps)
             password: password ?? '',
             name: String(form.get('name')),
             color: String(form.get('color')),
+            maxHp: Number(form.get('maxHp')),
+            ac: Number(form.get('ac')),
+            perception: Number(form.get('perception')),
         };
 
         return avatar.then(
@@ -221,7 +233,7 @@ function JoinForm({ sessionId, name }: JoinFormProps)
         <main className="ttrpg-dashboard ttrpg-player">
             <header className="ttrpg-dashboard__header">
                 <h1>Your character</h1>
-                <p>A name, a colour for the ring around your token, and a picture.</p>
+                <p>A name, a colour for the ring around your token, a picture, and a few numbers off your sheet.</p>
             </header>
             <form action={create} className="ttrpg-panel ttrpg-card">
                 <label className="ttrpg-field">
@@ -236,6 +248,21 @@ function JoinForm({ sessionId, name }: JoinFormProps)
                     Picture, from the camera or your photos
                     <input name="picture" type="file" accept="image/*" />
                 </label>
+                {/* Only the GM sees these. The rest of the table sees how hurt you look. */}
+                <div className="ttrpg-fields">
+                    <label className="ttrpg-field">
+                        Max HP
+                        <input name="maxHp" type="number" inputMode="numeric" min={1} max={9999} required />
+                    </label>
+                    <label className="ttrpg-field">
+                        AC
+                        <input name="ac" type="number" inputMode="numeric" min={0} max={50} required />
+                    </label>
+                    <label className="ttrpg-field" title="Passive Perception">
+                        Perception
+                        <input name="perception" type="number" inputMode="numeric" min={0} max={50} required />
+                    </label>
+                </div>
                 {failure && <p className="ttrpg-error" role="alert">{failure}</p>}
                 <button type="submit" className="ttrpg-button ttrpg-button--confirm" disabled={creating}>
                     {creating ? 'Joining' : 'Join'}
@@ -248,7 +275,7 @@ function JoinForm({ sessionId, name }: JoinFormProps)
 interface TableProps
 {
     sessionId: Id<'sessions'>;
-    /** The player's own token, or null on the table screen, which moves nothing. */
+    /** The player's own token, or null on the table screen, where the GM moves any token. */
     mine: Id<'tokens'> | null;
     frozen: boolean;
     /** How the GM set the fog to look, null for the default. */
@@ -257,23 +284,34 @@ interface TableProps
 
 /**
  * The map on the phone: everyone's tokens and the fog, and paths drawn from the player's own
- * token. Without one it is the Player view on the table screen: kept awake, its one button fading
- * out like the GM view's controls, and it saves what the party saw, so the fog is remembered while
- * the GM view is in Edit, see saveFog in convex/play.ts.
+ * token. Without one it is the Player view on the table screen, the editor's own Player view
+ * without its top bar: the GM opens doors and moves any token from it. Kept awake, its buttons
+ * fade out like the GM view's controls, and it saves what the party saw, so the fog is remembered
+ * while the GM view is in Edit, see saveFog in convex/play.ts.
  */
 function Table({ sessionId, mine, frozen, fogLook }: TableProps)
 {
     const onTable = mine === null;
+    // What a press does with no ruler on: open doors on the table screen, as in the editor, or on
+    // a phone draw paths from the own token.
+    const resting = onTable ? 'open-doors' : 'select';
     const scenario = useQuery(api.play.scenario, { sessionId });
     const tokens = useQuery(api.play.tokens, { sessionId, asPlayer: onTable });
     const fog = useQuery(api.play.fog, { sessionId });
     const ping = useQuery(api.play.ping, { sessionId });
-    const drafts = useQuery(api.play.drafts, { sessionId });
+    const drafts = useQuery(api.play.drafts, { sessionId, asPlayer: onTable });
+    const marks = useQuery(api.play.marks, { sessionId, asPlayer: onTable });
+    const mark = useMutation(api.play.mark);
+    const [tool, setTool] = useState<Measure | typeof resting>(resting);
+    // A door the table screen just opened or closed, shown until the editor's save of it comes
+    // back as a new scenario, see services/tableChannel.ts.
+    const [doorMoved, setDoorMoved] = useState<{ from: Scenario; to: Scenario } | null>(null);
     const move = useMutation(api.play.move);
     const sendPing = useMutation(api.play.sendPing);
     const leaveTable = useMutation(api.play.leave);
     const draw = useMutation(api.play.draw);
     const saveFog = useMutation(api.play.saveFog);
+    const saveStats = useMutation(api.play.setStats);
     const authToken = useAuthToken();
     const [pending, setPending] = useState<PendingMove | null>(null);
     const message = useMessage();
@@ -295,19 +333,34 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
         return <Note><Loading>The GM is setting up the map</Loading></Note>;
 
     const token = tokens.find((candidate) => candidate.id === mine);
+    // The one walking the drawn path: the own token on a phone, any on the table screen.
+    const walker = pending ? tokens.find((candidate) => candidate.id === pending.id) : undefined;
+    const shown = doorMoved && doorMoved.from === scenario ? doorMoved.to : scenario;
+
+    const failed = (reason: unknown) => message.error(explain(reason, 'That move did not go through. Try again.'));
 
     const confirm = () =>
     {
-        if (!pending || !mine)
+        if (!pending)
             return;
 
         const end = pending.points[pending.points.length - 1];
 
         setPending(null);
         message.clear();
-        move({ tokenId: mine, ...end, path: pending.points }).catch((reason: unknown) =>
-            message.error(explain(reason, 'That move did not go through. Try again.')),
-        );
+        move({ tokenId: pending.id as Id<'tokens'>, ...end, path: pending.points }).catch(failed);
+    };
+
+    // The door tool hands back the whole map; the one door that changed goes to the editor.
+    const doorChanged = (next: Scenario) =>
+    {
+        const wall = next.walls.find((candidate, index) => candidate.door && candidate.door.open !== shown.walls[index]?.door?.open);
+
+        if (!wall?.door)
+            return;
+
+        setDoorMoved({ from: scenario, to: next });
+        sendDoor(sessionId, { scenarioId: next.id, wallId: wall.id, open: wall.door.open });
     };
 
     // The token goes, and the page turns back to the join form, see Player.
@@ -364,6 +417,16 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
                 </div>
             )}
 
+            {!pending && (
+                <div className={`ttrpg-panel ttrpg-corner ttrpg-corner--left${idle ? ' ttrpg-hidden' : ''}`}>
+                    <RulerPicker
+                        measure={tool === 'measure' || tool === 'area' ? tool : null}
+                        onMeasure={(next) => setTool(next ?? resting)}
+                        start
+                    />
+                </div>
+            )}
+
             {/* Out of the way of the move sheet, which slides up over the bottom of the screen. */}
             {!onTable && !pending && (
                 <div className="ttrpg-panel ttrpg-corner">
@@ -392,30 +455,54 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
                                 </button>
                             </div>
                         </section>
+                        {token && mine && (
+                            <section className="ttrpg-shortcuts" aria-label="Your numbers">
+                                <h3 className="ttrpg-subhead">Your numbers</h3>
+                                <StatsForm
+                                    token={token}
+                                    onSave={(stats) =>
+                                        saveStats({ tokenId: mine, ...stats }).then(
+                                            () => message.done('Your numbers are saved.'),
+                                            (reason: unknown) =>
+                                            {
+                                                throw new Error(explain(reason, 'That did not save. Check the connection and try again.'));
+                                            },
+                                        )}
+                                />
+                            </section>
+                        )}
                     </Settings>
                 </div>
             )}
 
             <MapCanvas
-                scenario={scenario}
+                scenario={shown}
                 tokens={tokens}
                 mode="play"
-                tool="select"
+                tool={tool}
                 placing={null}
                 fogEpoch={0}
                 pending={pending}
                 frozen={frozen}
                 peek={false}
-                // No token is the table screen's, so none moves from it, see setOwn in map/view.ts.
-                own={mine ?? ''}
+                // Null in the Player view's window, where every token answers the GM.
+                own={mine}
+                onTokenMove={onTable ? (id, to) => void move({ tokenId: id as Id<'tokens'>, ...to }).catch(failed) : undefined}
+                onScenarioChange={onTable ? doorChanged : undefined}
                 shared={fog ?? null}
                 // A failed save is not said: the next sends everything seen, filling the gap.
                 onExplored={onTable ? (shared) => void saveFog({ sessionId, ...shared }).catch(() => undefined) : undefined}
                 fogSettings={fogLook ?? defaultFogSettings}
                 onPathEnd={setPending}
                 onPathCancel={() => setPending(null)}
+                // A right click with nothing half done puts the ruler away, as in the editor.
+                onToolCancel={() => setTool(resting)}
                 onStats={screen.frameRate ? setStats : undefined}
                 drafts={drafts}
+                marks={marks}
+                // Only a preview for the table, like a path being drawn. The table screen keeps its
+                // own: it runs as the host, so its ruler would come back to it as the GM's too.
+                onMark={onTable ? undefined : (next) => void mark({ sessionId, mark: next }).catch(() => undefined)}
                 onDraft={(id, points, feet) =>
                     void draw({ tokenId: id as Id<'tokens'>, points, feet }).catch(() =>
                     {
@@ -442,7 +529,7 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
                 )}
             </Toasts>
 
-            <MoveSheet move={pending} token={token} onMove={confirm} onCancel={() => setPending(null)} />
+            <MoveSheet move={pending} token={walker} onMove={confirm} onCancel={() => setPending(null)} />
 
             {screen.frameRate && stats && (
                 <p className="ttrpg-panel ttrpg-stats" aria-hidden="true">

@@ -38,8 +38,8 @@ export const defaultGrid: Grid = {
 };
 
 /**
- * Who made the demo's picture. Free to use with attribution, so every map with its picture shows
- * this on screen, see components/MapCanvas.tsx. Only human-made art goes into the app, see PLAN.md.
+ * Who made the demo's picture. Free to use with attribution, so the public demo shows this on
+ * screen, see components/MapCanvas.tsx. Only human-made art goes into the app, see PLAN.md.
  */
 export const demoCredit = {
     text: 'Map: Home in the Reeds by Explorer\'s Guild Publishing',
@@ -91,9 +91,10 @@ export function blankScenario(name: string): Scenario
 }
 
 
+// Aria bloodied and Bram with temp HP, so the demo shows how hurt looks and what the GM sees.
 const demoPlayers = [
-    { name: 'Aria', color: '#683c9b', speed: 30 },
-    { name: 'Bram', color: '#2f8f55', speed: 25 },
+    { name: 'Aria', color: '#683c9b', speed: 30, hp: 9, maxHp: 24, tempHp: 0, ac: 14, perception: 13 },
+    { name: 'Bram', color: '#2f8f55', speed: 25, hp: 30, maxHp: 30, tempHp: 4, ac: 17, perception: 11 },
 ];
 
 /**
@@ -109,6 +110,11 @@ export function demoOgre(grid: Grid): Omit<Token, 'id'>
         color: '#b4443c',
         size: 'large',
         speed: 40,
+        hp: 59,
+        maxHp: 59,
+        tempHp: 0,
+        ac: 11,
+        perception: 8,
         ...footprintCenter(grid, { q: 15, r: 5 }, 'large'),
     };
 }

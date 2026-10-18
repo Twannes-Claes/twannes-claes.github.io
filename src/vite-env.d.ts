@@ -9,15 +9,16 @@ interface ImportMetaEnv
     readonly VITE_SKYLANDERS_DEV_PASSWORD?: string;
     /** The TTRPG app's Convex development deployment, written to .env.local by `npx convex dev`. */
     readonly VITE_CONVEX_URL?: string;
-    /**
-     * Where the TTRPG QR code sends phones while testing on the Wi-Fi, like
-     * http://192.168.1.20:5173. Set in .env.development.local, see src/personal/ttrpg/README.md.
-     */
-    readonly VITE_JOIN_ORIGIN?: string;
 }
 
 /** Injected from version.txt by vite.config.ts. */
 declare const __APP_VERSION__: string;
+
+/**
+ * Under npm run dev, the dev server on the laptop's network address, where the TTRPG QR code
+ * sends phones. Null in the built site, see vite.config.ts.
+ */
+declare const __JOIN_ORIGIN__: string | null;
 
 /** Set up by the GoatCounter snippet in index.html. Absent until it loads. */
 interface Window

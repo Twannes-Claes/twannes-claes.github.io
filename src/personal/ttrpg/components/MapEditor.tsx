@@ -6,11 +6,13 @@ import type { FogSettings, Live, PictureBytes, Ping, Point, PropPicture, Scenari
 
 import { blankScenario, demoTokens } from '../content/scenarios';
 import { defaultFogSettings } from '../map/fog';
-import type { ToolId } from '../map/tools';
+import { withoutNumbers } from '../map/health';
+import { toggleDoor, type ToolId } from '../map/tools';
 import { scenarioFromUvtt } from '../map/uvtt';
 import type { FrameStats, PendingMove } from '../map/view';
 import { confirmAction } from '../services/confirm';
 import { baseName } from '../services/images';
+import { listenForDoors, type DoorChange } from '../services/tableChannel';
 
 import { Spinner, Toast, Toasts } from './Feedback';
 import { FogPanel } from './FogPanel';
@@ -21,6 +23,7 @@ import { Monsters } from './Monsters';
 import { MoveSheet } from './MoveSheet';
 import { PlayDock, type PlayTool } from './PlayDock';
 import { PropLibrary } from './PropLibrary';
+import { RulerPicker } from './RulerPicker';
 import { ScenarioList } from './ScenarioList';
 import { Settings } from './Settings';
 import { ToolRail } from './ToolRail';
@@ -168,6 +171,26 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
         return () => window.clearTimeout(timer);
     }, [scenarios, saved, store]);
+
+    // A door opened or closed on the table screen's Player view, which leaves saving the map to
+    // this editor, see services/tableChannel.ts. Kept like a click here, undo and autosave alike.
+    const sessionId = live ? live.sessionId : null;
+    const doorFromTable = useEffectEvent((door: DoorChange) =>
+        history.commit((current) =>
+            current.map((scenario) =>
+                scenario.id === door.scenarioId
+                    ? {
+                        ...scenario,
+                        walls: scenario.walls.map((wall) =>
+                            wall.id === door.wallId && wall.door && wall.door.open !== door.open ? toggleDoor(wall) : wall,
+                        ),
+                    }
+                    : scenario,
+            ),
+        ),
+    );
+
+    useEffect(() => (sessionId ? listenForDoors(sessionId, doorFromTable) : undefined), [sessionId]);
 
     // Leaving the editor drops its undo, so the map pictures only undo still held are freed now, see
     // release in convex/sessions.ts. A failure only leaves them for the next save.
@@ -355,6 +378,8 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     {
         setMode(next);
         setPending(null);
+        // A GM tool like Reveal has no button in the Player view to put it away with.
+        setPlayTool('open-doors');
 
         if (next !== 'edit' && live && live.live && live.activeScenarioId !== active.id)
             fail(live.open(active.id));
@@ -537,7 +562,8 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
         <main className="ttrpg-editor" onDrop={dropped} onDragOver={draggedOver}>
             <MapCanvas
                 scenario={active}
-                tokens={shown}
+                // The Player view shows how hurt everyone looks, not the numbers.
+                tokens={mode === 'players' ? shown.map(withoutNumbers) : shown}
                 mode={playing ? 'play' : 'edit'}
                 tool={playing ? playTool : tool === 'walls' ? wallTools[wallKind] : tool}
                 placing={playing ? null : placing}
@@ -562,8 +588,13 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 onPing={(at) => (liveMap ? fail(liveMap.sendPing(at)) : setLocalPing({ ...at, at: Date.now() }))}
                 drafts={liveMap ? liveMap.drafts : undefined}
                 onDraft={liveMap ? (id, points, feet) => fail(liveMap.draw(id, points, feet)) : undefined}
+                marks={liveMap ? liveMap.marks : undefined}
+                // Only a preview for the table, so a failed send is not worth a message.
+                onMark={liveMap ? (next) => void liveMap.mark(next).catch(() => undefined) : undefined}
                 fogSettings={fogSettings}
                 fogSource={liveMap ? 'live' : 'preview'}
+                // Only the demo has no session, see credit in MapCanvas.tsx.
+                credit={!live}
             />
 
             <div
@@ -632,6 +663,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                         onStarted={() => setMode('gm')}
                         onDone={message.done}
                         onError={message.error}
+                        hidden={idle}
                     />
                 )}
                 <Settings settings={screen} onChange={setScreen} hidden={idle} />
@@ -720,6 +752,17 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                         fogOpen={panel === 'fog'}
                     />
                 )
+            )}
+
+            {/* The Player view has a phone's ruler and nothing more, so it stays the map. */}
+            {mode === 'players' && !pending && (
+                <div className={`ttrpg-panel ttrpg-corner ttrpg-corner--left${idle ? ' ttrpg-hidden' : ''}`}>
+                    <RulerPicker
+                        measure={playTool === 'measure' || playTool === 'area' ? playTool : null}
+                        onMeasure={(next) => setPlayTool(next ?? 'open-doors')}
+                        start
+                    />
+                </div>
             )}
 
             {mode === 'gm' && !pending && !idle && panel === 'fog' && (

@@ -65,12 +65,13 @@ terminal or the Convex dashboard, never into the repo or a chat.
 
 Phones on the same Wi-Fi can play against the dev deployment:
 
-1. Put the laptop's network address in `.env.development.local`, for the QR code:
-   `VITE_JOIN_ORIGIN=http://192.168.1.20:5173` (the Network line `npm run dev -- --host` prints).
-2. Run `npm run dev -- --host`, so phones can reach the dev server.
-3. The GM stays on `http://localhost:5173`: sign in, start the session, show the QR code.
+1. Run `npm run dev -- --host`, so phones can reach the dev server.
+2. The GM stays on `http://localhost:5173`: sign in, start the session, show the QR code. Under
+   `npm run dev` the code holds the laptop's own network address, found when the dev server
+   starts (see `vite.config.ts`), so restart it after moving to another Wi-Fi.
 
-Phones need no setup. The GM page needs localhost because the browser only gives some features
+Phones need no setup. If they still cannot connect, Windows may be treating the Wi-Fi as a public
+network, whose firewall blocks them: set it to private in Windows' Wi-Fi settings. The GM page needs localhost because the browser only gives some features
 (like `crypto.randomUUID`) to localhost and https pages.
 
 ### 4. Going live

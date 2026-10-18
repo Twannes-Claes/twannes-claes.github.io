@@ -1,12 +1,14 @@
-import { faEye, faEyeSlash, faImage, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faEye, faEyeSlash, faHeart, faImage, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useActionState, useState } from 'react';
 
 import type { CreatureSize, Live, Point } from '../types';
 
+import { statsLine } from '../map/health';
 import { confirmAction } from '../services/confirm';
 
 import { Popover } from './Popover';
+import { StatsForm } from './StatsForm';
 
 const sizes: CreatureSize[] = ['tiny', 'small', 'medium', 'large', 'huge', 'gargantuan'];
 
@@ -35,17 +37,23 @@ export function Monsters({ live, at, onClose, onDone, onError }: MonstersProps)
     const [size, setSize] = useState<CreatureSize>('medium');
     const [hidden, setHidden] = useState(false);
     const [pictureName, setPictureName] = useState('');
+    // The monster whose numbers are open under its row.
+    const [editing, setEditing] = useState<string | null>(null);
 
     // The form clears itself after each one, so a pack of goblins is quick to add.
     const [failure, add, adding] = useActionState((_: string, form: FormData) =>
     {
         const picture = form.get('picture');
+        // An empty field is left out, rather than read as 0.
+        const number = (field: string) => (form.get(field) ? Number(form.get(field)) : undefined);
         const monster = {
             name: String(form.get('name')),
             color: String(form.get('color')),
             size,
             hidden,
             picture: picture instanceof File && picture.size > 0 ? picture : null,
+            maxHp: number('maxHp'),
+            ac: number('ac'),
         };
 
         return live
@@ -104,6 +112,19 @@ export function Monsters({ live, at, onClose, onDone, onError }: MonstersProps)
                     Ring
                     <input name="color" type="color" defaultValue="#b4443c" />
                 </label>
+                <div className="ttrpg-settings__group" role="group" aria-label="Numbers">
+                    Numbers
+                    <div className="ttrpg-fields">
+                        <label className="ttrpg-field" title="Left empty, it shows no damage">
+                            HP
+                            <input name="maxHp" type="number" inputMode="numeric" min={1} max={9999} />
+                        </label>
+                        <label className="ttrpg-field">
+                            AC
+                            <input name="ac" type="number" inputMode="numeric" min={0} max={50} />
+                        </label>
+                    </div>
+                </div>
                 <div className="ttrpg-settings__group" role="group" aria-label="Picture">
                     Picture
                     <label className="ttrpg-segment">
@@ -151,7 +172,18 @@ export function Monsters({ live, at, onClose, onDone, onError }: MonstersProps)
                                 <span className="ttrpg-row__main ttrpg-row__main--swatch">
                                     <span className="ttrpg-swatch" style={{ background: monster.color }} />
                                     {monster.name}
+                                    <span className="ttrpg-row__stats">{statsLine(monster)}</span>
                                 </span>
+                                <button
+                                    type="button"
+                                    className="ttrpg-icon-button ttrpg-icon-button--small"
+                                    aria-label={`Numbers of ${monster.name}`}
+                                    aria-pressed={editing === monster.id}
+                                    title="HP, AC and Perception"
+                                    onClick={() => setEditing((open) => (open === monster.id ? null : monster.id))}
+                                >
+                                    <FontAwesomeIcon icon={faHeart} />
+                                </button>
                                 <button
                                     type="button"
                                     className="ttrpg-icon-button ttrpg-icon-button--small"
@@ -172,6 +204,9 @@ export function Monsters({ live, at, onClose, onDone, onError }: MonstersProps)
                                 >
                                     <FontAwesomeIcon icon={faTrash} />
                                 </button>
+                                {editing === monster.id && (
+                                    <StatsForm token={monster} onSave={(stats) => live.setStats(monster.id, stats)} />
+                                )}
                             </li>
                         ))}
                     </ul>

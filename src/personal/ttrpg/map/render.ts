@@ -1,10 +1,13 @@
-import type { CreatureSize, Grid, Point, Scenario, Token } from '../types';
+import { faSkull } from '@fortawesome/free-solid-svg-icons';
+
+import type { CreatureSize, Grid, HealthState, Point, Scenario, Token } from '../types';
 
 import { toWorld, type Camera } from './camera.ts';
-import { door as doorColour, faded, ground, highlight, ink } from './colours.ts';
+import { danger, door as doorColour, faded, ground, highlight, ink } from './colours.ts';
 import { drawFog, type FogLayers, type FogLook } from './fog.ts';
 import type { Area } from './geometry.ts';
 import { cellAt, cellCenter, cellCorners, hexRadius } from './grid.ts';
+import { healthState, stateOf } from './health.ts';
 import { cellsAcross } from './size.ts';
 
 /** Around the map, darker than any floor, so the edge of the map reads. */
@@ -144,15 +147,32 @@ export function drawPill(
 {
     // One screen pixel, times scale, so the pill keeps its size on screen at any zoom.
     const unit = scale / zoom;
+
+    // Above and to the right of the point, so a finger on a phone does not cover it.
+    drawPillAt(ctx, text, { x: at.x + 14 * unit, y: at.y - 14 * unit - 26 * unit }, unit, colour);
+}
+
+/**
+ * A pill with its top left at a point, or its top middle with centred. unit is one screen pixel
+ * in world pixels. The text is ink unless text says otherwise.
+ */
+function drawPillAt(
+    ctx: CanvasRenderingContext2D,
+    label: string,
+    at: Point,
+    unit: number,
+    colour: string,
+    { centred = false, text = ink }: { centred?: boolean; text?: string } = {},
+)
+{
     const fontSize = 14 * unit;
     const height = 26 * unit;
 
     ctx.font = `600 ${fontSize}px 'JetBrains Mono Variable', ui-monospace, monospace`;
 
-    const width = ctx.measureText(text).width + 20 * unit;
-    // Above and to the right of the point, so a finger on a phone does not cover it.
-    const left = at.x + 14 * unit;
-    const top = at.y - height - 14 * unit;
+    const width = ctx.measureText(label).width + 20 * unit;
+    const left = centred ? at.x - width / 2 : at.x;
+    const top = at.y;
 
     // The look of the page's tooltips and messages, see .ttrpg-tip in styles/ttrpg.css.
     ctx.save();
@@ -164,13 +184,98 @@ export function drawPill(
     ctx.fillStyle = colour;
     ctx.fill();
     ctx.restore();
-    ctx.lineWidth = 1 / zoom;
+    ctx.lineWidth = unit;
     ctx.strokeStyle = faded(ink, 0.2);
     ctx.stroke();
-    ctx.fillStyle = ink;
+    ctx.fillStyle = text;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, left + width / 2, top + height / 2 + unit);
+    ctx.fillText(label, left + width / 2, top + height / 2 + unit);
+}
+
+/** The colour of a token's HP under it: warmer and redder the more hurt it is. */
+const healthText: Record<HealthState, string> = {
+    unhurt: ink,
+    hurt: doorColour,
+    bloodied: danger,
+    critical: danger,
+    down: faded(ink, 0.5),
+};
+
+/**
+ * A token's HP in a pill under it, like 23+5/30, for the screens that have its numbers: the GM
+ * view for every token, a phone for its own. Nothing for a token without them.
+ */
+export function drawHealth(ctx: CanvasRenderingContext2D, token: Lifted, radius: number, zoom: number, scale = 1)
+{
+    if (token.hp === undefined || token.maxHp === undefined)
+        return;
+
+    const unit = scale / zoom;
+    const temp = token.tempHp ? `+${token.tempHp}` : '';
+    const state = healthState(token.hp, token.maxHp);
+
+    drawPillAt(ctx, `${token.hp}${temp}/${token.maxHp}`, { x: token.x, y: token.y + radius + 4 * unit }, unit, ground, {
+        centred: true,
+        text: healthText[state],
+    });
+}
+
+/**
+ * How far up the picture the red of a wound reaches, as a share of it, and how deep it is at the
+ * bottom, for each state. Critical reaches past the top, so the whole picture is red.
+ */
+const woundLook: Record<Exclude<HealthState, 'unhurt' | 'down'>, { reach: number; alpha: number }> = {
+    hurt: { reach: 0.4, alpha: 0.35 },
+    bloodied: { reach: 0.7, alpha: 0.55 },
+    critical: { reach: 1.3, alpha: 0.7 },
+};
+
+/** Font Awesome's skull as a Path2D, made when first needed, since only the browser has one. */
+let skull: Path2D | null = null;
+
+/**
+ * How hurt a token looks, over its picture: red rising from the bottom as it gets hurt, and a
+ * downed one darkened with a skull. Everyone sees this, numbers or not, see map/health.ts.
+ */
+function drawWound(ctx: CanvasRenderingContext2D, token: Lifted, inner: number)
+{
+    const state = stateOf(token);
+
+    if (!state || state === 'unhurt')
+        return;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(token.x, token.y, inner, 0, Math.PI * 2);
+    ctx.clip();
+
+    if (state === 'down')
+    {
+        const [width, height, , , path] = faSkull.icon;
+        const size = inner * 1.1;
+
+        skull ??= new Path2D(Array.isArray(path) ? path.join(' ') : path);
+        ctx.fillStyle = 'rgb(18 17 19 / 0.7)';
+        ctx.fill();
+        ctx.translate(token.x - size / 2, token.y - (size * height) / width / 2);
+        ctx.scale(size / width, size / width);
+        ctx.fillStyle = faded(ink, 0.85);
+        ctx.fill(skull);
+        ctx.restore();
+
+        return;
+    }
+
+    const { reach, alpha } = woundLook[state];
+    const bottom = token.y + inner;
+    const wound = ctx.createLinearGradient(token.x, bottom, token.x, bottom - inner * 2 * reach);
+
+    wound.addColorStop(0, `rgb(150 18 24 / ${alpha})`);
+    wound.addColorStop(1, 'rgb(150 18 24 / 0)');
+    ctx.fillStyle = wound;
+    ctx.fill();
+    ctx.restore();
 }
 
 function drawSquareGrid(ctx: CanvasRenderingContext2D, grid: Grid, area: Area)
@@ -297,14 +402,16 @@ function drawToken(
     ctx.arc(token.x, token.y, radius - ctx.lineWidth / 2, 0, Math.PI * 2);
     ctx.stroke();
 
-    if (avatar)
-        return;
+    if (!avatar)
+    {
+        ctx.fillStyle = ink;
+        ctx.font = `600 ${inner * 0.9}px 'Onest Variable', system-ui, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(token.name.slice(0, 1).toUpperCase(), token.x, token.y + inner * 0.05);
+    }
 
-    ctx.fillStyle = ink;
-    ctx.font = `600 ${inner * 0.9}px 'Onest Variable', system-ui, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(token.name.slice(0, 1).toUpperCase(), token.x, token.y + inner * 0.05);
+    drawWound(ctx, token, inner);
 }
 
 /** How long the own token stands still before its ring first shows, how long one pulse lasts, and

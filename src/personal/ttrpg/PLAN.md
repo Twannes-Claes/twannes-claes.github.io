@@ -29,15 +29,15 @@ This file is the whole plan. [README.md](README.md) holds the routes and the one
 
 ## 2. Who uses it, and on what
 
-| Who         | Device                    | Signed in how                 | Can do                                                 |
-| ----------- | ------------------------- | ----------------------------- | ------------------------------------------------------ |
-| Owner (you) | Any                       | Discord                       | Everything a host can, plus approve other GMs as hosts |
-| Host (a GM) | Laptop, and the 4K screen | Discord (see 6)               | Edit mode: build sessions. Play mode: run them         |
-| Player      | Phone                     | No account (anonymous, see 6) | Join with the password, move own token, measure        |
+| Who         | Device                             | Signed in how                 | Can do                                                 |
+| ----------- | ---------------------------------- | ----------------------------- | ------------------------------------------------------ |
+| Owner (you) | Any                                | Discord                       | Everything a host can, plus approve other GMs as hosts |
+| Host (a GM) | Laptop, and a screen for the table | Discord (see 6)               | Edit mode: build sessions. Play mode: run them         |
+| Player      | Phone                              | No account (anonymous, see 6) | Join with the password, move own token, measure        |
 
-There is no separate table app. The GM opens the session twice: the laptop shows the **GM view**,
-with every number and control, and the 4K screen the **Player view**, the map **as the players
-see it**, fog included and nothing they may not see. See 12.
+There is no separate table app. The GM runs the session from the **GM view**, with every number
+and control, and shows the players the **Player view** on any screen they can see: the map **as
+the players see it**, fog included and nothing they may not see. See 12.
 
 ---
 
@@ -65,7 +65,7 @@ on your portfolio.
 - In edit mode: one slim tool rail on the left, the scenario list on the right, the properties
   of the selected thing in a small panel that appears only when something is selected.
 - In play mode: almost nothing. One small toolbar that fades out after a few seconds without
-  the mouse, so the 4K screen shows just the map.
+  the mouse, so the screen shows just the map.
 - Big, clear icons (Font Awesome, already installed) with a tooltip and a keyboard shortcut,
   like V select, W walls, P props, M measure, Q QR code.
 
@@ -528,8 +528,10 @@ no confirmation, no counting.
 ### Measuring
 
 A ruler tool for everyone: drag from A to B, see the distance in feet, snapped to cells on a grid
-and counted with the same 5, 10 diagonal rule.
-Local only, it is not shown to others.
+and counted with the same 5, 10 diagonal rule. Its pop-out, like Reveal's, also offers a
+**circle** for an area of effect: drag from where a spell lands out to how far it reaches, from a
+grid corner in whole cells. Both show on every screen while they are dragged, in the player's ring
+colour or the GM's, see 12.
 
 ---
 
@@ -539,7 +541,7 @@ Local only, it is not shown to others.
 
 1. In the editor, **Start session**. Set or change the password.
 2. The session goes `live` and the editor switches to play mode, full screen, on the active
-   scenario. The Player view link opens the 4K screen's own window, see 12.
+   scenario. The Player view, for the players to look at, opens from its link, see 12.
 3. Play mode asks the browser to stay awake (Screen Wake Lock API) and goes full screen
    (Fullscreen API), so the screen does not dim mid-fight.
 4. **Back to edit mode** at any time to fix something mid-session (a forgotten wall). Players
@@ -594,18 +596,27 @@ not see never reach their phone, the same rule as hidden monsters in 6.
 
 ### 1. GM view and Player view
 
-The 4K screen stops mirroring the laptop. Each gets its own view:
+Play mode splits in two: one view to run the session from, and one to show the players without
+giving anything away.
 
 - The top bar reads **Edit | GM view | Player view**.
-- **Player view** is a plain link that opens the session as the players may see it, for the 4K
-  screen in full screen. Being a link, Ctrl+click or a middle click opens it in a window of its
-  own. Fog as the players see it, damage states without numbers, no hidden monsters, no initiative
-  order, no stat blocks, no GM controls.
-- **GM view** is the laptop: play mode with everything. The fog is dimmed, so the GM sees through
-  it and still sees what the players see. Every number, Perception, stat blocks, the initiative
-  order and hidden monsters. Peek goes, the dimmed fog replaces it.
+- **Player view** is the session as the players may see it: fog as they see it, damage states
+  without numbers, no hidden monsters, no initiative order, no stat blocks. A plain click shows it
+  in the editor's tab; being a link, Ctrl+click or a middle click opens it in a window of its own,
+  the same view without the top bar, to put full screen on whatever screen the players look at.
+  The GM still opens doors, moves tokens and measures from it.
+- **GM view** is play mode with everything. The fog is dimmed, so the GM sees through it and still
+  sees what the players see. Every number, Perception, stat blocks, the initiative order and
+  hidden monsters. Peek goes, the dimmed fog replaces it.
 - **QR code:** gone from the top bar. The Players popover always has a **Show the QR code** button
   under the list, not only while nobody has joined, so a late player can still scan in.
+- **Built.** The Player view's own window is the join page with `?table` (`pages/Join.tsx`), shown
+  to the session's host only: no token of its own, kept awake, a full screen button and the ruler,
+  both fading out when the mouse rests. It gets what players get (`asPlayer` on `play.tokens`,
+  `play.drafts` and `play.marks`) and saves what the party saw, so the fog is remembered while the
+  GM view is in Edit. Doors clicked there go to the editor, which saves the map
+  (`services/tableChannel.ts`); tokens move through `play.move` like from the GM view. The demo
+  shows the Player view in its own tab only. The GM view's fog is at half strength.
 
 ### 2. Health and stats
 
@@ -624,6 +635,14 @@ The 4K screen stops mirroring the laptop. Each gets its own view:
 | Down     | 0, a player is down |
 
 A player at 0 is down and stays on the map. Death saves are kept at the table, see Optional.
+
+- **Built.** The rules live in `map/health.ts`, shared by the server and every screen;
+  `play.tokens` sends a screen without the numbers only each token's `state`. On the map, red
+  rises from the bottom of a hurt token's picture, and a downed one is darkened with a skull. A
+  screen with the numbers shows HP in a pill under the token, in play only. The GM sets any
+  token's numbers from the heart button in the Players and Monsters lists, a player their own from
+  their phone's settings (`play.setStats`, `components/StatsForm.tsx`). A monster added without HP
+  has no numbers and shows no damage.
 
 ### 3. Attack and heal
 
@@ -691,11 +710,20 @@ Built into play mode neatly, it should look and feel good.
 - **Reorder scenarios:** drag them in the list, kept in `sessions.order`.
 - **Haptics:** a short tick per cell while a player draws a path, and fitting haptics for every
   player interaction on a phone, new ones included: the initiative pop-up, Your turn, being hit.
+- **Ruler for everyone, built.** One Ruler button with a Line or Circle pop-out
+  (`components/RulerPicker.tsx`): in the GM view's dock, and bottom left on phones and in both
+  Player views. While a ruler is dragged it goes to every screen, like a live path: one row per
+  person in `marks` (`play.mark`, `play.marks`), at most every 150 ms, gone when let go or after a
+  minute without a change. A ruler drawn in the Player view's own window stays on it, as that
+  window runs as the host and would get it back as the GM's. Cones, lines and cubes can join the
+  pop-out the same way.
+- **The demo map's credit** shows on the public demo only, which its licence asks for; sessions
+  are played in private and show the map alone.
 
 ### Build order
 
-1 first, since it splits what the laptop and the 4K screen get, which everything after it relies
-on. Then 2, which 3, 4, 5 and 8 need. 6 needs 3 for attacks per turn. 7, 9 and 10 stand on their
+1 first, since it splits what the GM sees from what the players see, which everything after it
+relies on. Then 2, which 3, 4, 5 and 8 need. 6 needs 3 for attacks per turn. 7, 9 and 10 stand on their
 own and fit in anywhere.
 
 ### Optional, for later
@@ -882,8 +910,9 @@ Decided:
   Firebase's Storage and Cloud Functions need the paid Blaze plan, Supabase pauses free projects
   after a week without use.
 - **Image storage:** Convex file storage, 1 GB, pictures as WebP of at most 4096 px.
-- **The 4K screen:** the Player view in a window of its own, the laptop the GM view, see 12. No
-  separate table app or GM device. It mirrored the laptop in the first version.
+- **What the players look at:** the Player view, on any screen they can see, while the GM runs
+  the session from the GM view, see 12. No separate table app or GM device. In the first version
+  the players saw the GM's screen.
 - **Scenario switch:** every player respawns at the new scenario's spawn point.
 - **Fog:** smoky shadow (never flat black), dimmed for seen before, clear for seen now. Sight is
   unlimited up to walls, with soft blurred edges and a light haze in the distance.

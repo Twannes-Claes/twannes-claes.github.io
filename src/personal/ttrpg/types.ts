@@ -117,6 +117,51 @@ export interface Token
     movedAt?: number;
     /** A monster the game master keeps out of sight, even where players could see it. */
     hidden?: boolean;
+    /**
+     * The numbers, for the game master and the token's own player only. Missing on a token
+     * without them, like a monster added without HP, and on everyone else's screen, see
+     * withoutNumbers in map/health.ts.
+     */
+    hp?: number;
+    maxHp?: number;
+    tempHp?: number;
+    ac?: number;
+    /** Passive Perception, for the game master's secret checks. */
+    perception?: number;
+    /** What a screen without the numbers sees instead, see HealthState. */
+    state?: HealthState;
+}
+
+/**
+ * A ruler or an area of effect being dragged out, shown live on every screen at the table, see
+ * marks in convex/play.ts. A ruler runs from one point to the other; an area is a circle around
+ * from, out to to.
+ */
+export interface Mark
+{
+    kind: 'ruler' | 'area';
+    from: Point;
+    to: Point;
+}
+
+/** Another screen's mark, in its player's ring colour, or the GM's without one. */
+export interface SharedMark extends Mark
+{
+    id: string;
+    color?: string;
+}
+
+/** How hurt a token looks to everyone who may not see its numbers, see map/health.ts. */
+export type HealthState = 'unhurt' | 'hurt' | 'bloodied' | 'critical' | 'down';
+
+/** A token's numbers as the game master or its player sets them, see components/StatsForm.tsx. */
+export interface Stats
+{
+    hp: number;
+    maxHp: number;
+    tempHp: number;
+    ac: number;
+    perception: number;
 }
 
 /** A stored picture: where it loads from, and its size in pixels. */
@@ -163,6 +208,8 @@ export interface Store
  */
 export interface Live
 {
+    /** For the table screen's door changes, see services/tableChannel.ts. */
+    sessionId: string;
     /** Started and not ended: players can join and move. */
     live: boolean;
     frozen: boolean;
@@ -188,6 +235,8 @@ export interface Live
     addMonster: (monster: NewMonster, at: Point) => Promise<void>;
     hide: (tokenId: string, hidden: boolean) => Promise<void>;
     removeMonster: (tokenId: string) => Promise<void>;
+    /** Sets any token's HP, AC and Perception. */
+    setStats: (tokenId: string, stats: Stats) => Promise<void>;
     /** What the party has seen of the map being played, null until anything has been. */
     fog: SharedFog | null;
     /**
@@ -205,6 +254,10 @@ export interface Live
     drafts: Draft[];
     /** Shares a player's path as it is drawn, or drops it with null. */
     draw: (tokenId: string, points: Point[] | null, feet: number) => Promise<void>;
+    /** The rulers and areas players are dragging out, see Mark. */
+    marks: SharedMark[];
+    /** Shares the game master's ruler or area as it is dragged, or drops it with null. */
+    mark: (mark: Mark | null) => Promise<void>;
     /** How the fog looks on every screen, null until the game master changes it. */
     fogLook: FogSettings | null;
     setFogLook: (look: FogSettings) => Promise<void>;
@@ -278,6 +331,9 @@ export interface NewMonster
     hidden: boolean;
     /** Any picture the browser can read. Null shows the name's initial. */
     picture: Blob | null;
+    /** Left out, the monster has no numbers and shows no damage. */
+    maxHp?: number;
+    ac?: number;
 }
 
 /** One battle map of a session, see PLAN.md. */

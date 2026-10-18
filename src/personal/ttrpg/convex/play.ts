@@ -1,8 +1,9 @@
 import { getAuthUserId } from '@convex-dev/auth/server';
 import { ConvexError, v } from 'convex/values';
 
-import type { Draft, Point, Scenario, Token } from '../types';
+import type { Draft, Point, Scenario, SharedMark, Token } from '../types';
 import { distance } from '../map/geometry';
+import { cleanStats, withoutNumbers } from '../map/health';
 import { pathBlocked } from '../map/path';
 import { anchorAt, footprintCenter, footprintKeys } from '../map/size';
 import { spawnCells } from '../map/spawn';
@@ -202,8 +203,10 @@ export const scenario = query({
 /**
  * The tokens on the map being played, live on every screen. Null for anyone not at the table.
  * Players only get the monsters a player can see and the GM has not hidden, so the dev tools on
- * a phone show nothing the table does not; the host gets them all, for the GM view. With asPlayer
- * the host gets what players get, for the Player view on the table screen, see PlayerView.tsx.
+ * a phone show nothing the table does not; the host gets them all, for the GM view. The same goes
+ * for the numbers: a player gets their own token's, and of the rest only how hurt each looks. With
+ * asPlayer the host gets what players get, for the Player view on the table screen, see
+ * PlayerView.tsx.
  */
 export const tokens = query({
     args: { sessionId: v.id('sessions'), asPlayer: v.optional(v.boolean()) },
@@ -214,7 +217,8 @@ export const tokens = query({
         if (!session)
             return null;
 
-        const host = session.ownerId === (await getAuthUserId(ctx)) && asPlayer !== true;
+        const userId = await getAuthUserId(ctx);
+        const host = session.ownerId === userId && asPlayer !== true;
 
         if (!session.activeScenarioId)
             return [];
@@ -223,20 +227,64 @@ export const tokens = query({
 
         return here
             .filter((token) => host || token.kind === 'player' || (token.inSight === true && token.hidden !== true))
-            .map(({ _id, kind, name, color, size, speed, avatar, x, y, path, movedAt, hidden }) => ({
-                id: _id,
-                kind,
-                name,
-                color,
-                size,
-                speed,
-                avatar,
-                x,
-                y,
-                path,
-                movedAt,
-                hidden,
-            }));
+            .map((doc) =>
+            {
+                const { kind, name, color, size, speed, avatar, x, y, path, movedAt, hidden } = doc;
+                const { hp, maxHp, tempHp, ac, perception } = doc;
+                const token = {
+                    id: doc._id,
+                    kind,
+                    name,
+                    color,
+                    size,
+                    speed,
+                    avatar,
+                    x,
+                    y,
+                    path,
+                    movedAt,
+                    hidden,
+                    hp,
+                    maxHp,
+                    tempHp,
+                    ac,
+                    perception,
+                };
+
+                return host || doc.userId === userId ? token : withoutNumbers(token);
+            });
+    },
+});
+
+/**
+ * The game master sets any token's numbers, a player only their own, in the open: at a real
+ * table they keep their own sheet too. Taken as given, see cleanStats in map/health.ts.
+ */
+export const setStats = mutation({
+    args: {
+        tokenId: v.id('tokens'),
+        hp: v.number(),
+        maxHp: v.number(),
+        tempHp: v.number(),
+        ac: v.number(),
+        perception: v.number(),
+    },
+    handler: async (ctx, { tokenId, ...stats }) =>
+    {
+        const userId = await requireUser(ctx);
+        const token = await ctx.db.get('tokens', tokenId);
+
+        if (!token)
+            throw new ConvexError('That token is gone.');
+
+        const session = await sessionOf(ctx, token.sessionId);
+
+        if (session.ownerId !== userId && token.userId !== userId)
+            throw new ConvexError('That is not your token.');
+
+        await ctx.db.patch('tokens', tokenId, cleanStats(stats));
+
+        return null;
     },
 });
 
@@ -290,10 +338,20 @@ export const check = mutation({
  * a wrong password, see tryPassword.
  */
 export const join = mutation({
-    args: { sessionId: v.id('sessions'), password: v.string(), name: v.string(), color: v.string() },
-    handler: async (ctx, { sessionId, password, name, color }) =>
+    args: {
+        sessionId: v.id('sessions'),
+        password: v.string(),
+        name: v.string(),
+        color: v.string(),
+        maxHp: v.number(),
+        ac: v.number(),
+        perception: v.number(),
+    },
+    handler: async (ctx, { sessionId, password, name, color, maxHp, ac, perception }) =>
     {
         const userId = await requireUser(ctx);
+        // Joining at full health, with no temp HP yet.
+        const stats = cleanStats({ hp: maxHp, maxHp, tempHp: 0, ac, perception });
         const session = await sessionOf(ctx, sessionId);
         const character = name.trim().slice(0, 30);
 
@@ -316,7 +374,7 @@ export const join = mutation({
 
         if (existing)
         {
-            await ctx.db.patch('tokens', existing._id, { name: character, color });
+            await ctx.db.patch('tokens', existing._id, { name: character, color, ...stats });
 
             return existing._id;
         }
@@ -344,6 +402,7 @@ export const join = mutation({
             speed: 30,
             scenarioId: session.activeScenarioId,
             ...spot,
+            ...stats,
         });
 
         await refreshSight(ctx, sessionId, scenario);
@@ -589,9 +648,14 @@ export const addMonster = mutation({
         x: v.number(),
         y: v.number(),
         storageId: v.optional(v.id('_storage')),
+        /** Without it the monster has no numbers, and shows no damage. */
+        maxHp: v.optional(v.number()),
+        ac: v.optional(v.number()),
     },
-    handler: async (ctx, { sessionId, name, color, size, hidden, x, y, storageId }) =>
+    handler: async (ctx, { sessionId, name, color, size, hidden, x, y, storageId, maxHp, ac }) =>
     {
+        // At full health. Passive Perception starts at 10, the score of an unskilled creature.
+        const stats = maxHp === undefined ? {} : cleanStats({ hp: maxHp, maxHp, tempHp: 0, ac: ac ?? 10, perception: 10 });
         const session = await requireSession(ctx, sessionId);
         const monster = name.trim().slice(0, 30);
 
@@ -637,6 +701,7 @@ export const addMonster = mutation({
             hidden,
             scenarioId: session.activeScenarioId,
             ...spot,
+            ...stats,
         });
 
         await refreshSight(ctx, sessionId, scenario);
@@ -939,11 +1004,13 @@ async function dropDraftOf(ctx: MutationCtx, tokenId: Id<'tokens'>)
 /**
  * The paths players are drawing on the map being played, or waiting to walk, for everyone at the
  * table but whoever draws each one, whose own screen shows it already. Only players' paths are
- * shared: a monster's is the GM's plan, and the table screen shows it.
+ * shared: a monster's is the GM's plan, and only the GM view shows it. With asPlayer the host
+ * gets the ones they draw too: the Player view on the table screen runs as the host, but does
+ * not show what the GM view draws, see PlayerView.tsx.
  */
 export const drafts = query({
-    args: { sessionId: v.id('sessions') },
-    handler: async (ctx, { sessionId }): Promise<Draft[]> =>
+    args: { sessionId: v.id('sessions'), asPlayer: v.optional(v.boolean()) },
+    handler: async (ctx, { sessionId, asPlayer }): Promise<Draft[]> =>
     {
         const session = await memberOf(ctx, sessionId);
         const userId = await getAuthUserId(ctx);
@@ -957,7 +1024,7 @@ export const drafts = query({
             .take(maxPlayers * 2);
 
         return docs
-            .filter((doc) => doc.scenarioId === session.activeScenarioId && doc.userId !== userId)
+            .filter((doc) => doc.scenarioId === session.activeScenarioId && (asPlayer === true || doc.userId !== userId))
             .map(({ tokenId, points, feet }) => ({ id: tokenId, points, feet }));
     },
 });
@@ -1044,6 +1111,117 @@ export const dropDraft = internalMutation({
             await ctx.scheduler.runAfter(left, internal.play.dropDraft, { draftId });
         else
             await ctx.db.delete('drafts', draftId);
+
+        return null;
+    },
+});
+
+/** How long a ruler or area shows without a change, so one left by a closed phone still goes. */
+const markLife = 60 * 1000;
+
+/**
+ * The rulers and areas of effect being dragged out on the map being played, for everyone at the
+ * table but whoever drags each one, whose own screen draws it. With asPlayer the host gets their
+ * own too, for the Player view on the table screen, like drafts.
+ */
+export const marks = query({
+    args: { sessionId: v.id('sessions'), asPlayer: v.optional(v.boolean()) },
+    handler: async (ctx, { sessionId, asPlayer }): Promise<SharedMark[]> =>
+    {
+        const session = await memberOf(ctx, sessionId);
+        const userId = await getAuthUserId(ctx);
+
+        if (!session || !session.live)
+            return [];
+
+        const docs = await ctx.db
+            .query('marks')
+            .withIndex('by_sessionId_and_userId', (q) => q.eq('sessionId', sessionId))
+            .take(maxPlayers + 1);
+
+        return docs
+            .filter((doc) => doc.scenarioId === session.activeScenarioId && (asPlayer === true || doc.userId !== userId))
+            .map(({ _id, kind, from, to, color }) => ({ id: _id, kind, from, to, color }));
+    },
+});
+
+/**
+ * Someone at the table drags out a ruler or an area, or lets go of it with null. The host and
+ * players who joined, on the map being played, while the session is live. Frozen or not: measuring
+ * is talking, not moving.
+ */
+export const mark = mutation({
+    args: {
+        sessionId: v.id('sessions'),
+        mark: v.union(
+            v.object({
+                kind: v.union(v.literal('ruler'), v.literal('area')),
+                from: v.object({ x: v.number(), y: v.number() }),
+                to: v.object({ x: v.number(), y: v.number() }),
+            }),
+            v.null(),
+        ),
+    },
+    handler: async (ctx, { sessionId, mark }) =>
+    {
+        const userId = await requireUser(ctx);
+        const session = await sessionOf(ctx, sessionId);
+        const token = session.ownerId === userId ? null : await ownToken(ctx, sessionId, userId);
+        const doc = await ctx.db
+            .query('marks')
+            .withIndex('by_sessionId_and_userId', (q) => q.eq('sessionId', sessionId).eq('userId', userId))
+            .unique();
+        const finite = mark !== null && [mark.from.x, mark.from.y, mark.to.x, mark.to.y].every(Number.isFinite);
+        const atTable = session.ownerId === userId || token !== null;
+
+        if (!mark || !finite || !atTable || session.live !== true || !session.activeScenarioId)
+        {
+            if (doc)
+                await ctx.db.delete('marks', doc._id);
+
+            return null;
+        }
+
+        const row = {
+            sessionId,
+            scenarioId: session.activeScenarioId,
+            userId,
+            ...mark,
+            color: token?.color,
+            at: Date.now(),
+        };
+
+        if (doc)
+        {
+            await ctx.db.replace('marks', doc._id, row);
+
+            return null;
+        }
+
+        const markId = await ctx.db.insert('marks', row);
+
+        await ctx.scheduler.runAfter(markLife, internal.play.dropMark, { markId });
+
+        return null;
+    },
+});
+
+/** Drops a ruler or area that has not changed for markLife, or looks again once it would have. */
+export const dropMark = internalMutation({
+    args: { markId: v.id('marks') },
+    handler: async (ctx, { markId }) =>
+    {
+        const doc = await ctx.db.get('marks', markId);
+
+        if (!doc)
+            return null;
+
+        const left = doc.at + markLife - Date.now();
+
+        if (left > 0)
+            await ctx.scheduler.runAfter(left, internal.play.dropMark, { markId });
+        else
+            await ctx.db.delete('marks', markId);
 
         return null;
     },

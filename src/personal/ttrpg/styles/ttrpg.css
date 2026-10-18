@@ -120,6 +120,21 @@ html:has(.ttrpg) {
     animation: ttrpg-rise 150ms var(--ttrpg-ease);
 }
 
+/* Opening to the right of its button, for one in the screen's left corner. Back by the corner
+   panel's padding and border, so both panels line up and so do the buttons in them. */
+.ttrpg-pop__menu--start {
+    left: -5px;
+    translate: none;
+    animation-name: ttrpg-rise-start;
+}
+
+@keyframes ttrpg-rise-start {
+    from {
+        opacity: 0;
+        translate: 0 12px;
+    }
+}
+
 /* One choice per row, split by the same thin line as the dock's groups. */
 .ttrpg-pop__row {
     display: flex;
@@ -1002,6 +1017,22 @@ html:has(.ttrpg) {
     padding: 4px;
 }
 
+/* The ruler of a phone or the Player view, bottom left, the other thumb's corner from the
+   settings. The map's credit moves up out of its way. */
+.ttrpg-corner--left {
+    right: auto;
+    left: max(16px, env(safe-area-inset-left));
+}
+
+main:has(.ttrpg-corner--left) .ttrpg-credit {
+    bottom: calc(max(16px, env(safe-area-inset-bottom)) + 3.5rem);
+}
+
+/* And above the ruler's pop-out while it is open. */
+main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
+    bottom: calc(max(16px, env(safe-area-inset-bottom)) + 7rem);
+}
+
 /* Top right on a phone, which keeps its bottom right for the settings. */
 .ttrpg-player .ttrpg-stats {
     top: max(16px, env(safe-area-inset-top));
@@ -1589,6 +1620,36 @@ html:has(.ttrpg) {
     font-size: 0.875rem;
 }
 
+/* Short number fields side by side, like HP, AC and Perception. Their label stays above the
+   field, also inside a settings form, whose labels sit beside theirs. */
+.ttrpg-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(5rem, 1fr));
+    gap: 0.5rem;
+}
+
+.ttrpg-fields .ttrpg-field {
+    grid-template-columns: none;
+    align-items: start;
+    gap: 0.35rem;
+}
+
+/* A token's numbers to change, under its row in a list or in the phone's settings. */
+.ttrpg-stats-form {
+    display: grid;
+    gap: 0.75rem;
+    padding: 0.5rem 0 0.75rem;
+}
+
+/* A token's numbers in its row, quiet beside the name. */
+.ttrpg-row__stats {
+    margin-inline-start: auto;
+    color: var(--ttrpg-muted);
+    font-family: 'JetBrains Mono Variable', ui-monospace, monospace;
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
 .ttrpg-field input,
 .ttrpg-field select {
     min-height: 44px;
@@ -1845,8 +1906,15 @@ html:has(.ttrpg) {
 
 .ttrpg-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 4px;
+}
+
+/* Opened under its row, the full width of it. */
+.ttrpg-row > .ttrpg-stats-form {
+    flex-basis: 100%;
+    padding-inline: 0.75rem;
 }
 
 .ttrpg-row__main {
