@@ -176,6 +176,7 @@ export const status = query({
         return {
             sessionId,
             name: session.name,
+            host,
             live: session.live === true,
             frozen: session.frozen === true,
             activeScenarioId: session.activeScenarioId ?? null,
@@ -201,18 +202,19 @@ export const scenario = query({
 /**
  * The tokens on the map being played, live on every screen. Null for anyone not at the table.
  * Players only get the monsters a player can see and the GM has not hidden, so the dev tools on
- * a phone show nothing the table does not; the host gets them all, for Peek.
+ * a phone show nothing the table does not; the host gets them all, for the GM view. With asPlayer
+ * the host gets what players get, for the Player view on the table screen, see PlayerView.tsx.
  */
 export const tokens = query({
-    args: { sessionId: v.id('sessions') },
-    handler: async (ctx, { sessionId }): Promise<Token[] | null> =>
+    args: { sessionId: v.id('sessions'), asPlayer: v.optional(v.boolean()) },
+    handler: async (ctx, { sessionId, asPlayer }): Promise<Token[] | null> =>
     {
         const session = await memberOf(ctx, sessionId);
 
         if (!session)
             return null;
 
-        const host = session.ownerId === (await getAuthUserId(ctx));
+        const host = session.ownerId === (await getAuthUserId(ctx)) && asPlayer !== true;
 
         if (!session.activeScenarioId)
             return [];

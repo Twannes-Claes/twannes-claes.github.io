@@ -12,11 +12,9 @@ import {
     faSquare,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useEffect } from 'react';
 
 import type { Scenario } from '../types';
 
-import { typing } from './useKeys';
 import { useFullscreen } from './useScreen';
 
 /** What a press on the map does in play mode, besides drawing paths and dragging monsters. */
@@ -37,7 +35,6 @@ interface PlayDockProps
     onTool: (tool: PlayTool) => void;
     frozen: boolean;
     onFreeze: () => void;
-    onPeek: (peek: boolean) => void;
     /** The maps of the session, to switch between. Players follow, see PLAN.md. */
     scenarios: Scenario[];
     activeId: string;
@@ -53,18 +50,16 @@ interface PlayDockProps
 }
 
 /**
- * The game master's controls in play mode, at the bottom: the map, the ruler, Reveal area, Peek,
- * Freeze, the fog and full screen. Peek works while held, the button or the space bar, so the fog
- * never stays open on the table screen by accident. Ruler and Reveal toggle, and pressing the
- * one that is on goes back to opening doors with a click. While Reveal is on, a pop-out above it
- * picks uncover or hide, and a box or a circle, for a torch thrown or a spell of light.
+ * The game master's controls in the GM view, at the bottom: the map, the ruler, Reveal area,
+ * Freeze, the fog and full screen. Ruler and Reveal toggle, and pressing the one that is on goes
+ * back to opening doors with a click. While Reveal is on, a pop-out above it picks uncover or
+ * hide, and a box or a circle, for a torch thrown or a spell of light.
  */
 export function PlayDock({
     tool,
     onTool,
     frozen,
     onFreeze,
-    onPeek,
     scenarios,
     activeId,
     onScenario,
@@ -76,32 +71,6 @@ export function PlayDock({
 }: PlayDockProps)
 {
     const { fullscreen, toggle } = useFullscreen();
-
-    useEffect(() =>
-    {
-        const held = (peek: boolean) => (event: KeyboardEvent) =>
-        {
-            if (event.key !== ' ' || event.repeat || typing(event))
-                return;
-
-            event.preventDefault();
-            onPeek(peek);
-        };
-
-        const press = held(true);
-        const release = held(false);
-
-        window.addEventListener('keydown', press);
-        window.addEventListener('keyup', release);
-
-        return () =>
-        {
-            window.removeEventListener('keydown', press);
-            window.removeEventListener('keyup', release);
-            onPeek(false);
-        };
-    }, [onPeek]);
-
     const pick = (next: PlayTool) => onTool(tool === next ? 'open-doors' : next);
     const hiding = tool === 'hide' || tool === 'hide-circle';
     const circle = tool === 'reveal-circle' || tool === 'hide-circle';
@@ -197,18 +166,6 @@ export function PlayDock({
                         </span>
                     )}
                 </span>
-                <button
-                    type="button"
-                    className="ttrpg-segment"
-                    title="Hold to see through the fog (Space)"
-                    onPointerDown={() => onPeek(true)}
-                    onPointerUp={() => onPeek(false)}
-                    onPointerLeave={() => onPeek(false)}
-                    onPointerCancel={() => onPeek(false)}
-                >
-                    <FontAwesomeIcon icon={faEye} />
-                    Peek
-                </button>
             </div>
             {onMonsters && (
                 <div className="ttrpg-dock__group">

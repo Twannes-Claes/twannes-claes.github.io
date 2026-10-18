@@ -118,7 +118,8 @@ export interface MapView
     setDrafts: (drafts: Draft[]) => void;
     /**
      * On a player's phone, their own token: the only one they can draw a path from. Every other
-     * press pans. Null is the game master's screen, where every token answers.
+     * press pans. Null is the game master's screen, where every token answers. An id no token has,
+     * like '', is the Player view on the table screen, where none does.
      */
     setOwn: (id: string | null) => void;
     /** Forgets everything seen before. */
@@ -613,14 +614,15 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             scenario,
             background,
             picture: loaded,
-            // Peeking, the game master sees every monster too.
+            // Peeking, the GM view, the game master sees every monster too, and the fog at half
+            // strength: clear enough to see through, dark enough to tell what the players see.
             tokens: fadeTokens(fogEnabled && !peek ? shown.filter(seenByPlayers) : shown, time),
             editing: !fogEnabled,
             own,
             ownRestedAt,
             motion: !calm.matches,
             fog,
-            fogLook: { fade: !calm.matches, opacity: peek ? 0.3 : 1, settings: fogSettings },
+            fogLook: { fade: !calm.matches, opacity: peek ? 0.5 : 1, settings: fogSettings },
             time,
             // The path's line goes under the tokens, so it never covers the one walking it.
             beneath: () =>

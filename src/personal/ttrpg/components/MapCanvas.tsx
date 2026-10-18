@@ -49,7 +49,7 @@ interface MapCanvasProps
     shared?: SharedFog | null;
     /**
      * Hears what this screen has seen, to share, with forget when the game master hid some. Only
-     * the game master's screen listens.
+     * the GM view and the Player view on the table screen listen, never a phone.
      */
     onExplored?: (fog: SharedFog, forget?: boolean) => void;
     /**

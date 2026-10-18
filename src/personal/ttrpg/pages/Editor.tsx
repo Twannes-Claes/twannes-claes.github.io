@@ -17,10 +17,11 @@ function loadSession()
 }
 
 /**
- * The battle map editor, and its play mode that the game master mirrors to the table screen.
- * The session id is in ?s= rather than the path, because GitHub Pages only serves prerendered
- * paths, see PLAN.md. With ?demo it opens the demo map, kept in this tab only, see
- * services/demo.ts. ?debug adds a frame rate display, for checking the table screen and phones.
+ * The battle map editor, with the GM view the game master runs a session from. The table screen
+ * gets the Player view, see pages/Join.tsx. The session id is in ?s= rather than the path,
+ * because GitHub Pages only serves prerendered paths, see PLAN.md. With ?demo it opens the demo
+ * map, kept in this tab only, see services/demo.ts. ?debug adds a frame rate display, for
+ * checking the table screen and phones.
  */
 export default function Editor()
 {

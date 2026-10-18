@@ -1,4 +1,4 @@
-import { faImage, faRightFromBracket, faSnowflake } from '@fortawesome/free-solid-svg-icons';
+import { faCompress, faExpand, faImage, faRightFromBracket, faSnowflake } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useAuthActions, useAuthToken, useConvexAuth } from '@convex-dev/auth/react';
 import { useConvex, useMutation, useQuery } from 'convex/react';
@@ -20,6 +20,7 @@ import { MapCanvas } from './MapCanvas';
 import { MoveSheet } from './MoveSheet';
 import { Settings } from './Settings';
 import { useMessage } from './useMessage';
+import { useFullscreen, useIdle, useWakeLock } from './useScreen';
 import { useScreenSettings } from './useScreenSettings';
 
 /** Ring colours to start from, the portfolio's accent first. The player can pick any other. */
@@ -29,6 +30,8 @@ interface PlayerViewProps
 {
     /** From ?s=, what the QR code holds. */
     sessionId: string;
+    /** From ?table, the Player view for the table screen. Only the session's host gets it. */
+    table: boolean;
 }
 
 /**
@@ -51,7 +54,7 @@ function Note({ children }: { children: ReactNode })
     return <main className="ttrpg-placeholder">{children}</main>;
 }
 
-function Player({ sessionId }: PlayerViewProps)
+function Player({ sessionId, table }: PlayerViewProps)
 {
     const { isLoading, isAuthenticated } = useConvexAuth();
     const { signIn } = useAuthActions();
@@ -99,6 +102,9 @@ function Player({ sessionId }: PlayerViewProps)
             </Note>
         );
     }
+
+    if (table && status.host)
+        return <Table sessionId={status.sessionId} mine={null} frozen={status.frozen} fogLook={status.fogLook} />;
 
     if (status.kicked)
     {
@@ -242,17 +248,24 @@ function JoinForm({ sessionId, name }: JoinFormProps)
 interface TableProps
 {
     sessionId: Id<'sessions'>;
-    mine: Id<'tokens'>;
+    /** The player's own token, or null on the table screen, which moves nothing. */
+    mine: Id<'tokens'> | null;
     frozen: boolean;
     /** How the GM set the fog to look, null for the default. */
     fogLook: FogSettings | null;
 }
 
-/** The map on the phone: everyone's tokens and the fog, and paths drawn from the player's own token. */
+/**
+ * The map on the phone: everyone's tokens and the fog, and paths drawn from the player's own
+ * token. Without one it is the Player view on the table screen: kept awake, its one button fading
+ * out like the GM view's controls, and it saves what the party saw, so the fog is remembered while
+ * the GM view is in Edit, see saveFog in convex/play.ts.
+ */
 function Table({ sessionId, mine, frozen, fogLook }: TableProps)
 {
+    const onTable = mine === null;
     const scenario = useQuery(api.play.scenario, { sessionId });
-    const tokens = useQuery(api.play.tokens, { sessionId });
+    const tokens = useQuery(api.play.tokens, { sessionId, asPlayer: onTable });
     const fog = useQuery(api.play.fog, { sessionId });
     const ping = useQuery(api.play.ping, { sessionId });
     const drafts = useQuery(api.play.drafts, { sessionId });
@@ -260,12 +273,17 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
     const sendPing = useMutation(api.play.sendPing);
     const leaveTable = useMutation(api.play.leave);
     const draw = useMutation(api.play.draw);
+    const saveFog = useMutation(api.play.saveFog);
     const authToken = useAuthToken();
     const [pending, setPending] = useState<PendingMove | null>(null);
     const message = useMessage();
     const [screen, setScreen] = useScreenSettings();
     const [stats, setStats] = useState<FrameStats | null>(null);
     const [uploading, setUploading] = useState(false);
+    const { fullscreen, toggle } = useFullscreen();
+    const idle = useIdle(screen.hideAfter, onTable && screen.hideAfter > 0);
+
+    useWakeLock(onTable);
 
     if (scenario === undefined || tokens === undefined)
         return <Note><Loading>Opening the map</Loading></Note>;
@@ -280,7 +298,7 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
 
     const confirm = () =>
     {
-        if (!pending)
+        if (!pending || !mine)
             return;
 
         const end = pending.points[pending.points.length - 1];
@@ -332,8 +350,22 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
 
     return (
         <main className="ttrpg-player">
+            {onTable && (
+                <div className={`ttrpg-panel ttrpg-corner${idle ? ' ttrpg-hidden' : ''}`}>
+                    <button
+                        type="button"
+                        className="ttrpg-segment"
+                        aria-label={fullscreen ? 'Leave full screen' : 'Full screen'}
+                        title={fullscreen ? 'Leave full screen' : 'Full screen'}
+                        onClick={toggle}
+                    >
+                        <FontAwesomeIcon icon={fullscreen ? faCompress : faExpand} />
+                    </button>
+                </div>
+            )}
+
             {/* Out of the way of the move sheet, which slides up over the bottom of the screen. */}
-            {!pending && (
+            {!onTable && !pending && (
                 <div className="ttrpg-panel ttrpg-corner">
                     <Settings settings={screen} onChange={setScreen} phone>
                         <section className="ttrpg-shortcuts" aria-label="Your token">
@@ -374,8 +406,11 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
                 pending={pending}
                 frozen={frozen}
                 peek={false}
-                own={mine}
+                // No token is the table screen's, so none moves from it, see setOwn in map/view.ts.
+                own={mine ?? ''}
                 shared={fog ?? null}
+                // A failed save is not said: the next sends everything seen, filling the gap.
+                onExplored={onTable ? (shared) => void saveFog({ sessionId, ...shared }).catch(() => undefined) : undefined}
                 fogSettings={fogLook ?? defaultFogSettings}
                 onPathEnd={setPending}
                 onPathCancel={() => setPending(null)}

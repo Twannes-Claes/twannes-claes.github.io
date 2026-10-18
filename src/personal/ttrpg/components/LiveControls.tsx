@@ -32,7 +32,7 @@ interface LiveControlsProps
     live: Live;
     /** The map the session starts on: the one open in the editor. */
     scenarioId: string;
-    /** Hears that the session started, so the editor can switch to play mode. */
+    /** Hears that the session started, so the editor can switch to the GM view. */
     onStarted: () => void;
     /** Hears what worked, for the editor's toast. */
     onDone: (message: string) => void;
@@ -40,9 +40,9 @@ interface LiveControlsProps
 }
 
 /**
- * Starting and ending a saved session, beside the Edit and Play switch. Start asks for the
- * password players join with; while live, the players at the table and the QR code that leads
- * to the join page.
+ * Starting and ending a saved session, beside the mode switch. Start asks for the password
+ * players join with; while live, the players at the table, with the QR code that leads to the
+ * join page under them.
  */
 export function LiveControls({ live, scenarioId, onStarted, onDone, onError }: LiveControlsProps)
 {
@@ -60,7 +60,7 @@ export function LiveControls({ live, scenarioId, onStarted, onDone, onError }: L
                 {
                     setAsking(false);
                     onStarted();
-                    onDone('The session is live. Show the QR code so players can join.');
+                    onDone('The session is live. The QR code to join is under Players.');
 
                     return '';
                 })
@@ -178,15 +178,6 @@ export function LiveControls({ live, scenarioId, onStarted, onDone, onError }: L
                 <FontAwesomeIcon icon={faUsers} />
                 Players <span className="ttrpg-count">{players.length}</span>
             </button>
-            <button
-                type="button"
-                className="ttrpg-segment"
-                aria-label="Show the QR code to join"
-                title="Show the QR code to join"
-                onClick={() => setShowQr(true)}
-            >
-                <FontAwesomeIcon icon={faQrcode} />
-            </button>
             <button type="button" className="ttrpg-segment" title="End the session for everyone" onClick={end}>
                 <FontAwesomeIcon icon={faStop} />
                 End
@@ -195,13 +186,7 @@ export function LiveControls({ live, scenarioId, onStarted, onDone, onError }: L
             {showPlayers && (
                 <Popover title="Players" className="ttrpg-start" dismissOnOutside onClose={() => setShowPlayers(false)}>
                     {players.length === 0 ? (
-                        <div className="ttrpg-empty">
-                            <p>Nobody has joined yet.</p>
-                            <button type="button" className="ttrpg-segment ttrpg-segment--block" onClick={() => setShowQr(true)}>
-                                <FontAwesomeIcon icon={faQrcode} />
-                                Show the QR code
-                            </button>
-                        </div>
+                        <p className="ttrpg-empty">Nobody has joined yet.</p>
                     ) : (
                         <ul className="ttrpg-rows">
                             {players.map((player) => (
@@ -223,6 +208,11 @@ export function LiveControls({ live, scenarioId, onStarted, onDone, onError }: L
                             ))}
                         </ul>
                     )}
+                    {/* Always here, the only way to the QR code, so late players can join. */}
+                    <button type="button" className="ttrpg-segment ttrpg-segment--block" onClick={() => setShowQr(true)}>
+                        <FontAwesomeIcon icon={faQrcode} />
+                        Show the QR code
+                    </button>
                 </Popover>
             )}
 

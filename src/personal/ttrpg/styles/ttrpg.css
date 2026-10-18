@@ -157,6 +157,7 @@ html:has(.ttrpg) {
     font-size: 0.875rem;
     font-weight: 500;
     white-space: nowrap;
+    text-decoration: none;
     cursor: pointer;
     transition:
         background-color 150ms var(--ttrpg-ease),
@@ -371,6 +372,7 @@ html:has(.ttrpg) {
 }
 
 .ttrpg-segment[aria-pressed='true'],
+.ttrpg-segment[aria-current='true'],
 .ttrpg-icon-button[aria-pressed='true'] {
     background: var(--ttrpg-accent);
     color: var(--ttrpg-ink);
@@ -1890,7 +1892,7 @@ a.ttrpg-row__main:focus-visible {
     border-radius: 50%;
 }
 
-/* A monster the players cannot see, faded like it is on the table screen while peeking. */
+/* A monster the players cannot see, faded in the list. */
 .ttrpg-row--hidden .ttrpg-row__main {
     color: var(--ttrpg-muted);
     font-style: italic;

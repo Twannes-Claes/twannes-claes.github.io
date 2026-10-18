@@ -45,9 +45,8 @@ const shortcuts: { title: string; keys: [string, string][] }[] = [
         ],
     },
     {
-        title: 'Player view',
+        title: 'GM view',
         keys: [
-            ['Space', 'Hold to see through fog'],
             ['Long press', 'Ping a spot for everyone'],
             ['Enter', 'Move along the path'],
             ['Esc', 'Cancel the path'],

@@ -26,7 +26,7 @@ interface MonstersProps
 /**
  * The game master's monsters and NPCs on the map being played, opened from the play dock. Adding
  * one puts it in the middle of the screen, so pan there first; drag it from there. Hidden ones
- * stay off every player's screen and the table screen, except while peeking.
+ * stay off every player's screen and the Player view, and only show in the GM view.
  */
 export function Monsters({ live, at, onClose, onDone, onError }: MonstersProps)
 {

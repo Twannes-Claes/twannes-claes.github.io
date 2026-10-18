@@ -15,8 +15,8 @@ This file is the whole plan. [README.md](README.md) holds the routes and the one
   each (the tavern, the road, the crypt).
 - Each scenario gets a background picture, a square or hex grid, props such as trees and rocks,
   **walls** that block sight and movement, and a **spawn point**.
-- The GM sets a password and presses **Start**. The editor switches to **play mode**, full
-  screen. The GM's screen is mirrored to the big screen on the table. A button shows a big
+- The GM sets a password and presses **Start**. The laptop shows the **GM view**, and the big
+  screen on the table the **Player view**, in a window of its own (see 12). A button shows a big
   **QR code**.
 - Players scan it, type the password, enter a character name and add a picture. Their round
   token appears around the spawn point.
@@ -29,16 +29,15 @@ This file is the whole plan. [README.md](README.md) holds the routes and the one
 
 ## 2. Who uses it, and on what
 
-| Who         | Device                            | Signed in how                 | Can do                                                 |
-| ----------- | --------------------------------- | ----------------------------- | ------------------------------------------------------ |
-| Owner (you) | Any                               | Discord                       | Everything a host can, plus approve other GMs as hosts |
-| Host (a GM) | Laptop, mirrored to the 4K screen | Discord (see 6)               | Edit mode: build sessions. Play mode: run them         |
-| Player      | Phone                             | No account (anonymous, see 6) | Join with the password, move own token, measure        |
+| Who         | Device                    | Signed in how                 | Can do                                                 |
+| ----------- | ------------------------- | ----------------------------- | ------------------------------------------------------ |
+| Owner (you) | Any                       | Discord                       | Everything a host can, plus approve other GMs as hosts |
+| Host (a GM) | Laptop, and the 4K screen | Discord (see 6)               | Edit mode: build sessions. Play mode: run them         |
+| Player      | Phone                     | No account (anonymous, see 6) | Join with the password, move own token, measure        |
 
-There is no separate table app. The 4K screen just mirrors the GM's laptop, and what it shows is
-the editor in **play mode**. Since the players look at that screen, play mode shows the map **as
-the players see it**, fog included. The GM gets a **Peek** toggle (hold a key or button) to see
-through the fog for a moment.
+There is no separate table app. The GM opens the session twice: the laptop shows the **GM view**,
+with every number and control, and the 4K screen the **Player view**, the map **as the players
+see it**, fog included and nothing they may not see. See 12.
 
 ---
 
@@ -85,7 +84,7 @@ on your portfolio.
 - Built for one hand: the controls sit at the bottom, in thumb reach.
 - The Move and Cancel choice is a bottom sheet with two big buttons.
 - Short haptic tick per cell while drawing a path (`navigator.vibrate`, where the phone supports
-  it).
+  it), and fitting haptics for every other player interaction on a phone.
 - The join flow is three short, friendly screens (password, name, picture), not one long form.
 
 ### Motion
@@ -446,7 +445,6 @@ they go to Convex file storage, so a 20 MB PNG becomes a few MB.
 ### Walls (the collider layer)
 
 - Click, click, click to draw a chain of wall segments, double click or Esc to finish.
-- A rectangle tool for rooms.
 - Snaps to grid corners by default, free with Alt.
 - Per wall: blocks sight, blocks movement (a window blocks movement but not sight).
 - An eraser, and a toggle to hide the wall layer while dressing the map.
@@ -541,7 +539,7 @@ Local only, it is not shown to others.
 
 1. In the editor, **Start session**. Set or change the password.
 2. The session goes `live` and the editor switches to play mode, full screen, on the active
-   scenario. The laptop is mirrored to the 4K screen.
+   scenario. The Player view link opens the 4K screen's own window, see 12.
 3. Play mode asks the browser to stay awake (Screen Wake Lock API) and goes full screen
    (Fullscreen API), so the screen does not dim mid-fight.
 4. **Back to edit mode** at any time to fix something mid-session (a forgotten wall). Players
@@ -588,16 +586,132 @@ phones never race for the same cell. NPC tokens belong to their scenario and sta
 
 ---
 
-## 12. Later, not in the first version
+## 12. Next, after the first version
 
-Kept out on purpose so the first version ships. Each is a clean add-on.
+The first version is built. This is what comes after it, agreed after the first sessions on dev.
+Like the rest of the app, the server only sends a screen what it may show: numbers a player may
+not see never reach their phone, the same rule as hidden monsters in 6.
 
-| Feature              | Why later                                                                                   |
-| -------------------- | ------------------------------------------------------------------------------------------- |
-| Initiative tracker   | Turn order, and unlocking movement only for whoever's turn it is (Freeze covers it for now) |
-| Lights               | The `.dd2vtt` light sources, for dark dungeons                                              |
-| Lights, darkvision   | Per token vision ranges and light sources                                                   |
-| Dice, HP, conditions | Most tables already do this on paper or in a character app                                  |
+### 1. GM view and Player view
+
+The 4K screen stops mirroring the laptop. Each gets its own view:
+
+- The top bar reads **Edit | GM view | Player view**.
+- **Player view** is a plain link that opens the session as the players may see it, for the 4K
+  screen in full screen. Being a link, Ctrl+click or a middle click opens it in a window of its
+  own. Fog as the players see it, damage states without numbers, no hidden monsters, no initiative
+  order, no stat blocks, no GM controls.
+- **GM view** is the laptop: play mode with everything. The fog is dimmed, so the GM sees through
+  it and still sees what the players see. Every number, Perception, stat blocks, the initiative
+  order and hidden monsters. Peek goes, the dimmed fog replaces it.
+- **QR code:** gone from the top bar. The Players popover always has a **Show the QR code** button
+  under the list, not only while nobody has joined, so a late player can still scan in.
+
+### 2. Health and stats
+
+- Every token has **HP**, **temp HP** and **AC**: players, summons and monsters. Damage takes temp
+  HP first.
+- Joining asks a player for their HP, AC and passive **Perception** too.
+- The GM view shows every number. A player sees their own and their summons'; of everyone else
+  only the damage state, as an overlay on the token:
+
+| State    | When                |
+| -------- | ------------------- |
+| Unhurt   | Full HP             |
+| Hurt     | Below full          |
+| Bloodied | 50% or less         |
+| Critical | 25% or less         |
+| Down     | 0, a player is down |
+
+A player at 0 is down and stays on the map. Death saves are kept at the table, see Optional.
+
+### 3. Attack and heal
+
+- A player or the GM selects one or more targets, picks **Attack** or **Heal** and enters the
+  amount. The server applies it: a player never sees a monster's HP, only its state change.
+- Players can attack monsters and other players, and heal themselves and other players.
+- Every screen plays a short animation, drawn in code: a slash or flash on the target for an
+  attack, a soft green glow for a heal.
+- A monster brought to 0 plays a death animation instead and disappears from the map.
+- Freeze locks every player's moves and attacks.
+
+### 4. Damage effects
+
+- Badly hurt tokens get a bleeding overlay, and leave a small trail of blood drops as they walk.
+- A killed monster leaves a decal on the ground: blood, a body or loot. Drawn in code for now,
+  decoration only, nothing to pick up.
+- Decals stay until the GM clears them, and Start session clears them all.
+
+### 5. Conditions
+
+- A fixed list, shown as small icons on the token, for players and monsters alike.
+- The GM sets them on anyone. A player only on themselves and their summons.
+
+### 6. Initiative
+
+Built into play mode neatly, it should look and feel good.
+
+1. The GM presses **Start initiative**. Every phone gets a pop-up to enter its roll; the GM enters
+   the rolls of the monsters taking part, hidden ones too.
+2. The order sorts itself and the turns begin.
+3. Only whoever's turn it is moves and attacks, player or monster. Summons act on their owner's
+   turn and are not in the order themselves.
+4. The phone says **Your turn**. The Player view shows whose turn it is with a highlight on the
+   token; a hidden monster's turn only reads as an enemy turn, without giving the token away.
+5. The order itself is only on the GM view.
+6. A turn ends with **End turn** on the phone or **Next** on the GM view, so the GM does not have
+   to. A downed player keeps their turn.
+7. A player who joins mid-fight gets the pop-up and is slotted into the order.
+8. **End initiative** goes back to free movement. Freeze still works on top of it.
+
+### 7. Monster presets
+
+- A stat block template in Markdown: everything a usual stat block has (stats, saves, skills,
+  senses, actions, reactions, legendary actions). What else it needs shows in testing.
+- The GM writes a preset in the app or uploads a `.md` file, and edits it later. Presets live in
+  the GM's library, for all their sessions, like the props.
+- The GM view shows a preset as a neat stat block. Placing one fills in the monster's HP, AC, size
+  and speed from it.
+
+### 8. Summons and companions
+
+- A player makes them from the settings on their phone: a name, a picture, HP and AC.
+- They turn them on and off, or delete them.
+- Not in the initiative order, see 6.
+
+### 9. Polygon reveal
+
+- Reveal's box becomes a polygon; the circle stays.
+- Click the corners. A key held keeps a line at 0, 45 or 90 degrees, like Shift in Photoshop, for
+  clean boxes.
+- Corners snap to walls and grid corners, and clicking the first corner closes the shape.
+
+### 10. Smaller things
+
+- **Reorder scenarios:** drag them in the list, kept in `sessions.order`.
+- **Haptics:** a short tick per cell while a player draws a path, and fitting haptics for every
+  player interaction on a phone, new ones included: the initiative pop-up, Your turn, being hit.
+
+### Build order
+
+1 first, since it splits what the laptop and the 4K screen get, which everything after it relies
+on. Then 2, which 3, 4, 5 and 8 need. 6 needs 3 for attacks per turn. 7, 9 and 10 stand on their
+own and fit in anywhere.
+
+### Optional, for later
+
+| Feature          | What                                                                                      |
+| ---------------- | ----------------------------------------------------------------------------------------- |
+| Death saves      | Tracked for a downed player, instead of at the table                                      |
+| Better decals    | Blood, bodies and loot from art the GM uploads, instead of drawn in code                  |
+| Lights           | The `.dd2vtt` light sources, for dark dungeons                                            |
+| Smaller pictures | Shrink map and prop uploads further, to cut file egress (the bulk of it, not the queries) |
+
+### Dropped
+
+- **Rectangle wall tool.** Chains of walls and the `.dd2vtt` import cover rooms.
+- **Darkvision and vision ranges.** Too much complexity for what it adds.
+- **Dice.** Rolled at the table.
 
 ---
 
@@ -768,15 +882,16 @@ Decided:
   Firebase's Storage and Cloud Functions need the paid Blaze plan, Supabase pauses free projects
   after a week without use.
 - **Image storage:** Convex file storage, 1 GB, pictures as WebP of at most 4096 px.
-- **The 4K screen:** mirrors the GM's laptop, showing the editor in play mode. No separate table
-  app or GM device.
+- **The 4K screen:** the Player view in a window of its own, the laptop the GM view, see 12. No
+  separate table app or GM device. It mirrored the laptop in the first version.
 - **Scenario switch:** every player respawns at the new scenario's spawn point.
 - **Fog:** smoky shadow (never flat black), dimmed for seen before, clear for seen now. Sight is
   unlimited up to walls, with soft blurred edges and a light haze in the distance.
 - **Diagonals:** 5, 10, 5, 10 by default, or 5 each as a grid setting.
 - **Hosts:** fellow GMs can host. They ask from the dashboard, you approve.
 - **Sign in:** Discord only, through Convex Auth. Only GMs sign in, and they all have Discord.
-- **NPCs and monsters:** a name and a picture, round with a border. No HP.
+- **NPCs and monsters:** a name and a picture, round with a border. HP, AC and stat blocks come
+  in 12.
 - **Props:** no built-in set and no AI-made art; game masters upload the art they own.
 - **Route:** `/ttrpg`, one general name for every system.
 

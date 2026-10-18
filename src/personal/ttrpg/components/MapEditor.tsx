@@ -1,6 +1,6 @@
-import { faCheck, faEye, faPen, faSnowflake, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faHatWizard, faPen, faSnowflake, faTriangleExclamation, faTv } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useEffect, useEffectEvent, useRef, useState, type DragEvent } from 'react';
+import { useEffect, useEffectEvent, useRef, useState, type DragEvent, type MouseEvent } from 'react';
 
 import type { FogSettings, Live, PictureBytes, Ping, Point, PropPicture, Scenario, Store } from '../types';
 
@@ -30,7 +30,11 @@ import { useScreenSettings } from './useScreenSettings';
 import { useIdle, useWakeLock } from './useScreen';
 import { WallPanel, type WallKind } from './WallPanel';
 
-type Mode = 'edit' | 'play';
+/**
+ * Both play modes show the map in play. The GM view dims the fog and shows every monster, with
+ * the GM's controls; the Player view shows only what the players may see, see PLAN.md.
+ */
+type Mode = 'edit' | 'gm' | 'players';
 
 /** The map tool behind each kind of the walls tool, see WallPanel. */
 const wallTools: Record<WallKind, ToolId> = { wall: 'walls', ring: 'rings', change: 'doors' };
@@ -114,7 +118,6 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const [pending, setPending] = useState<PendingMove | null>(null);
     const [frozen, setFrozen] = useState(false);
     const [playTool, setPlayTool] = useState<PlayTool>('open-doors');
-    const [peek, setPeek] = useState(false);
     // The one panel open above the play dock.
     const [panel, setPanel] = useState<'monsters' | 'fog' | null>(null);
     // The fog's look: the session's when it is saved, this screen's in the demo. While a slider
@@ -127,13 +130,14 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const viewCenter = useRef<Point | null>(null);
     const [stats, setStats] = useState<FrameStats | null>(null);
     const [screen, setScreen] = useScreenSettings();
-    // The table screen stays on, and the controls step aside once the mouse rests as long as this
+    const playing = mode !== 'edit';
+    // The screen stays on, and the controls step aside once the mouse rests as long as this
     // screen's settings say, unless a move is waiting on its sheet.
-    const idle = useIdle(screen.hideAfter, mode === 'play' && !pending && screen.hideAfter > 0);
+    const idle = useIdle(screen.hideAfter, playing && !pending && screen.hideAfter > 0);
     const showStats = debug || screen.frameRate;
     const unsaved = Boolean(store.save) && scenarios !== saved;
 
-    useWakeLock(mode === 'play');
+    useWakeLock(playing);
 
     // The backgrounds undo and redo can still bring back, so the save keeps their pictures. Read
     // when the save goes, rather than a dependency, so a render alone never delays it.
@@ -307,7 +311,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     // A right click with nothing half done: stop placing a picture, or go back to no tool.
     const putToolAway = () =>
     {
-        if (mode === 'play')
+        if (playing)
             setPlayTool('open-doors');
         else if (placing)
             setPlacing(null);
@@ -352,9 +356,20 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
         setMode(next);
         setPending(null);
 
-        if (next === 'play' && live && live.live && live.activeScenarioId !== active.id)
+        if (next !== 'edit' && live && live.live && live.activeScenarioId !== active.id)
             fail(live.open(active.id));
 
+    };
+
+    // A plain click shows the Player view here. Ctrl, Shift or the middle button leave the link to
+    // the browser, which opens it in a tab or window of its own, for the table screen.
+    const showPlayerView = (event: MouseEvent) =>
+    {
+        if (event.ctrlKey || event.metaKey || event.shiftKey)
+            return;
+
+        event.preventDefault();
+        switchMode('players');
     };
 
     // By id, so an upload that finishes after another map opened still lands on its own map.
@@ -373,7 +388,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
         setTokens(demoTokens(scenario));
         setPending(null);
 
-        if (mode === 'play' && live && live.live)
+        if (playing && live && live.live)
             fail(live.open(scenario.id));
 
     };
@@ -523,14 +538,14 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
             <MapCanvas
                 scenario={active}
                 tokens={shown}
-                mode={mode}
-                tool={mode === 'edit' ? (tool === 'walls' ? wallTools[wallKind] : tool) : playTool}
-                placing={mode === 'edit' ? placing : null}
+                mode={playing ? 'play' : 'edit'}
+                tool={playing ? playTool : tool === 'walls' ? wallTools[wallKind] : tool}
+                placing={playing ? null : placing}
                 wallSnap={wallSnap}
                 fogEpoch={fogEpoch}
                 pending={pending}
                 frozen={isFrozen}
-                peek={mode === 'play' && peek}
+                peek={mode === 'gm'}
                 onTokenMove={moveToken}
                 onPathEnd={setPending}
                 onPathCancel={() => setPending(null)}
@@ -574,22 +589,47 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 <button
                     type="button"
                     className="ttrpg-segment"
-                    aria-pressed={mode === 'play'}
+                    aria-pressed={mode === 'gm'}
                     title={
-                        live && live.live
-                            ? 'Live: what the players see, with your GM controls'
-                            : 'What the players will see, with two test players'
+                        liveMap
+                            ? 'Live: the fog dimmed, every monster, and your GM controls'
+                            : 'Run the map, with two test players'
                     }
-                    onClick={() => switchMode('play')}
+                    onClick={() => switchMode('gm')}
                 >
-                    <FontAwesomeIcon icon={faEye} />
-                    Player view
+                    <FontAwesomeIcon icon={faHatWizard} />
+                    GM view
                 </button>
+                {/* A link for a saved session, so Ctrl+click opens it for the table screen. The
+                    demo lives in this tab only, so it has nothing to open there. */}
+                {live ? (
+                    <a
+                        href={`${live.joinPath}&table`}
+                        className="ttrpg-segment"
+                        aria-current={mode === 'players' ? 'true' : undefined}
+                        title="What the players see. Ctrl+click opens it in a window of its own, for the table screen"
+                        onClick={showPlayerView}
+                    >
+                        <FontAwesomeIcon icon={faTv} />
+                        Player view
+                    </a>
+                ) : (
+                    <button
+                        type="button"
+                        className="ttrpg-segment"
+                        aria-pressed={mode === 'players'}
+                        title="What the players will see"
+                        onClick={() => switchMode('players')}
+                    >
+                        <FontAwesomeIcon icon={faTv} />
+                        Player view
+                    </button>
+                )}
                 {live && (
                     <LiveControls
                         live={live}
                         scenarioId={active.id}
-                        onStarted={() => setMode('play')}
+                        onStarted={() => setMode('gm')}
                         onDone={message.done}
                         onError={message.error}
                     />
@@ -598,7 +638,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
             </div>
 
             <Toasts>
-                {mode === 'play' && isFrozen && (
+                {playing && isFrozen && (
                     <Toast kind="info" icon={faSnowflake}>
                         Movement paused by the GM
                     </Toast>
@@ -612,7 +652,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
             </Toasts>
 
             <MoveSheet
-                move={mode === 'play' ? pending : null}
+                move={playing ? pending : null}
                 token={walker}
                 onMove={confirmMove}
                 onCancel={() => setPending(null)}
@@ -664,7 +704,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                     {store.save && <SaveState unsaved={unsaved} failed={saveFailed} />}
                 </>
             ) : (
-                !pending && (
+                mode === 'gm' && !pending && (
                     <PlayDock
                         tool={playTool}
                         onTool={setPlayTool}
@@ -673,7 +713,6 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                         scenarios={scenarios}
                         activeId={active.id}
                         onScenario={select}
-                        onPeek={setPeek}
                         hidden={idle}
                         onMonsters={liveMap ? () => togglePanel('monsters') : undefined}
                         monstersOpen={panel === 'monsters'}
@@ -683,7 +722,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 )
             )}
 
-            {mode === 'play' && !pending && !idle && panel === 'fog' && (
+            {mode === 'gm' && !pending && !idle && panel === 'fog' && (
                 <FogPanel
                     settings={fogSettings}
                     onChange={setFogDraft}
@@ -694,7 +733,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 />
             )}
 
-            {mode === 'play' && !pending && !idle && liveMap && panel === 'monsters' && (
+            {mode === 'gm' && !pending && !idle && liveMap && panel === 'monsters' && (
                 <Monsters
                     live={liveMap}
                     at={() => viewCenter.current ?? active.spawn}
