@@ -2,11 +2,11 @@ import { faCheck, faHatWizard, faPen, faSnowflake, faTriangleExclamation, faTv }
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useEffectEvent, useRef, useState, type DragEvent, type MouseEvent } from 'react';
 
-import type { FogSettings, HitKind, Live, PictureBytes, Ping, Point, PropPicture, Scenario, SharedHit, Store } from '../types';
+import type { BloodSettings, Decal, FogSettings, HitKind, Live, PictureBytes, Ping, Point, PropPicture, Scenario, SharedHit, Store } from '../types';
 
 import { blankScenario, demoTokens } from '../content/scenarios';
 import { defaultFogSettings } from '../map/fog';
-import { cleanStats, hitOn, withoutNumbers } from '../map/health';
+import { cleanStats, defaultBlood, downedPool, hitOn, withoutNumbers } from '../map/health';
 import { toggleDoor, type ToolId } from '../map/tools';
 import { scenarioFromUvtt } from '../map/uvtt';
 import type { FrameStats, PendingMove } from '../map/view';
@@ -130,6 +130,9 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     // Pings and hits off a live map stay on this screen.
     const [localPing, setLocalPing] = useState<Ping | null>(null);
     const [localHit, setLocalHit] = useState<SharedHit | null>(null);
+    const [localDecals, setLocalDecals] = useState<Decal[]>([]);
+    // Which blood shows: the session's when it is saved, this tab's in the demo.
+    const [demoBlood, setDemoBlood] = useState(defaultBlood);
     // The tokens picked for an attack or a heal, or null when not picking, see HitSheet.
     const [targets, setTargets] = useState<string[] | null>(null);
     const [fogDraft, setFogDraft] = useState<FogSettings | null>(null);
@@ -339,12 +342,20 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const hitHere = (ids: string[], kind: HitKind, amount: number) =>
     {
         const struck = tokens.filter((token) => ids.includes(token.id));
+        const killed = struck.filter((token) => hitOn(token, kind, amount).died);
 
         setLocalHit({
             at: Date.now(),
             kind,
-            targets: struck.map((token) => ({ x: token.x, y: token.y, size: token.size, died: hitOn(token, kind, amount).died })),
+            targets: struck.map((token) => ({ x: token.x, y: token.y, size: token.size, died: killed.includes(token) })),
         });
+        const downed = struck.filter((token) => hitOn(token, kind, amount).downed);
+
+        setLocalDecals((current) => [
+            ...current,
+            ...killed.map(({ x, y, size }) => ({ id: crypto.randomUUID(), x, y, size })),
+            ...downed.map(({ x, y, size }) => ({ id: crypto.randomUUID(), x, y, size, scale: downedPool })),
+        ]);
         setTokens((current) =>
             current.flatMap((token) =>
             {
@@ -353,6 +364,27 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 return died ? [] : [{ ...token, ...after }];
             }),
         );
+    };
+
+    const decals = liveMap ? liveMap.decals : localDecals;
+    const blood = live ? (live.blood ?? defaultBlood) : demoBlood;
+
+    const setBlood = (change: Partial<BloodSettings>) =>
+    {
+        if (live)
+            fail(live.setBlood({ ...blood, ...change }));
+        else
+            setDemoBlood({ ...blood, ...change });
+
+    };
+
+    const clearDecals = () =>
+    {
+        if (liveMap)
+            fail(liveMap.clearDecals());
+        else
+            setLocalDecals([]);
+
     };
 
     const dealHit = (kind: HitKind, amount: number) =>
@@ -456,11 +488,20 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
     const changeScenario = (next: Scenario, merge = false) => updateScenario(next.id, () => next, merge);
 
-    // Every player starts over at the spawn point of the scenario that opens, see PLAN.md.
+    // Every player starts over at the spawn point of the scenario that opens, see PLAN.md, but
+    // keeps their numbers, as respawn in convex/play.ts does live.
     const open = (scenario: Scenario) =>
     {
         setActiveId(scenario.id);
-        setTokens(demoTokens(scenario));
+        setTokens((current) =>
+            demoTokens(scenario).map((token) =>
+            {
+                const was = current.find((other) => other.id === token.id);
+
+                return was && token.kind === 'player' ? { ...was, x: token.x, y: token.y, path: undefined, movedAt: undefined } : token;
+            }),
+        );
+        setLocalDecals([]);
         setPending(null);
         setTargets(null);
 
@@ -647,6 +688,8 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 // Only the demo has no session, see credit in MapCanvas.tsx.
                 credit={!live}
                 hit={liveMap ? liveMap.lastHit : localHit}
+                decals={decals}
+                blood={blood}
                 targets={targets}
                 onTarget={pickTarget}
             />
@@ -733,7 +776,36 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                         hidden={idle}
                     />
                 )}
-                <Settings settings={screen} onChange={setScreen} hidden={idle} />
+                <Settings
+                    settings={screen}
+                    onChange={setScreen}
+                    hidden={idle}
+                    table={
+                        <section className="ttrpg-shortcuts" aria-label="Blood">
+                            <h3 className="ttrpg-subhead">Blood</h3>
+                            <div className="ttrpg-settings__choices">
+                                <button
+                                    type="button"
+                                    className="ttrpg-segment"
+                                    aria-pressed={blood.ground}
+                                    title="Trails behind badly hurt tokens, and a pool where a monster falls"
+                                    onClick={() => setBlood({ ground: !blood.ground })}
+                                >
+                                    On the ground
+                                </button>
+                                <button
+                                    type="button"
+                                    className="ttrpg-segment"
+                                    aria-pressed={blood.wounds}
+                                    title="Red rising in a hurt token, and drips once it is bloodied"
+                                    onClick={() => setBlood({ wounds: !blood.wounds })}
+                                >
+                                    On tokens
+                                </button>
+                            </div>
+                        </section>
+                    }
+                />
             </div>
 
             <Toasts>
@@ -828,6 +900,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                         onFog={() => togglePanel('fog')}
                         fogOpen={panel === 'fog'}
                         onAttack={startTargets}
+                        onClearDecals={blood.ground && decals.length > 0 ? clearDecals : undefined}
                     />
                 )
             )}

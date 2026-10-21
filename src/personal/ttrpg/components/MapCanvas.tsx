@@ -1,15 +1,17 @@
 import { useEffect, useEffectEvent, useRef } from 'react';
 
-import type { Draft, FogSettings, Mark, Ping, Point, PropPicture, Scenario, SharedFog, SharedHit, SharedMark, Token } from '../types';
+import type { BloodSettings, Decal, Draft, FogSettings, Mark, Ping, Point, PropPicture, Scenario, SharedFog, SharedHit, SharedMark, Token } from '../types';
 
 import { demoCredit, demoScenario } from '../content/scenarios';
 import { defaultFogSettings } from '../map/fog';
+import { defaultBlood } from '../map/health';
 import type { ToolId } from '../map/tools';
 import { createMapView, type FrameStats, type MapView, type PendingMove } from '../map/view';
 
 /** One empty list for screens without drafts, so its effect does not run on every render. */
 const noDrafts: Draft[] = [];
 const noMarks: SharedMark[] = [];
+const noDecals: Decal[] = [];
 
 interface MapCanvasProps
 {
@@ -80,6 +82,10 @@ interface MapCanvasProps
     targets?: string[] | null;
     /** Hears a token pressed while picking targets. */
     onTarget?: (id: string) => void;
+    /** What killed monsters left on the map, see Decal. */
+    decals?: Decal[];
+    /** Which blood shows, see BloodSettings. */
+    blood?: BloodSettings;
 }
 
 /**
@@ -120,6 +126,8 @@ export function MapCanvas({
     hit,
     targets = null,
     onTarget,
+    decals = noDecals,
+    blood = defaultBlood,
 }: MapCanvasProps)
 {
     const canvas = useRef<HTMLCanvasElement>(null);
@@ -260,6 +268,17 @@ export function MapCanvas({
     {
         view.current?.setTargets(targets);
     }, [targets]);
+
+    useEffect(() =>
+    {
+        view.current?.setBlood(blood);
+    }, [blood]);
+
+    // Again for another map, which drops the old map's decals, see setScenario in map/view.ts.
+    useEffect(() =>
+    {
+        view.current?.setDecals(decals);
+    }, [decals, scenario.id]);
 
     useEffect(() =>
     {

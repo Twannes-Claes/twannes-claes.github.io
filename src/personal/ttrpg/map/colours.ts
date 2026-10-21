@@ -20,6 +20,8 @@ export const heal = '#6fcf8e';
 export const shield = '#3f7fd0';
 /** A path past the token's speed. */
 export const tooFar = '#b4443c';
+/** Dark and a little brown, as blood looks on the ground. */
+export const blood = '#7a1016';
 
 /** One of the colours above see-through, as eight-digit hex, which every canvas reads. */
 export function faded(colour: string, alpha: number): string

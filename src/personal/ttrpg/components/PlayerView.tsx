@@ -10,11 +10,12 @@ import { useAuthActions, useAuthToken, useConvexAuth } from '@convex-dev/auth/re
 import { useConvex, useMutation, useQuery } from 'convex/react';
 import { useActionState, useEffect, useState, type ReactNode } from 'react';
 
-import type { FogSettings, HitKind, Scenario } from '../types';
+import type { BloodSettings, FogSettings, HitKind, Scenario } from '../types';
 
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
 import { defaultFogSettings } from '../map/fog';
+import { defaultBlood } from '../map/health';
 import type { FrameStats, PendingMove } from '../map/view';
 import { confirmAction } from '../services/confirm';
 import { explain, uploadAvatar } from '../services/backend';
@@ -114,7 +115,7 @@ function Player({ sessionId, table }: PlayerViewProps)
     }
 
     if (table && status.host)
-        return <Table sessionId={status.sessionId} mine={null} frozen={status.frozen} fogLook={status.fogLook} />;
+        return <Table sessionId={status.sessionId} mine={null} frozen={status.frozen} fogLook={status.fogLook} blood={status.blood} />;
 
     if (status.kicked)
     {
@@ -129,7 +130,7 @@ function Player({ sessionId, table }: PlayerViewProps)
     if (!status.mine)
         return <JoinForm sessionId={status.sessionId} name={status.name} />;
 
-    return <Table sessionId={status.sessionId} mine={status.mine} frozen={status.frozen} fogLook={status.fogLook} />;
+    return <Table sessionId={status.sessionId} mine={status.mine} frozen={status.frozen} fogLook={status.fogLook} blood={status.blood} />;
 }
 
 interface JoinFormProps
@@ -281,6 +282,8 @@ interface TableProps
     frozen: boolean;
     /** How the GM set the fog to look, null for the default. */
     fogLook: FogSettings | null;
+    /** Which blood the GM lets show, null for all of it. */
+    blood: BloodSettings | null;
 }
 
 /**
@@ -290,7 +293,7 @@ interface TableProps
  * fade out like the GM view's controls, and it saves what the party saw, so the fog is remembered
  * while the GM view is in Edit, see saveFog in convex/play.ts.
  */
-function Table({ sessionId, mine, frozen, fogLook }: TableProps)
+function Table({ sessionId, mine, frozen, fogLook, blood }: TableProps)
 {
     const onTable = mine === null;
     // What a press does with no ruler on: open doors on the table screen, as in the editor, or on
@@ -301,6 +304,7 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
     const fog = useQuery(api.play.fog, { sessionId });
     const ping = useQuery(api.play.ping, { sessionId });
     const lastHit = useQuery(api.play.lastHit, { sessionId, asPlayer: onTable });
+    const decals = useQuery(api.play.decals, { sessionId, asPlayer: onTable });
     const hit = useMutation(api.play.hit);
     // The tokens picked for an attack or a heal, or null when not picking, see HitSheet.
     const [targets, setTargets] = useState<string[] | null>(null);
@@ -536,6 +540,8 @@ function Table({ sessionId, mine, frozen, fogLook }: TableProps)
                 // A right click with nothing half done puts the ruler away, as in the editor.
                 onToolCancel={() => (targets ? setTargets(null) : setTool(resting))}
                 hit={lastHit}
+                decals={decals}
+                blood={blood ?? defaultBlood}
                 targets={targets}
                 onTarget={pickTarget}
                 onStats={screen.frameRate ? setStats : undefined}

@@ -17,7 +17,7 @@ import {
     snapPoint,
     wrapOffset,
 } from './grid.ts';
-import { applyHit, cleanStats, healthState, withoutNumbers } from './health.ts';
+import { applyHit, cleanStats, healthState, hitOn, withoutNumbers } from './health.ts';
 import { extendPath, pathBlocked, pathFeet } from './path.ts';
 import { placedSize, propAt, snapCenter, snapSize } from './props.ts';
 import { anchorAt, footprint, footprintCenter } from './size.ts';
@@ -635,3 +635,8 @@ assert.deepEqual(applyHit({ hp: 20, maxHp: 30, tempHp: 5 }, 'attack', 8), { hp: 
 assert.deepEqual(applyHit({ hp: 20, maxHp: 30, tempHp: 5 }, 'attack', 3), { hp: 20, tempHp: 2 });
 assert.deepEqual(applyHit({ hp: 4, maxHp: 30 }, 'attack', 50), { hp: 0, tempHp: 0 });
 assert.deepEqual(applyHit({ hp: 25, maxHp: 30, tempHp: 2 }, 'heal', 10), { hp: 30, tempHp: 2 });
+
+// A player brought to 0 goes down once, not again while there; a monster dies instead.
+assert.equal(hitOn({ kind: 'player', hp: 5, maxHp: 30 }, 'attack', 9).downed, true);
+assert.equal(hitOn({ kind: 'player', hp: 0, maxHp: 30 }, 'attack', 9).downed, false);
+assert.deepEqual(hitOn({ kind: 'npc', hp: 5, maxHp: 30 }, 'attack', 9), { after: { hp: 0, tempHp: 0 }, died: true, downed: false });

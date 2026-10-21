@@ -665,9 +665,29 @@ A player at 0 is down and stays on the map. Death saves are kept at the table, s
 ### 4. Damage effects
 
 - Badly hurt tokens get a bleeding overlay, and leave a small trail of blood drops as they walk.
-- A killed monster leaves a decal on the ground: blood, a body or loot. Drawn in code for now,
-  decoration only, nothing to pick up.
+- A killed monster leaves a pool of blood on the ground. Decoration only, nothing to pick up.
+  Only blood is drawn in code: bodies or loot would clash with the maps' art, see Better decals.
 - Decals stay until the GM clears them, and Start session clears them all.
+- Both are optional: the GM turns blood on the ground and blood on tokens off apart, for the table.
+- **Built.**
+    - **On tokens:** a bloodied token has two drips running down its picture, a critical one three,
+      over the red that rises as it gets hurt.
+    - **Trails:** a bloodied token walking leaves uneven drops with specks around them, a critical
+      one closer together and bigger. A downed body moved by the GM leaves a smear: live on the
+      GM's screen, and from where it lay to where it was put down on every other, which only sees
+      it arrive. They fade after half a minute. Every screen draws them itself from the token's
+      state, so they cost no writes, and a monster out of the players' sight leaves none on their
+      screens.
+    - **Pools:** a monster killed by `play.hit` leaves a row in `decals`, a pool of blood shaped by
+      its id. A player going down leaves one too, wider so it shows around their token, which
+      stays once they are healed (`downed` from `hitOn` in `map/health.ts`). A new pool spreads out
+      fast and settles, like spilt liquid. Players only get the pools of monsters they saw die.
+    - **Clearing:** the broom in the GM view's dock fades out the pools of the map being played
+      (`play.clearDecals`), and Start clears every map.
+    - **Settings:** the GM's gear has two tabs, **Editor** for this screen and **Table** for every
+      screen. Table has **Blood**: On the ground (trails and pools) and On tokens (the red and the
+      drips), saved on the session (`play.setBlood`) so every screen follows.
+    - The demo keeps its pools and switches in the tab.
 
 ### 5. Conditions
 
@@ -690,6 +710,10 @@ Built into play mode neatly, it should look and feel good.
    to. A downed player keeps their turn.
 7. A player who joins mid-fight gets the pop-up and is slotted into the order.
 8. **End initiative** goes back to free movement. Freeze still works on top of it.
+9. In a Pathfinder session (see 11) the roll pop-up reminds the player that initiative is usually
+   their Perception, as it is easy to forget.
+10. **Up next**, a session setting: the phone of whoever comes after the current turn says so, as a
+    heads-up to plan their turn.
 
 ### 7. Monster presets
 
@@ -699,6 +723,10 @@ Built into play mode neatly, it should look and feel good.
   the GM's library, for all their sessions, like the props.
 - The GM view shows a preset as a neat stat block. Placing one fills in the monster's HP, AC, size
   and speed from it.
+- **Goes down at 0**, a switch on the preset and on the Monsters form: at 0 HP the monster or NPC
+  is down like a player (skull, lying in a pool of blood, healable) instead of dying and leaving
+  the map. Off by default, so monsters still die. For an NPC the party wants to save, or a foe to
+  question.
 
 ### 8. Summons and companions
 
@@ -724,15 +752,80 @@ Built into play mode neatly, it should look and feel good.
   person in `marks` (`play.mark`, `play.marks`), at most every 150 ms, gone when let go or after a
   minute without a change. A ruler drawn in the Player view's own window stays on it, as that
   window runs as the host and would get it back as the GM's. Cones, lines and cubes can join the
-  pop-out the same way.
+  pop-out the same way, see 16.
 - **The demo map's credit** shows on the public demo only, which its licence asks for; sessions
   are played in private and show the map alone.
+
+### 11. Game system
+
+- Each session has a system, picked when it is made and changeable later: **5e**, **Pathfinder
+  2e** or **Other**.
+- It only changes the few things the games do differently: the cone's shape (16) and the
+  initiative hint (6). The rest of the app stays the same for every system.
+
+### 12. Props the GM can move
+
+- A prop can be marked **Movable** in Edit, like a cart. In the GM view the GM drags movable props
+  only, so a click on a barrel never moves it by accident.
+- A move is saved to the map like an edit in Edit: it stays there next session, and undo works.
+  Every screen sees it once it is saved.
+
+### 13. The GM's right-click menu
+
+- In the GM view only, never on phones: a right click on a token opens a small menu with what the
+  GM does to it most. Hide or show, its numbers, its size, remove. Conditions (5) join it later.
+- It replaces digging through the Players and Monsters lists for one token. Those lists stay.
+
+### 14. Monster staging
+
+- Monsters are placed in **Edit**, while preparing the map, and saved with it: on the map, or on a
+  **tray** beside the map, off the grid, that only the GM view shows.
+- They start hidden. The GM drags one from the tray onto the map, or shows one already on it, when
+  it is needed. The right-click menu (13) hides one again.
+- Monster presets (7) are what the tray is filled from.
+- What a monster killed in one session is at the next Start shows in testing.
+
+### 15. Session drawings
+
+- A **Draw** tool next to the Ruler, for the GM and for players: freehand lines in their ring
+  colour or the GM's, for a trap someone found, a plan, an arrow.
+- Every screen sees every drawing, live, like a ruler.
+- An **eraser** in the same pop-out: a player erases only their own drawings, the GM any of them.
+- Never saved with the map: **End session** clears them all.
+
+### 16. Cone ruler
+
+- **Cone** joins Line and Circle in the ruler's pop-out, dragged from where it starts out to how far
+  it reaches.
+- Its shape follows the session's system (11): in 5e a cone as wide as it is long, in Pathfinder 2e
+  the quarter circle of cells the rules use. Other draws the 5e one.
+
+### 17. Group checks
+
+- The GM writes what to roll and why, like "Reflex save, the floor gives way", and sends it to
+  everyone.
+- Every phone gets a pop-up with that text and one field for a number, the same pop-up as the
+  initiative roll (6), so they are built together.
+- The GM view lists who rolled what, and who is still missing. Only the GM sees the numbers. The GM
+  closes the check when it is done.
+
+### 18. Music
+
+- The GM keeps a list of **YouTube links** with a name each, in their library for all sessions,
+  like the props. Only the link is stored, never the audio.
+- A music button in the GM view's dock opens the list: play one, switch to another, loop and
+  volume, with the YouTube player embedded in the panel.
+- It plays from the GM's laptop, in the editor's tab, so it keeps playing in Edit too.
 
 ### Build order
 
 1 first, since it splits what the GM sees from what the players see, which everything after it
 relies on. Then 2, which 3, 4, 5 and 8 need. 6 needs 3 for attacks per turn. 7, 9 and 10 stand on their
 own and fit in anywhere.
+
+11 goes before 16 and the initiative hint in 6. 13 and 14 go together, as 14 hides and shows from
+13's menu, and 7 fills 14's tray. 17 is built with 6, which shares its pop-up. 12, 15 and 18 stand
+on their own.
 
 ### Optional, for later
 
@@ -742,12 +835,13 @@ own and fit in anywhere.
 | Better decals    | Blood, bodies and loot from art the GM uploads, instead of drawn in code                  |
 | Lights           | The `.dd2vtt` light sources, for dark dungeons                                            |
 | Smaller pictures | Shrink map and prop uploads further, to cut file egress (the bulk of it, not the queries) |
+| Dice             | A dice roller on the phones, for tables that do not roll at the table                     |
+| Spell effects    | After a ruler area is drawn, pick an element and it plays there on every screen, in code  |
 
 ### Dropped
 
 - **Rectangle wall tool.** Chains of walls and the `.dd2vtt` import cover rooms.
 - **Darkvision and vision ranges.** Too much complexity for what it adds.
-- **Dice.** Rolled at the table.
 
 ---
 

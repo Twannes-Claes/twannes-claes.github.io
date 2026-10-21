@@ -188,6 +188,14 @@ export const remove = mutation({
         for (const draft of drafts)
             await ctx.db.delete('drafts', draft._id);
 
+        const decals = await ctx.db
+            .query('decals')
+            .withIndex('by_sessionId_and_scenarioId', (q) => q.eq('sessionId', sessionId))
+            .take(200);
+
+        for (const decal of decals)
+            await ctx.db.delete('decals', decal._id);
+
         await ctx.db.delete('sessions', sessionId);
 
         return null;

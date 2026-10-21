@@ -1,4 +1,4 @@
-import type { Cell, Draft, FogSettings, Mark, Point, PropPicture, Scenario, SharedFog, SharedHit, SharedMark, Token } from '../types';
+import type { BloodSettings, Cell, CreatureSize, Decal, Draft, FogSettings, Mark, Point, PropPicture, Scenario, SharedFog, SharedHit, SharedMark, Token } from '../types';
 
 import { centerOn, fitCamera, panBy, toWorld, zoomAt, type Camera } from './camera.ts';
 import {
@@ -18,6 +18,7 @@ import {
 } from './fog.ts';
 import { accent, ground, highlight, tooFar } from './colours.ts';
 import { distance, midpoint, onMap } from './geometry.ts';
+import { defaultBlood, stateOf } from './health.ts';
 import { extendPath, lineFeet, pathBlocked, pathFeet } from './path.ts';
 import {
     drawHealth,
@@ -29,6 +30,7 @@ import {
     drawUnknownStep,
     render,
     tokenRadius,
+    type Drop,
     type HitEffect,
     type Lifted,
     type Scene,
@@ -62,6 +64,19 @@ const hitLife = 900;
 const arrivalSlack = 2000;
 /** At most this often a path being drawn goes to the server, so a fast drag sends a few updates, not one per cell. */
 const draftGap = 150;
+/**
+ * A badly hurt token walking leaves a drop of blood about every this many cells. Each lasts
+ * dropLife, fading over the last dropFade, and a screen keeps at most maxDrops.
+ */
+const dropGap = 0.45;
+const dropLife = 30 * 1000;
+const dropFade = 8 * 1000;
+const maxDrops = 400;
+/** A downed body moved leaves a smear: a drop about every this many cells, so they run together. */
+const smearGap = 0.15;
+/** How long a new pool of blood takes to spread out, and a cleared one to fade. */
+const decalSpread = 2500;
+const decalFade = 1200;
 
 /** A path a player drew and let go of, waiting for Move or Cancel. */
 export interface PendingMove
@@ -143,6 +158,10 @@ export interface MapView
      * not. While picking, a press on a token goes to onTarget rather than moving it.
      */
     setTargets: (ids: string[] | null) => void;
+    /** What killed monsters left on the map, see Decal. */
+    setDecals: (decals: Decal[]) => void;
+    /** Which blood shows, see BloodSettings. */
+    setBlood: (blood: BloodSettings) => void;
     /** Other screens' paths, drawn faintly in their token's colour, see Draft. */
     setDrafts: (drafts: Draft[]) => void;
     /** Other screens' rulers and areas, in their player's colour, see Mark. */
@@ -253,6 +272,13 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     let hits: (HitEffect & { start: number })[] = [];
     /** The tokens picked as targets, or null when not picking, see setTargets. */
     let targets: string[] | null = null;
+    /** The decals, with since when each shows, and the cleared ones, with since when they fade. */
+    let decals: (Decal & { at: number })[] = [];
+    let clearedDecals: (Decal & { at: number })[] = [];
+    /** The blood badly hurt tokens left as they moved, with when, and where each left its last. */
+    let drops: (Drop & { start: number })[] = [];
+    const lastDrop = new Map<string, Point>();
+    let blood = defaultBlood;
     /** When the phone's own token last stopped walking, for its ring, see drawPulse in map/render.ts. */
     let ownRestedAt = performance.now();
     /** Other screens' paths, see setDrafts. */
@@ -616,6 +642,67 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         Object.assign(stats, { since: time, frames: 0, spent: 0, worst: 0 });
     };
 
+    /**
+     * One drop of blood at a token: scattered over its lower half as if dripping off it, bigger
+     * when it is critical. A smear, from a downed body being moved, is bigger still and closer
+     * under it, so the drops run together into a streak.
+     */
+    const bleed = (at: Point, size: CreatureSize, time: number, heavy: boolean, smear: boolean) =>
+    {
+        if (!scenario)
+            return;
+
+        const radius = tokenRadius(scenario.grid, size);
+        const spot = Math.random() * Math.PI;
+        const reach = radius * (smear ? 0.25 : 0.5) * Math.random();
+
+        drops.push({
+            x: at.x + Math.cos(spot) * reach,
+            y: at.y + Math.sin(spot) * reach,
+            radius: radius * (smear ? 0.13 : heavy ? 0.08 : 0.06) * (0.8 + Math.random() * 0.4),
+            seed: Math.random(),
+            alpha: 1,
+            start: time,
+        });
+        drops = drops.slice(-maxDrops);
+    };
+
+    /**
+     * Blood behind every badly hurt token walking where this screen shows it, so a monster out of
+     * the players' sight leaves no trail on their screens, and a smear behind a downed body the
+     * game master drags or walks here. Old drops go.
+     */
+    const layDrops = (visible: Lifted[], time: number) =>
+    {
+        drops = blood.ground ? drops.filter((drop) => time - drop.start < dropLife) : [];
+
+        if (!scenario || !blood.ground)
+            return;
+
+        for (const token of visible)
+        {
+            const moving = walks.has(token.id) || dragging?.id === token.id;
+            const state = moving ? stateOf(token) : undefined;
+
+            if (state !== 'bloodied' && state !== 'critical' && state !== 'down')
+            {
+                lastDrop.delete(token.id);
+                continue;
+            }
+
+            // Critical bleeds harder: drops closer together. A body smears, closer still.
+            const smear = state === 'down';
+            const gap = smear ? smearGap : dropGap * (state === 'critical' ? 0.6 : 1);
+            const last = lastDrop.get(token.id);
+
+            if (last && distance(last, token) < scenario.grid.size * gap)
+                continue;
+
+            lastDrop.set(token.id, { x: token.x, y: token.y });
+            bleed(token, token.size, time, state === 'critical', smear);
+        }
+    };
+
     const draw = (time: number) =>
     {
         frame = 0;
@@ -628,8 +715,29 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         // The fog or a token still fading in or out.
         pings = pings.filter((ping) => time - ping.start < pingLife);
         hits = hits.filter((hit) => time - hit.start < hitLife);
+        clearedDecals = calm.matches ? [] : clearedDecals.filter((decal) => time - decal.at < decalFade);
 
-        const settling = fading.size > 0 || pings.length > 0 || hits.length > 0 || (layers !== null && time - layers.changedAt < fogSettings.fade);
+        // A new pool spreads out fast and settles, like spilt liquid, its colour there well before
+        // its size. A cleared one fades softly. Reduced motion shows and clears them at once.
+        const progress = (at: number, length: number) => (calm.matches ? 1 : Math.min(1, (time - at) / length));
+        const easeOut = (step: number) => 1 - (1 - step) ** 3;
+        const shownDecals = [
+            ...decals.map((decal) =>
+            {
+                const spread = progress(decal.at, decalSpread);
+
+                return { ...decal, alpha: easeOut(Math.min(1, spread * 3)), scale: (decal.scale ?? 1) * (0.3 + 0.7 * easeOut(spread)) };
+            }),
+            ...clearedDecals.map((decal) =>
+            {
+                const gone = progress(decal.at, decalFade);
+
+                return { ...decal, alpha: 1 - gone * gone * (3 - 2 * gone) };
+            }),
+        ];
+        const decalsMoving = blood.ground && (clearedDecals.length > 0 || decals.some((decal) => progress(decal.at, decalSpread) < 1));
+        const settling =
+            fading.size > 0 || pings.length > 0 || hits.length > 0 || decalsMoving || (layers !== null && time - layers.changedAt < fogSettings.fade);
 
         // Only the smoke is moving: skip frames until its own rate comes round.
         if (!urgent && !walking && !settling && time - drawnAt < 1000 / smokeFps)
@@ -683,6 +791,9 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         // Peeking, the GM view, the game master sees every monster too, and the fog at half
         // strength: clear enough to see through, dark enough to tell what the players see.
         const visible = fogEnabled && !peek ? shown.filter(seenByPlayers) : shown;
+
+        layDrops(visible, time);
+
         const scene: Scene = {
             scenario,
             background,
@@ -695,6 +806,9 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             fog,
             fogLook: { fade: !calm.matches, opacity: peek ? 0.5 : 1, settings: fogSettings },
             time,
+            decals: blood.ground ? shownDecals : [],
+            wounds: blood.wounds,
+            drops: drops.map((drop) => ({ ...drop, alpha: Math.min(1, (dropLife - (time - drop.start)) / dropFade) })),
             // The path's line goes under the tokens, so it never covers the one walking it.
             beneath: () =>
             {
@@ -764,7 +878,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         // the next frame. Reduced motion keeps the smoke still and skips the fades; a walk still
         // plays. Only once: the fog refreshed above may already have asked, and two would draw
         // every frame twice.
-        if ((walking || fading.size > 0 || pings.length > 0 || hits.length > 0 || (fog && !calm.matches)) && frame === 0)
+        if ((walking || fading.size > 0 || pings.length > 0 || hits.length > 0 || decalsMoving || (fog && !calm.matches)) && frame === 0)
             frame = requestAnimationFrame(draw);
 
         measure(time, performance.now() - started);
@@ -1387,6 +1501,11 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
                 // The new map's tokens fade in, the old map's do not fade out over it.
                 lastShown = new Map();
                 fading.clear();
+                drops = [];
+                lastDrop.clear();
+                // The old map's blood does not fade out over this one.
+                decals = [];
+                clearedDecals = [];
                 clearTimeout(exploredTimer);
             }
 
@@ -1420,6 +1539,32 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
                 if (previous || Date.now() - token.movedAt < walk.duration + arrivalSlack)
                     walks.set(token.id, walk);
 
+            }
+
+            // A downed body dragged on another screen arrives here without a path, put straight
+            // down: it smears from where it lay to where it is now. The screen that dragged it laid
+            // its smear as it went, and has it there already, so it adds none.
+            if (scenario && blood.ground)
+            {
+                const now = performance.now();
+                const step = scenario.grid.size * smearGap;
+
+                for (const token of next)
+                {
+                    const previous = before.get(token.id);
+
+                    if (!previous || walks.has(token.id) || dragging?.id === token.id || stateOf(token) !== 'down')
+                        continue;
+
+                    const length = distance(previous, token);
+
+                    for (let along = 0; along < length; along += step)
+                    {
+                        const share = along / length;
+
+                        bleed({ x: previous.x + (token.x - previous.x) * share, y: previous.y + (token.y - previous.y) * share }, token.size, now, false, true);
+                    }
+                }
             }
 
             // A token in mid drag keeps following the finger rather than jumping back.
@@ -1486,6 +1631,24 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         setTargets: (ids) =>
         {
             targets = ids;
+            redraw();
+        },
+        setBlood: (next) =>
+        {
+            blood = next;
+            redraw();
+        },
+        setDecals: (next) =>
+        {
+            const now = performance.now();
+            const since = new Map(decals.map((decal) => [decal.id, decal.at]));
+            const kept = new Set(next.map((decal) => decal.id));
+
+            clearedDecals = [
+                ...clearedDecals.filter((decal) => !kept.has(decal.id)),
+                ...decals.filter((decal) => !kept.has(decal.id)).map((decal) => ({ ...decal, at: now })),
+            ];
+            decals = next.map((decal) => ({ ...decal, at: since.get(decal.id) ?? now }));
             redraw();
         },
         setPeek: (next) =>

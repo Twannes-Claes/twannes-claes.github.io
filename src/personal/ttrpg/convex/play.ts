@@ -1,9 +1,9 @@
 import { getAuthUserId } from '@convex-dev/auth/server';
 import { ConvexError, v } from 'convex/values';
 
-import type { Draft, Point, Scenario, SharedHit, SharedMark, Token } from '../types';
+import type { Decal, Draft, Point, Scenario, SharedHit, SharedMark, Token } from '../types';
 import { distance } from '../map/geometry';
-import { cleanStats, hitOn, withoutNumbers } from '../map/health';
+import { cleanStats, downedPool, hitOn, withoutNumbers } from '../map/health';
 import { pathBlocked } from '../map/path';
 import { anchorAt, footprintCenter, footprintKeys } from '../map/size';
 import { spawnCells } from '../map/spawn';
@@ -13,7 +13,7 @@ import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireSession, requireUser } from './access';
-import { fogSettingsValidator, sizeValidator } from './schema';
+import { bloodSettingsValidator, fogSettingsValidator, sizeValidator } from './schema';
 import { refreshSight, tokensOf, tokensOn } from './sight';
 import { dropFile } from './usage';
 import { storedPicture } from './pictures';
@@ -185,6 +185,7 @@ export const status = query({
             mine: mine ? mine._id : null,
             kicked: session.kicked?.includes(userId) === true,
             fogLook: session.fogLook ?? null,
+            blood: session.blood ?? null,
             password: host ? (session.password ?? '') : null,
         };
     },
@@ -573,6 +574,10 @@ export const start = mutation({
         for (const doc of seen)
             await forgetFog(ctx, doc);
 
+        // Every map starts clean, the blood of the last night mopped up.
+        for (const doc of await decalsOf(ctx, sessionId))
+            await ctx.db.delete('decals', doc._id);
+
         return null;
     },
 });
@@ -888,6 +893,18 @@ export const setFogLook = mutation({
     },
 });
 
+/** The host sets which blood every screen at the table shows. */
+export const setBlood = mutation({
+    args: { sessionId: v.id('sessions'), blood: bloodSettingsValidator },
+    handler: async (ctx, { sessionId, blood }) =>
+    {
+        await requireSession(ctx, sessionId);
+        await ctx.db.patch('sessions', sessionId, { blood });
+
+        return null;
+    },
+});
+
 /**
  * The host ends the session: phones say so, and the players leave the table with their tokens and
  * pictures, so the next start begins with nobody there. Monsters stay, they belong to the maps.
@@ -1008,6 +1025,57 @@ export const sendPing = mutation({
 
 /** The most tokens one attack or heal reaches, a whole party and then some. */
 const maxTargets = 20;
+/** Decals a session keeps, more than a night of fighting leaves. Past it, new ones are not kept. */
+const maxDecals = 200;
+
+/** A session's decals, or only those of one of its maps. */
+function decalsOf(ctx: QueryCtx, sessionId: Id<'sessions'>, scenarioId?: string)
+{
+    return ctx.db
+        .query('decals')
+        .withIndex('by_sessionId_and_scenarioId', (q) =>
+            scenarioId === undefined ? q.eq('sessionId', sessionId) : q.eq('sessionId', sessionId).eq('scenarioId', scenarioId),
+        )
+        .take(maxDecals);
+}
+
+/**
+ * What killed monsters left on the map being played, for everyone at the table. Players only get
+ * those of monsters they saw die, like lastHit; asPlayer gives the host what players get.
+ */
+export const decals = query({
+    args: { sessionId: v.id('sessions'), asPlayer: v.optional(v.boolean()) },
+    handler: async (ctx, { sessionId, asPlayer }): Promise<Decal[]> =>
+    {
+        const session = await memberOf(ctx, sessionId);
+        const userId = await getAuthUserId(ctx);
+
+        if (!session || !session.live || !session.activeScenarioId)
+            return [];
+
+        const host = session.ownerId === userId && asPlayer !== true;
+        const docs = await decalsOf(ctx, sessionId, session.activeScenarioId);
+
+        return docs.filter((doc) => host || doc.seen).map(({ _id, x, y, size, scale }) => ({ id: _id, x, y, size, scale }));
+    },
+});
+
+/** The host clears the decals off the map being played. */
+export const clearDecals = mutation({
+    args: { sessionId: v.id('sessions') },
+    handler: async (ctx, { sessionId }) =>
+    {
+        const session = await requireSession(ctx, sessionId);
+
+        if (!session.activeScenarioId)
+            return null;
+
+        for (const doc of await decalsOf(ctx, sessionId, session.activeScenarioId))
+            await ctx.db.delete('decals', doc._id);
+
+        return null;
+    },
+});
 
 /**
  * The last attack or heal on the map being played, for everyone at the table. Players only get
@@ -1041,8 +1109,8 @@ export const lastHit = query({
  * Deals amount of damage to tokens, or heals them, see applyHit in map/health.ts. The game master
  * reaches any token on the map being played. A player only tokens they can see, attacks monsters
  * and players, heals players, and does nothing while the table is frozen. A monster brought to 0
- * dies and leaves the map; a player is down and stays. A token without numbers takes nothing, but
- * still shows the hit.
+ * dies and leaves the map, and a decal where it fell; a player is down and stays, in a pool. A
+ * token without numbers takes nothing, but still shows the hit.
  */
 export const hit = mutation({
     args: {
@@ -1069,6 +1137,7 @@ export const hit = mutation({
 
         const points = Number.isFinite(amount) ? Math.min(9999, Math.max(0, Math.round(amount))) : 0;
         const targets = [];
+        let room = maxDecals - (await decalsOf(ctx, sessionId)).length;
 
         for (const tokenId of new Set(tokenIds.slice(0, maxTargets)))
         {
@@ -1082,7 +1151,7 @@ export const hit = mutation({
             if (!host && (!seen || (kind === 'heal' && token.kind !== 'player')))
                 continue;
 
-            const { after, died } = hitOn(token, kind, points);
+            const { after, died, downed } = hitOn(token, kind, points);
 
             targets.push({ x: token.x, y: token.y, size: token.size, seen, died });
 
@@ -1096,6 +1165,14 @@ export const hit = mutation({
             }
             else if (after)
                 await ctx.db.patch('tokens', tokenId, after);
+
+            // Blood where a monster fell, or under a player going down, staying once they are up.
+            if ((died || downed) && room-- > 0)
+            {
+                const pool = { sessionId, scenarioId, x: token.x, y: token.y, size: token.size, seen };
+
+                await ctx.db.insert('decals', downed ? { ...pool, scale: downedPool } : pool);
+            }
 
         }
 

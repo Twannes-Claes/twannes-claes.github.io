@@ -20,6 +20,9 @@ export const fogSettingsValidator = v.object({
     smoke: v.number(),
 });
 
+/** Which blood shows, see BloodSettings in types.ts. */
+export const bloodSettingsValidator = v.object({ ground: v.boolean(), wounds: v.boolean() });
+
 /**
  * A scenario as the editor keeps it, see Scenario in types.ts. The saving and loading calls in
  * components/SessionEditor.tsx only type check while the two match.
@@ -102,6 +105,8 @@ export default defineSchema({
         kicked: v.optional(v.array(v.id('users'))),
         /** How the fog looks on every screen. Missing is the look in map/fog.ts. */
         fogLook: v.optional(fogSettingsValidator),
+        /** Which blood every screen shows, see BloodSettings in types.ts. Missing shows it all. */
+        blood: v.optional(bloodSettingsValidator),
     }).index('by_ownerId', ['ownerId']),
     /**
      * Who stands where while a session is played. Players' tokens carry their anonymous user, so a
@@ -186,6 +191,21 @@ export default defineSchema({
             v.object({ x: v.number(), y: v.number(), size: sizeValidator, seen: v.boolean(), died: v.boolean() }),
         ),
     }).index('by_sessionId', ['sessionId']),
+    /**
+     * The blood a killed monster or a downed player left on the ground, until the host clears the
+     * map or starts the session again, see Decal in types.ts.
+     */
+    decals: defineTable({
+        sessionId: v.id('sessions'),
+        scenarioId: v.string(),
+        x: v.number(),
+        y: v.number(),
+        size: sizeValidator,
+        /** How much wider than the creature the pool is, see Decal. Missing is its own size. */
+        scale: v.optional(v.number()),
+        /** Whether players saw the monster die, so one killed out of sight gives nothing away. */
+        seen: v.boolean(),
+    }).index('by_sessionId_and_scenarioId', ['sessionId', 'scenarioId']),
     /**
      * A player's path while it is drawn and until it is walked or dropped, one row per token, so
      * every other screen shows it live, see drafts in convex/play.ts. Its own table, as it

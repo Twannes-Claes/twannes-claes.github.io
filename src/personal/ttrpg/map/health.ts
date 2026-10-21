@@ -1,4 +1,4 @@
-import type { HealthState, HitKind, Stats, Token } from '../types';
+import type { BloodSettings, HealthState, HitKind, Stats, Token } from '../types';
 
 /*
  * Hit points, shared by the server and every screen, see "Health and stats" in PLAN.md. The game
@@ -37,16 +37,24 @@ export function applyHit(stats: { hp: number; maxHp: number; tempHp?: number }, 
 }
 
 /**
- * What a hit does to a token: its HP after, null for one without numbers, which takes nothing, and
- * whether it dies of it, a monster brought to 0. A player at 0 is down and stays.
+ * What a hit does to a token: its HP after, null for one without numbers, which takes nothing,
+ * whether it dies of it, a monster brought to 0, and whether it goes down, a player brought to 0
+ * from above it. A player at 0 is down and stays; hit again there, they go down no further.
  */
 export function hitOn(token: Pick<Token, 'kind' | 'hp' | 'maxHp' | 'tempHp'>, kind: HitKind, amount: number)
 {
     const { hp, maxHp, tempHp } = token;
     const after = hp !== undefined && maxHp !== undefined ? applyHit({ hp, maxHp, tempHp }, kind, amount) : null;
+    const zero = after !== null && after.hp === 0;
 
-    return { after, died: after !== null && after.hp === 0 && token.kind === 'npc' };
+    return { after, died: zero && token.kind === 'npc', downed: zero && token.kind === 'player' && hp !== 0 };
 }
+
+/** How much wider than its token the pool a player goes down in is, so it shows around them. */
+export const downedPool = 1.6;
+
+/** All the blood, until the game master turns some off. */
+export const defaultBlood: BloodSettings = { ground: true, wounds: true };
 
 /** How hurt a token looks, from its numbers or, without them, what the server said. */
 export function stateOf(token: Pick<Token, 'hp' | 'maxHp' | 'state'>): HealthState | undefined

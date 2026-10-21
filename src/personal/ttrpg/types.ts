@@ -168,6 +168,20 @@ export interface SharedHit
     targets: { x: number; y: number; size: CreatureSize; died: boolean }[];
 }
 
+/**
+ * A pool of blood on the ground until the game master clears it, see decals in convex/play.ts:
+ * where a monster died, or, wider, where a player went down. Decoration only.
+ */
+export interface Decal
+{
+    id: string;
+    x: number;
+    y: number;
+    size: CreatureSize;
+    /** How much wider than the creature, so a downed player's shows around them. Missing is 1. */
+    scale?: number;
+}
+
 /** A token's numbers as the game master or its player sets them, see components/StatsForm.tsx. */
 export interface Stats
 {
@@ -255,6 +269,10 @@ export interface Live
     lastHit: SharedHit | null;
     /** Deals damage to tokens, or heals them, see hit in convex/play.ts. */
     hit: (tokenIds: string[], kind: HitKind, amount: number) => Promise<void>;
+    /** What killed monsters left on the map being played, see Decal. */
+    decals: Decal[];
+    /** Clears them off the map being played. */
+    clearDecals: () => Promise<void>;
     /** What the party has seen of the map being played, null until anything has been. */
     fog: SharedFog | null;
     /**
@@ -279,6 +297,21 @@ export interface Live
     /** How the fog looks on every screen, null until the game master changes it. */
     fogLook: FogSettings | null;
     setFogLook: (look: FogSettings) => Promise<void>;
+    /** Which blood every screen shows, null until the game master changes it. */
+    blood: BloodSettings | null;
+    setBlood: (blood: BloodSettings) => Promise<void>;
+}
+
+/**
+ * Which blood shows, set by the game master for the whole table from the gear in the editor, as
+ * not every group wants it. A downed token keeps its skull either way.
+ */
+export interface BloodSettings
+{
+    /** The trails badly hurt tokens leave, and the pools where monsters fell. */
+    ground: boolean;
+    /** The red rising in a hurt token's picture, and the drips once it is bloodied. */
+    wounds: boolean;
 }
 
 /**

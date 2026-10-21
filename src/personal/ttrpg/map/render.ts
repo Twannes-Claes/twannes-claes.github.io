@@ -1,9 +1,9 @@
 import { faShieldHalved, faSkull, type IconDefinition } from '@fortawesome/free-solid-svg-icons';
 
-import type { CreatureSize, Grid, HealthState, Point, Scenario, Token } from '../types';
+import type { CreatureSize, Decal, Grid, HealthState, Point, Scenario, Token } from '../types';
 
 import { toWorld, type Camera } from './camera.ts';
-import { danger, door as doorColour, faded, ground, heal, highlight, ink, shield } from './colours.ts';
+import { blood, danger, door as doorColour, faded, ground, heal, highlight, ink, shield } from './colours.ts';
 import { drawFog, type FogLayers, type FogLook } from './fog.ts';
 import type { Area } from './geometry.ts';
 import { cellAt, cellCenter, cellCorners, hexRadius } from './grid.ts';
@@ -25,6 +25,17 @@ export interface Viewport
 
 /** A token as it shows mid walk: lift is how high it is off the map, 0 to 1, see map/walk.ts. */
 export type Lifted = Token & { lift?: number };
+
+/**
+ * A drop of blood a badly hurt token left as it walked, see map/view.ts: seed shapes it, and
+ * alpha fades it out.
+ */
+export interface Drop extends Point
+{
+    radius: number;
+    seed: number;
+    alpha: number;
+}
 
 /** Everything one frame shows. */
 export interface Scene
@@ -52,6 +63,86 @@ export interface Scene
     time: number;
     /** Drawn in world pixels just before the tokens: the path one is about to walk, under them. */
     beneath?: () => void;
+    /**
+     * On the ground, under the fog: what killed monsters left, alpha fading them in and out, and
+     * the drops of the badly hurt.
+     */
+    decals?: (Decal & { alpha?: number; scale?: number })[];
+    drops?: Drop[];
+    /** False when the GM turned off the red and the drips on hurt tokens. The skull stays. */
+    wounds?: boolean;
+}
+
+/**
+ * A number from 0 to 1 that a text and a salt always give, so a decal or a drip has the same
+ * shape on every screen without anyone sending it. FNV-1a.
+ */
+function seeded(text: string, salt: number): number
+{
+    let hash = 2166136261 ^ salt;
+
+    for (const char of text)
+        hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+
+    return (hash >>> 0) / 4294967296;
+}
+
+/**
+ * A pool of blood about a creature's size with splashes around it, shaped by its id: what a killed
+ * monster left, or, scale times as wide, the one a downed player lies in.
+ */
+function drawDecal(ctx: CanvasRenderingContext2D, decal: Decal, grid: Grid, scale = 1)
+{
+    const radius = tokenRadius(grid, decal.size) * scale;
+    const random = (salt: number) => seeded(decal.id, salt);
+
+    // Overlapping circles in one path fill as one shape, so where they overlap is no darker.
+    ctx.beginPath();
+
+    for (let index = 0; index < 11; index++)
+    {
+        const pool = index < 5;
+        const angle = random(index) * Math.PI * 2;
+        const reach = radius * (pool ? 0.4 * random(index + 20) : 0.85 + 0.45 * random(index + 20));
+        const size = radius * (pool ? 0.4 + 0.25 * random(index + 40) : 0.05 + 0.07 * random(index + 40));
+        const x = decal.x + Math.cos(angle) * reach;
+        const y = decal.y + Math.sin(angle) * reach;
+
+        ctx.moveTo(x + size, y);
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+    }
+
+    ctx.fillStyle = faded(blood, 0.8);
+    ctx.fill();
+}
+
+/**
+ * A drop of blood a walking token left: an uneven blob of three circles close together, and up to
+ * three specks scattered round it, never in a row, so a trail reads as blood rather than as
+ * footprints. One shape, so where they overlap is no darker.
+ */
+function drawDrop(ctx: CanvasRenderingContext2D, { x, y, radius, seed, alpha }: Drop)
+{
+    const random = (salt: number) => seeded(String(seed), salt);
+    const specks = Math.floor(random(0) * 4);
+
+    ctx.beginPath();
+
+    for (let index = 0; index < 3 + specks; index++)
+    {
+        const blob = index < 3;
+        const turn = random(index + 10) * Math.PI * 2;
+        const reach = radius * (blob ? 0.35 * random(index + 20) : 1.4 + random(index + 20));
+        const size = radius * (blob ? 0.6 + 0.3 * random(index + 30) : 0.1 + 0.15 * random(index + 30));
+        const partX = x + Math.cos(turn) * reach;
+        const partY = y + Math.sin(turn) * reach;
+
+        ctx.moveTo(partX + size, partY);
+        ctx.arc(partX, partY, size, 0, Math.PI * 2);
+    }
+
+    ctx.fillStyle = faded(blood, 0.85 * alpha);
+    ctx.fill();
 }
 
 /** A token's radius, 60 percent across the cells it covers, so the grid shows around it. */
@@ -400,15 +491,39 @@ const woundLook: Record<Exclude<HealthState, 'unhurt' | 'down'>, { reach: number
     critical: { reach: 1.3, alpha: 0.7 },
 };
 
+/** How long one drip takes to run down a badly hurt token. */
+const dripTime = 2200;
+
 /**
- * How hurt a token looks, over its picture: red rising from the bottom as it gets hurt, and a
- * downed one darkened with a skull. Everyone sees this, numbers or not, see map/health.ts.
+ * Blood running down a bloodied token's picture, two drips, three when critical. Each starts at
+ * its own moment, from the token's id, so a row of hurt tokens does not drip in step. Still,
+ * halfway down, when motion is reduced. Inside the clip of the picture.
  */
-function drawWound(ctx: CanvasRenderingContext2D, token: Lifted, inner: number)
+function drawDrips(ctx: CanvasRenderingContext2D, token: Lifted, inner: number, critical: boolean, time: number, motion: boolean)
+{
+    for (const [index, across] of (critical ? [-0.4, 0.15, 0.5] : [-0.3, 0.4]).entries())
+    {
+        const phase = motion ? (time / dripTime + seeded(token.id, index)) % 1 : 0.5;
+        const x = token.x + across * inner;
+        const y = token.y - inner * 0.1 + phase * inner * 0.9;
+
+        ctx.beginPath();
+        ctx.ellipse(x, y, inner * 0.06, inner * 0.11, 0, 0, Math.PI * 2);
+        ctx.fillStyle = `rgb(150 18 24 / ${0.85 * Math.sin(Math.PI * phase)})`;
+        ctx.fill();
+    }
+}
+
+/**
+ * How hurt a token looks, over its picture: red rising from the bottom as it gets hurt, blood
+ * dripping once it is bloodied, and a downed one darkened with a skull. Everyone sees this,
+ * numbers or not, see map/health.ts. Without wounds, as the GM can set, only the skull.
+ */
+function drawWound(ctx: CanvasRenderingContext2D, token: Lifted, inner: number, time: number, motion: boolean, wounds: boolean)
 {
     const state = stateOf(token);
 
-    if (!state || state === 'unhurt')
+    if (!state || state === 'unhurt' || (!wounds && state !== 'down'))
         return;
 
     ctx.save();
@@ -435,6 +550,10 @@ function drawWound(ctx: CanvasRenderingContext2D, token: Lifted, inner: number)
     wound.addColorStop(1, 'rgb(150 18 24 / 0)');
     ctx.fillStyle = wound;
     ctx.fill();
+
+    if (state !== 'hurt')
+        drawDrips(ctx, token, inner, state === 'critical', time, motion);
+
     ctx.restore();
 }
 
@@ -515,6 +634,9 @@ function drawToken(
     token: Lifted,
     base: number,
     avatar: CanvasImageSource | null,
+    time: number,
+    motion: boolean,
+    wounds: boolean,
 )
 {
     // A walking token grows a touch and its shadow drops, as if picked up off the map.
@@ -571,7 +693,7 @@ function drawToken(
         ctx.fillText(token.name.slice(0, 1).toUpperCase(), token.x, token.y + inner * 0.05);
     }
 
-    drawWound(ctx, token, inner);
+    drawWound(ctx, token, inner, time, motion, wounds);
 }
 
 /** How long the own token stands still before its ring first shows, how long one pulse lasts, and
@@ -630,7 +752,7 @@ function drawSpawn(ctx: CanvasRenderingContext2D, at: Point, radius: number)
  */
 export function render(
     ctx: CanvasRenderingContext2D,
-    { scenario, background, picture, tokens, editing, own, ownRestedAt, motion, fog, fogLook, time, beneath }: Scene,
+    { scenario, background, picture, tokens, editing, own, ownRestedAt, motion, fog, fogLook, time, beneath, decals = [], drops = [], wounds = true }: Scene,
     camera: Camera,
     viewport: Viewport,
 )
@@ -698,6 +820,17 @@ export function render(
         ctx.restore();
     }
 
+    for (const decal of decals)
+    {
+        ctx.globalAlpha = decal.alpha ?? 1;
+        drawDecal(ctx, decal, grid, decal.scale);
+    }
+
+    ctx.globalAlpha = 1;
+
+    for (const drop of drops)
+        drawDrop(ctx, drop);
+
     ctx.lineCap = 'round';
 
     // On a picture the walls are part of the art, so their lines only show while editing. A
@@ -741,7 +874,7 @@ export function render(
         if (token.id === own && token.lift === undefined)
             drawPulse(ctx, token, tokenRadius(grid, token.size), time - ownRestedAt, motion);
 
-        drawToken(ctx, token, tokenRadius(grid, token.size), token.avatar ? picture(token.avatar) : null);
+        drawToken(ctx, token, tokenRadius(grid, token.size), token.avatar ? picture(token.avatar) : null, time, motion, wounds);
     }
 
     ctx.globalAlpha = 1;

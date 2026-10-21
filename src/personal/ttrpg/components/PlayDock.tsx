@@ -1,4 +1,5 @@
 import {
+    faBroom,
     faCloud,
     faCompress,
     faDragon,
@@ -50,6 +51,8 @@ interface PlayDockProps
     fogOpen: boolean;
     /** Starts picking targets for an attack or a heal, see HitSheet.tsx. */
     onAttack: () => void;
+    /** Clears what killed monsters left on the map. Only while there is some, see Decal. */
+    onClearDecals?: () => void;
 }
 
 /**
@@ -73,6 +76,7 @@ export function PlayDock({
     onFog,
     fogOpen,
     onAttack,
+    onClearDecals,
 }: PlayDockProps)
 {
     const { fullscreen, toggle } = useFullscreen();
@@ -196,6 +200,17 @@ export function PlayDock({
                 >
                     <FontAwesomeIcon icon={faCloud} />
                 </button>
+                {onClearDecals && (
+                    <button
+                        type="button"
+                        className="ttrpg-segment"
+                        aria-label="Clear the blood"
+                        title="Clear the blood and what fallen monsters left"
+                        onClick={onClearDecals}
+                    >
+                        <FontAwesomeIcon icon={faBroom} />
+                    </button>
+                )}
             </div>
             <div className="ttrpg-dock__group">
                 <button

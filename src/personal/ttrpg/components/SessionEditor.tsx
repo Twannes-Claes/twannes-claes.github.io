@@ -4,7 +4,7 @@ import { ConvexError } from 'convex/values';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import type { Draft, Live, PictureBytes, PropPicture, Scenario, SharedMark, Token } from '../types';
+import type { Decal, Draft, Live, PictureBytes, PropPicture, Scenario, SharedMark, Token } from '../types';
 
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
@@ -59,6 +59,7 @@ function monsterPicture(picture: Blob | null): Promise<Id<'_storage'> | undefine
 const noTokens: Token[] = [];
 const noDrafts: Draft[] = [];
 const noMarks: SharedMark[] = [];
+const noDecals: Decal[] = [];
 
 /**
  * A saved session in the editor: loaded once when it opens, then the editor holds it and saves
@@ -89,11 +90,13 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const fog = useQuery(api.play.fog, following ? { sessionId: id } : 'skip');
     const ping = useQuery(api.play.ping, following ? { sessionId: id } : 'skip');
     const lastHit = useQuery(api.play.lastHit, following ? { sessionId: id } : 'skip');
+    const decals = useQuery(api.play.decals, following ? { sessionId: id } : 'skip');
     const drafts = useQuery(api.play.drafts, following ? { sessionId: id } : 'skip');
     const marks = useQuery(api.play.marks, following ? { sessionId: id } : 'skip');
     const saveFog = useMutation(api.play.saveFog);
     const resetFog = useMutation(api.play.resetFog);
     const setFogLook = useMutation(api.play.setFogLook);
+    const setBlood = useMutation(api.play.setBlood);
     const startSession = useMutation(api.play.start);
     const endSession = useMutation(api.play.end);
     const freezeSession = useMutation(api.play.freeze);
@@ -105,6 +108,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const removeNpc = useMutation(api.play.removeMonster);
     const setStats = useMutation(api.play.setStats);
     const hit = useMutation(api.play.hit);
+    const clearDecals = useMutation(api.play.clearDecals);
     const sendPing = useMutation(api.play.sendPing);
     const draw = useMutation(api.play.draw);
     const mark = useMutation(api.play.mark);
@@ -170,6 +174,8 @@ function Session({ sessionId, debug }: SessionEditorProps)
             setStats: (tokenId, stats) => friendly(setStats({ tokenId: tokenId as Id<'tokens'>, ...stats })),
             lastHit: lastHit ?? null,
             hit: (tokenIds, kind, amount) => friendly(hit({ sessionId: id, tokenIds: tokenIds as Id<'tokens'>[], kind, amount })),
+            decals: decals ?? noDecals,
+            clearDecals: () => friendly(clearDecals({ sessionId: id })),
             fog: fog ?? null,
             saveFog: (shared, forget) => friendly(saveFog({ sessionId: id, ...shared, forget })),
             resetFog: () => friendly(resetFog({ sessionId: id })),
@@ -181,6 +187,8 @@ function Session({ sessionId, debug }: SessionEditorProps)
             mark: (next) => friendly(mark({ sessionId: id, mark: next })),
             fogLook: status.fogLook,
             setFogLook: (look) => friendly(setFogLook({ sessionId: id, look })),
+            blood: status.blood,
+            setBlood: (blood) => friendly(setBlood({ sessionId: id, blood })),
         }
         : undefined;
 

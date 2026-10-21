@@ -388,6 +388,7 @@ html:has(.ttrpg) {
 
 .ttrpg-segment[aria-pressed='true'],
 .ttrpg-segment[aria-current='true'],
+.ttrpg-segment[aria-selected='true'],
 .ttrpg-icon-button[aria-pressed='true'] {
     background: var(--ttrpg-accent);
     color: var(--ttrpg-ink);

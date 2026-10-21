@@ -76,17 +76,20 @@ interface SettingsProps
     phone?: boolean;
     /** Settings of the page's own, above the screen's, like a player's picture. */
     children?: ReactNode;
+    /** The game master's settings for every screen at the table, in a tab beside this screen's. */
+    table?: ReactNode;
     /** The bar the gear is on has faded out, see useIdle: the panel steps aside with it. */
     hidden?: boolean;
 }
 
 /**
  * The gear beside the modes: this screen's settings, see useScreenSettings.ts, and every shortcut,
- * or on a phone every gesture.
+ * or on a phone every gesture. With table, a Table tab beside them for the whole table.
  */
-export function Settings({ settings, onChange, phone = false, children, hidden = false }: SettingsProps)
+export function Settings({ settings, onChange, phone = false, children, table, hidden = false }: SettingsProps)
 {
     const [open, setOpen] = useState(false);
+    const [tab, setTab] = useState<'editor' | 'table'>('editor');
     const set = (change: Partial<ScreenSettings>) => onChange({ ...settings, ...change });
     // The size while the slider is held. It only zooms once let go, or the slider would grow
     // and shrink under the pointer.
@@ -117,72 +120,101 @@ export function Settings({ settings, onChange, phone = false, children, hidden =
             {open && !hidden && (
                 <Popover title="Settings" className={phone ? 'ttrpg-dock-panel' : 'ttrpg-start'} dismissOnOutside closeButton={false} onClose={() => setOpen(false)}>
                     <div className="ttrpg-popover__body ttrpg-settings">
-                        {children}
-                        <section className="ttrpg-shortcuts" aria-label="Control size" title="How big the controls are on this screen">
-                            <h3 className="ttrpg-subhead">Control size</h3>
-                            <div className="ttrpg-settings__line">
-                                <input
-                                    type="range"
-                                    aria-label="Control size"
-                                    min={smallestScale}
-                                    max={largestScale}
-                                    step={0.05}
-                                    value={shown}
-                                    style={{ '--fill': `${((shown - smallestScale) / (largestScale - smallestScale)) * 100}%` } as CSSProperties}
-                                    onChange={(event) => setDraft(event.target.valueAsNumber)}
-                                    onPointerUp={settle}
-                                    onKeyUp={settle}
-                                    onBlur={settle}
-                                />
-                                <span className="ttrpg-settings__value">{`${Math.round(shown * 100)}%`}</span>
+                        {table && (
+                            <div className="ttrpg-settings__choices" role="tablist" aria-label="Settings for">
+                                <button
+                                    type="button"
+                                    role="tab"
+                                    className="ttrpg-segment"
+                                    aria-selected={tab === 'editor'}
+                                    title="This screen: control size and shortcuts"
+                                    onClick={() => setTab('editor')}
+                                >
+                                    Editor
+                                </button>
+                                <button
+                                    type="button"
+                                    role="tab"
+                                    className="ttrpg-segment"
+                                    aria-selected={tab === 'table'}
+                                    title="Every screen at the table, phones too"
+                                    onClick={() => setTab('table')}
+                                >
+                                    Table
+                                </button>
                             </div>
-                        </section>
-                        {!phone && (
-                            <section className="ttrpg-shortcuts" aria-label="Hide controls after" title="In player view, after this long without the mouse">
-                                <h3 className="ttrpg-subhead">Hide controls after</h3>
-                                <div className="ttrpg-settings__choices">
-                                    {hideChoices.map((choice) => (
-                                        <button
-                                            key={choice.after}
-                                            type="button"
-                                            className="ttrpg-segment"
-                                            aria-pressed={settings.hideAfter === choice.after}
-                                            onClick={() => set({ hideAfter: choice.after })}
-                                        >
-                                            {choice.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </section>
                         )}
-                        {(phone ? gestures : shortcuts).map((group) => (
-                            <section key={group.title} className="ttrpg-shortcuts" aria-label={group.title}>
-                                <h3 className="ttrpg-subhead">{group.title}</h3>
-                                <dl>
-                                    {group.keys.map(([keys, what]) => (
-                                        <div key={what}>
-                                            <dt>
-                                                {keys.split(' or ').map((key) => <kbd key={key}>{key}</kbd>)}
-                                            </dt>
-                                            <dd>{what}</dd>
+                        {table && tab === 'table' && table}
+                        {(!table || tab === 'editor') && (
+                            <>
+                                {children}
+                                <section className="ttrpg-shortcuts" aria-label="Control size" title="How big the controls are on this screen">
+                                    <h3 className="ttrpg-subhead">Control size</h3>
+                                    <div className="ttrpg-settings__line">
+                                        <input
+                                            type="range"
+                                            aria-label="Control size"
+                                            min={smallestScale}
+                                            max={largestScale}
+                                            step={0.05}
+                                            value={shown}
+                                            style={{ '--fill': `${((shown - smallestScale) / (largestScale - smallestScale)) * 100}%` } as CSSProperties}
+                                            onChange={(event) => setDraft(event.target.valueAsNumber)}
+                                            onPointerUp={settle}
+                                            onKeyUp={settle}
+                                            onBlur={settle}
+                                        />
+                                        <span className="ttrpg-settings__value">{`${Math.round(shown * 100)}%`}</span>
+                                    </div>
+                                </section>
+                                {!phone && (
+                                    <section className="ttrpg-shortcuts" aria-label="Hide controls after" title="In player view, after this long without the mouse">
+                                        <h3 className="ttrpg-subhead">Hide controls after</h3>
+                                        <div className="ttrpg-settings__choices">
+                                            {hideChoices.map((choice) => (
+                                                <button
+                                                    key={choice.after}
+                                                    type="button"
+                                                    className="ttrpg-segment"
+                                                    aria-pressed={settings.hideAfter === choice.after}
+                                                    onClick={() => set({ hideAfter: choice.after })}
+                                                >
+                                                    {choice.label}
+                                                </button>
+                                            ))}
                                         </div>
-                                    ))}
-                                </dl>
-                            </section>
-                        ))}
-                        <div className="ttrpg-subhead ttrpg-subhead--row">
-                            <h3>Frame rate</h3>
-                            <button
-                                type="button"
-                                className="ttrpg-icon-button ttrpg-icon-button--small"
-                                aria-pressed={settings.frameRate}
-                                aria-label="Show the frame rate"
-                                title={settings.frameRate ? 'Hide the frame rate' : 'Show the frame rate, for checking a screen'}
-                                onClick={() => set({ frameRate: !settings.frameRate })}
-                            >
-                                <FontAwesomeIcon icon={faEye} />
-                            </button>
-                        </div>
+                                    </section>
+                                )}
+                                {(phone ? gestures : shortcuts).map((group) => (
+                                    <section key={group.title} className="ttrpg-shortcuts" aria-label={group.title}>
+                                        <h3 className="ttrpg-subhead">{group.title}</h3>
+                                        <dl>
+                                            {group.keys.map(([keys, what]) => (
+                                                <div key={what}>
+                                                    <dt>
+                                                        {keys.split(' or ').map((key) => <kbd key={key}>{key}</kbd>)}
+                                                    </dt>
+                                                    <dd>{what}</dd>
+                                                </div>
+                                            ))}
+                                        </dl>
+                                    </section>
+                                ))}
+                                <div className="ttrpg-subhead ttrpg-subhead--row">
+                                    <h3>Frame rate</h3>
+                                    <button
+                                        type="button"
+                                        className="ttrpg-icon-button ttrpg-icon-button--small"
+                                        aria-pressed={settings.frameRate}
+                                        aria-label="Show the frame rate"
+                                        title={settings.frameRate ? 'Hide the frame rate' : 'Show the frame rate, for checking a screen'}
+                                        onClick={() => set({ frameRate: !settings.frameRate })}
+                                    >
+                                        <FontAwesomeIcon icon={faEye} />
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </Popover>
             )}
