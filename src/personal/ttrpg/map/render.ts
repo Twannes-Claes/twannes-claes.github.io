@@ -3,7 +3,7 @@ import { faShieldHalved, faSkull, type IconDefinition } from '@fortawesome/free-
 import type { CreatureSize, Decal, Grid, HealthState, Point, Scenario, Token } from '../types';
 
 import { toWorld, type Camera } from './camera.ts';
-import { blood, danger, door as doorColour, faded, ground, heal, highlight, ink, shield } from './colours.ts';
+import { blood, bloodDark, danger, door as doorColour, faded, ground, heal, highlight, ink, shield } from './colours.ts';
 import { drawFog, type FogLayers, type FogLook } from './fog.ts';
 import type { Area } from './geometry.ts';
 import { cellAt, cellCenter, cellCorners, hexRadius } from './grid.ts';
@@ -112,8 +112,19 @@ function drawDecal(ctx: CanvasRenderingContext2D, decal: Decal, grid: Grid, scal
         ctx.arc(x, y, size, 0, Math.PI * 2);
     }
 
-    ctx.fillStyle = faded(blood, 0.8);
+    ctx.fillStyle = bloodFill(ctx, decal.x, decal.y, radius * 1.1, 0.8);
     ctx.fill();
+}
+
+/** Blood dark where it lies thick at the middle, thinning to red towards reach and past it. */
+function bloodFill(ctx: CanvasRenderingContext2D, x: number, y: number, reach: number, alpha: number): CanvasGradient
+{
+    const fill = ctx.createRadialGradient(x, y, 0, x, y, reach);
+
+    fill.addColorStop(0, faded(bloodDark, alpha));
+    fill.addColorStop(1, faded(blood, alpha));
+
+    return fill;
 }
 
 /**
@@ -141,7 +152,7 @@ function drawDrop(ctx: CanvasRenderingContext2D, { x, y, radius, seed, alpha }: 
         ctx.arc(partX, partY, size, 0, Math.PI * 2);
     }
 
-    ctx.fillStyle = faded(blood, 0.85 * alpha);
+    ctx.fillStyle = bloodFill(ctx, x, y, radius * 1.2, 0.85 * alpha);
     ctx.fill();
 }
 
