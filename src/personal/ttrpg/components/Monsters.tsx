@@ -1,4 +1,4 @@
-import { faEye, faEyeSlash, faHeart, faImage, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faEye, faEyeSlash, faHeart, faImage, faListCheck, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useActionState, useState } from 'react';
 
@@ -6,6 +6,7 @@ import type { CreatureSize, Live, Point } from '../types';
 
 import { confirmAction } from '../services/confirm';
 
+import { ConditionPicker } from './ConditionPicker';
 import { Popover } from './Popover';
 import { StatChips, StatsForm } from './StatsForm';
 
@@ -36,8 +37,10 @@ export function Monsters({ live, at, onClose, onDone, onError }: MonstersProps)
     const [size, setSize] = useState<CreatureSize>('medium');
     const [hidden, setHidden] = useState(false);
     const [pictureName, setPictureName] = useState('');
-    // The monster whose numbers are open under its row.
-    const [editing, setEditing] = useState<string | null>(null);
+    // The monster whose numbers or conditions are open under its row.
+    const [editing, setEditing] = useState<{ id: string; what: 'numbers' | 'conditions' } | null>(null);
+    const toggleEditing = (id: string, what: 'numbers' | 'conditions') =>
+        setEditing((was) => (was?.id === id && was.what === what ? null : { id, what }));
 
     // The form clears itself after each one, so a pack of goblins is quick to add.
     const [failure, add, adding] = useActionState((_: string, form: FormData) =>
@@ -180,11 +183,21 @@ export function Monsters({ live, at, onClose, onDone, onError }: MonstersProps)
                                     type="button"
                                     className="ttrpg-icon-button ttrpg-icon-button--small"
                                     aria-label={`Numbers of ${monster.name}`}
-                                    aria-pressed={editing === monster.id}
+                                    aria-pressed={editing?.id === monster.id && editing.what === 'numbers'}
                                     title="HP, AC and Perception"
-                                    onClick={() => setEditing((open) => (open === monster.id ? null : monster.id))}
+                                    onClick={() => toggleEditing(monster.id, 'numbers')}
                                 >
                                     <FontAwesomeIcon icon={faHeart} />
+                                </button>
+                                <button
+                                    type="button"
+                                    className="ttrpg-icon-button ttrpg-icon-button--small"
+                                    aria-label={`Conditions of ${monster.name}`}
+                                    aria-pressed={editing?.id === monster.id && editing.what === 'conditions'}
+                                    title="Conditions"
+                                    onClick={() => toggleEditing(monster.id, 'conditions')}
+                                >
+                                    <FontAwesomeIcon icon={faListCheck} />
                                 </button>
                                 <button
                                     type="button"
@@ -206,8 +219,15 @@ export function Monsters({ live, at, onClose, onDone, onError }: MonstersProps)
                                 >
                                     <FontAwesomeIcon icon={faTrash} />
                                 </button>
-                                {editing === monster.id && (
+                                {editing?.id === monster.id && editing.what === 'numbers' && (
                                     <StatsForm token={monster} onSave={(stats) => live.setStats(monster.id, stats)} />
+                                )}
+                                {editing?.id === monster.id && editing.what === 'conditions' && (
+                                    <ConditionPicker
+                                        system={live.system}
+                                        conditions={monster.conditions ?? []}
+                                        onChange={(conditions) => live.setConditions(monster.id, conditions)}
+                                    />
                                 )}
                             </li>
                         ))}

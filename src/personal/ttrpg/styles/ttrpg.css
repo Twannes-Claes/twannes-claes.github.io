@@ -1713,6 +1713,47 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
     grid-column: span 3;
 }
 
+/* A token's conditions to turn on and off, two or more to a line, see ConditionPicker.tsx. */
+.ttrpg-conditions {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+    gap: 4px;
+    padding-block: 0.5rem 0.75rem;
+}
+
+.ttrpg-condition {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+}
+
+/* No fade: a level's minus and plus going widen the button at once, and the purple fading out
+   over the new width flashed. */
+.ttrpg-condition > .ttrpg-segment {
+    flex: 1;
+    min-width: 0;
+    padding-inline: 0.6rem;
+    transition: none;
+}
+
+.ttrpg-condition__value {
+    display: inline-flex;
+    align-items: center;
+}
+
+.ttrpg-condition__number {
+    min-width: 1.5rem;
+    color: var(--ttrpg-ink);
+    font-family: var(--ttrpg-mono);
+    font-size: 0.875rem;
+    text-align: center;
+}
+
+.ttrpg-conditions > .ttrpg-error {
+    grid-column: 1 / -1;
+}
+
 /* A token's numbers under its name in a list, see StatChips. They wrap as a whole, so none is cut
    off. */
 .ttrpg-chips {
@@ -2017,7 +2058,7 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
 }
 
 /* Opened under its row, the full width of it. */
-.ttrpg-row > .ttrpg-stats-form {
+.ttrpg-row > :is(.ttrpg-stats-form, .ttrpg-conditions) {
     flex-basis: 100%;
     padding-inline: 0.75rem;
 }

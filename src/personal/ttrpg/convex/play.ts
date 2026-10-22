@@ -2,6 +2,7 @@ import { getAuthUserId } from '@convex-dev/auth/server';
 import { ConvexError, v } from 'convex/values';
 
 import type { Decal, Draft, Point, Scenario, SharedHit, SharedMark, Token } from '../types';
+import { cleanConditions } from '../content/conditions';
 import { distance } from '../map/geometry';
 import { cleanStats, downedPool, hitOn, withoutNumbers } from '../map/health';
 import { pathBlocked } from '../map/path';
@@ -13,7 +14,7 @@ import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireSession, requireUser } from './access';
-import { bloodSettingsValidator, fogSettingsValidator, sizeValidator } from './schema';
+import { bloodSettingsValidator, conditionValidator, fogSettingsValidator, sizeValidator } from './schema';
 import { refreshSight, tokensOf, tokensOn } from './sight';
 import { dropFile } from './usage';
 import { storedPicture } from './pictures';
@@ -232,7 +233,7 @@ export const tokens = query({
             .filter((token) => host || token.kind === 'player' || (token.inSight === true && token.hidden !== true))
             .map((doc) =>
             {
-                const { kind, name, color, size, speed, avatar, x, y, path, movedAt, hidden } = doc;
+                const { kind, name, color, size, speed, avatar, x, y, path, movedAt, hidden, conditions } = doc;
                 const { hp, maxHp, tempHp, ac, perception } = doc;
                 const token = {
                     id: doc._id,
@@ -252,6 +253,7 @@ export const tokens = query({
                     tempHp,
                     ac,
                     perception,
+                    conditions,
                 };
 
                 return host || doc.userId === userId ? token : withoutNumbers(token);
@@ -286,6 +288,31 @@ export const setStats = mutation({
             throw new ConvexError('That is not your token.');
 
         await ctx.db.patch('tokens', tokenId, cleanStats(stats));
+
+        return null;
+    },
+});
+
+/**
+ * The game master sets any token's conditions, a player only their own, kept to the session's
+ * list, see cleanConditions in content/conditions.ts.
+ */
+export const setConditions = mutation({
+    args: { tokenId: v.id('tokens'), conditions: v.array(conditionValidator) },
+    handler: async (ctx, { tokenId, conditions }) =>
+    {
+        const userId = await requireUser(ctx);
+        const token = await ctx.db.get('tokens', tokenId);
+
+        if (!token)
+            throw new ConvexError('That token is gone.');
+
+        const session = await sessionOf(ctx, token.sessionId);
+
+        if (session.ownerId !== userId && token.userId !== userId)
+            throw new ConvexError('That is not your token.');
+
+        await ctx.db.patch('tokens', tokenId, { conditions: cleanConditions(session.system ?? '5e', conditions.slice(0, 50)) });
 
         return null;
     },

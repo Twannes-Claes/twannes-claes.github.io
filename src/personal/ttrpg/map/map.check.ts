@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 
 import type { Cell, Grid, Point, Scenario, Token, Wall } from '../types';
+import { cleanConditions } from '../content/conditions.ts';
 
 import { toScreen, toWorld, zoomAt } from './camera.ts';
 import { createExplored, markSeen, packedFlag, packSeen, wasSeen } from './fog.ts';
@@ -640,3 +641,10 @@ assert.deepEqual(applyHit({ hp: 25, maxHp: 30, tempHp: 2 }, 'heal', 10), { hp: 3
 assert.equal(hitOn({ kind: 'player', hp: 5, maxHp: 30 }, 'attack', 9).downed, true);
 assert.equal(hitOn({ kind: 'player', hp: 0, maxHp: 30 }, 'attack', 9).downed, false);
 assert.deepEqual(hitOn({ kind: 'npc', hp: 5, maxHp: 30 }, 'attack', 9), { after: { hp: 0, tempHp: 0 }, died: true, downed: false });
+
+// Conditions keep to the system's list and order, once each, values whole and in range.
+assert.deepEqual(
+    cleanConditions('5e', [{ id: 'prone' }, { id: 'clumsy', value: 2 }, { id: 'exhaustion', value: 9.6 }, { id: 'prone' }, { id: 'blinded', value: 3 }]),
+    [{ id: 'blinded' }, { id: 'exhaustion', value: 6 }, { id: 'prone' }],
+);
+assert.deepEqual(cleanConditions('pf2e', [{ id: 'frightened' }, { id: 'dying', value: 0 }]), [{ id: 'dying', value: 1 }, { id: 'frightened', value: 1 }]);

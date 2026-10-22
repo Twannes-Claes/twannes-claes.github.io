@@ -3,6 +3,7 @@ import {
     faCloud,
     faEye,
     faHeart,
+    faListCheck,
     faPlay,
     faQrcode,
     faStop,
@@ -14,10 +15,11 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useActionState, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import type { Live, Stats, Token } from '../types';
+import type { Condition, GameSystem, Live, Stats, Token } from '../types';
 
 import { confirmAction } from '../services/confirm';
 
+import { ConditionPicker } from './ConditionPicker';
 import { Spinner } from './Feedback';
 import { Popover } from './Popover';
 import { StatChips, StatsForm } from './StatsForm';
@@ -51,6 +53,9 @@ interface PlayersProps
     /** Every token; the players among them are listed. */
     tokens: Token[];
     onSetStats: (tokenId: string, stats: Stats) => Promise<void>;
+    /** The session's game, whose conditions the list offers. */
+    system: GameSystem;
+    onSetConditions: (tokenId: string, conditions: Condition[]) => Promise<void>;
     /** Removes one from the table, only in a live session. */
     onKick?: (tokenId: string, name: string) => void;
     /** Shows the QR code to join, only in a live session. */
@@ -63,11 +68,13 @@ interface PlayersProps
  * The Players button and its pop-out: who is at the table, with their numbers to change. Live
  * it lists who joined; before that the GM view's two test players, see demoTokens.
  */
-export function Players({ tokens, onSetStats, onKick, onQr, hidden = false }: PlayersProps)
+export function Players({ tokens, onSetStats, system, onSetConditions, onKick, onQr, hidden = false }: PlayersProps)
 {
     const [open, setOpen] = useState(false);
-    // The player whose numbers are open under their row.
-    const [editing, setEditing] = useState<string | null>(null);
+    // The player whose numbers or conditions are open under their row.
+    const [editing, setEditing] = useState<{ id: string; what: 'numbers' | 'conditions' } | null>(null);
+    const toggleEditing = (id: string, what: 'numbers' | 'conditions') =>
+        setEditing((was) => (was?.id === id && was.what === what ? null : { id, what }));
     const players = tokens.filter((token) => token.kind === 'player');
 
     return (
@@ -104,11 +111,21 @@ export function Players({ tokens, onSetStats, onKick, onQr, hidden = false }: Pl
                                         type="button"
                                         className="ttrpg-icon-button ttrpg-icon-button--small"
                                         aria-label={`Numbers of ${player.name}`}
-                                        aria-pressed={editing === player.id}
+                                        aria-pressed={editing?.id === player.id && editing.what === 'numbers'}
                                         title="HP, AC and Perception"
-                                        onClick={() => setEditing((was) => (was === player.id ? null : player.id))}
+                                        onClick={() => toggleEditing(player.id, 'numbers')}
                                     >
                                         <FontAwesomeIcon icon={faHeart} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="ttrpg-icon-button ttrpg-icon-button--small"
+                                        aria-label={`Conditions of ${player.name}`}
+                                        aria-pressed={editing?.id === player.id && editing.what === 'conditions'}
+                                        title="Conditions"
+                                        onClick={() => toggleEditing(player.id, 'conditions')}
+                                    >
+                                        <FontAwesomeIcon icon={faListCheck} />
                                     </button>
                                     {onKick && (
                                         <button
@@ -121,8 +138,15 @@ export function Players({ tokens, onSetStats, onKick, onQr, hidden = false }: Pl
                                             <FontAwesomeIcon icon={faUserXmark} />
                                         </button>
                                     )}
-                                    {editing === player.id && (
+                                    {editing?.id === player.id && editing.what === 'numbers' && (
                                         <StatsForm token={player} onSave={(stats) => onSetStats(player.id, stats)} />
+                                    )}
+                                    {editing?.id === player.id && editing.what === 'conditions' && (
+                                        <ConditionPicker
+                                            system={system}
+                                            conditions={player.conditions ?? []}
+                                            onChange={(conditions) => onSetConditions(player.id, conditions)}
+                                        />
                                     )}
                                 </li>
                             ))}
@@ -267,7 +291,13 @@ export function LiveControls({ live, scenarioId, onStarted, onDone, onError, hid
 
     return (
         <>
-            <Players tokens={live.tokens} onSetStats={live.setStats} onKick={kick} onQr={() => setShowQr(true)} hidden={hidden} />
+            <Players
+                tokens={live.tokens}
+                onSetStats={live.setStats}
+                system={live.system}
+                onSetConditions={live.setConditions}
+                onKick={kick} onQr={() => setShowQr(true)} hidden={hidden}
+            />
             <button type="button" className="ttrpg-segment" title="End the session for everyone" onClick={end}>
                 <FontAwesomeIcon icon={faStop} />
                 End

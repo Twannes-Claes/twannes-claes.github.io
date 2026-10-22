@@ -130,6 +130,18 @@ export interface Token
     perception?: number;
     /** What a screen without the numbers sees instead, see HealthState. */
     state?: HealthState;
+    /** What it suffers from, for everyone to see, see Condition. */
+    conditions?: Condition[];
+}
+
+/**
+ * A condition on a token, like Prone, by its id in content/conditions.ts, with its value for one
+ * that has levels, like Exhaustion 2 or Frightened 1.
+ */
+export interface Condition
+{
+    id: string;
+    value?: number;
 }
 
 /**
@@ -265,6 +277,8 @@ export interface Live
     removeMonster: (tokenId: string) => Promise<void>;
     /** Sets any token's HP, AC and Perception. */
     setStats: (tokenId: string, stats: Stats) => Promise<void>;
+    /** Sets any token's conditions, see Condition. */
+    setConditions: (tokenId: string, conditions: Condition[]) => Promise<void>;
     /** The last attack or heal, null before any, see SharedHit. */
     lastHit: SharedHit | null;
     /** Deals damage to tokens, or heals them, see hit in convex/play.ts. */

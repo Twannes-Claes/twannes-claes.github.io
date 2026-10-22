@@ -10,7 +10,7 @@ import { useAuthActions, useAuthToken, useConvexAuth } from '@convex-dev/auth/re
 import { useConvex, useMutation, useQuery } from 'convex/react';
 import { useActionState, useEffect, useState, type ReactNode } from 'react';
 
-import type { BloodSettings, FogSettings, HitKind, Scenario } from '../types';
+import type { BloodSettings, FogSettings, GameSystem, HitKind, Scenario } from '../types';
 
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
@@ -23,6 +23,7 @@ import { toAvatar } from '../services/images';
 import { sendDoor } from '../services/tableChannel';
 
 import { Backend } from './Backend';
+import { ConditionPicker } from './ConditionPicker';
 import { Loading, Toast, Toasts } from './Feedback';
 import { MapCanvas } from './MapCanvas';
 import { AttackButton, HitSheet } from './HitSheet';
@@ -115,7 +116,7 @@ function Player({ sessionId, table }: PlayerViewProps)
     }
 
     if (table && status.host)
-        return <Table sessionId={status.sessionId} mine={null} frozen={status.frozen} fogLook={status.fogLook} blood={status.blood} />;
+        return <Table sessionId={status.sessionId} mine={null} frozen={status.frozen} fogLook={status.fogLook} blood={status.blood} system={status.system} />;
 
     if (status.kicked)
     {
@@ -130,7 +131,7 @@ function Player({ sessionId, table }: PlayerViewProps)
     if (!status.mine)
         return <JoinForm sessionId={status.sessionId} name={status.name} />;
 
-    return <Table sessionId={status.sessionId} mine={status.mine} frozen={status.frozen} fogLook={status.fogLook} blood={status.blood} />;
+    return <Table sessionId={status.sessionId} mine={status.mine} frozen={status.frozen} fogLook={status.fogLook} blood={status.blood} system={status.system} />;
 }
 
 interface JoinFormProps
@@ -284,6 +285,8 @@ interface TableProps
     fogLook: FogSettings | null;
     /** Which blood the GM lets show, null for all of it. */
     blood: BloodSettings | null;
+    /** The session's game, whose conditions the player picks from. */
+    system: GameSystem;
 }
 
 /**
@@ -293,7 +296,7 @@ interface TableProps
  * fade out like the GM view's controls, and it saves what the party saw, so the fog is remembered
  * while the GM view is in Edit, see saveFog in convex/play.ts.
  */
-function Table({ sessionId, mine, frozen, fogLook, blood }: TableProps)
+function Table({ sessionId, mine, frozen, fogLook, blood, system }: TableProps)
 {
     const onTable = mine === null;
     // What a press does with no ruler on: open doors on the table screen, as in the editor, or on
@@ -321,6 +324,7 @@ function Table({ sessionId, mine, frozen, fogLook, blood }: TableProps)
     const draw = useMutation(api.play.draw);
     const saveFog = useMutation(api.play.saveFog);
     const saveStats = useMutation(api.play.setStats);
+    const saveConditions = useMutation(api.play.setConditions);
     const authToken = useAuthToken();
     const [pending, setPending] = useState<PendingMove | null>(null);
     // The map the path and targets were made on. When the GM opens another, they go: confirmed,
@@ -505,6 +509,23 @@ function Table({ sessionId, mine, frozen, fogLook, blood }: TableProps)
                                     onSave={(stats) =>
                                         saveStats({ tokenId: mine, ...stats }).then(
                                             () => message.done('Your numbers are saved.'),
+                                            (reason: unknown) =>
+                                            {
+                                                throw new Error(explain(reason, 'That did not save. Check the connection and try again.'));
+                                            },
+                                        )}
+                                />
+                            </section>
+                        )}
+                        {token && mine && (
+                            <section className="ttrpg-shortcuts" aria-label="Your conditions">
+                                <h3 className="ttrpg-subhead">Your conditions</h3>
+                                <ConditionPicker
+                                    system={system}
+                                    conditions={token.conditions ?? []}
+                                    onChange={(conditions) =>
+                                        saveConditions({ tokenId: mine, conditions }).then(
+                                            () => undefined,
                                             (reason: unknown) =>
                                             {
                                                 throw new Error(explain(reason, 'That did not save. Check the connection and try again.'));

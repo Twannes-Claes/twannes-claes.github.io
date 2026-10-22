@@ -1,11 +1,12 @@
 import { faShieldHalved, faSkull, type IconDefinition } from '@fortawesome/free-solid-svg-icons';
 
 import type { CreatureSize, Decal, Grid, HealthState, Point, Scenario, Token } from '../types';
+import { conditionKind, type ConditionKind } from '../content/conditions.ts';
 
 import { toWorld, type Camera } from './camera.ts';
-import { blood, bloodDark, danger, door as doorColour, faded, ground, heal, highlight, ink, shield } from './colours.ts';
+import { accent, blood, bloodDark, danger, door as doorColour, faded, ground, heal, highlight, ink, shield } from './colours.ts';
 import { drawFog, type FogLayers, type FogLook } from './fog.ts';
-import type { Area } from './geometry.ts';
+import { distance, type Area } from './geometry.ts';
 import { cellAt, cellCenter, cellCorners, hexRadius } from './grid.ts';
 import { healthState, stateOf } from './health.ts';
 import { cellsAcross } from './size.ts';
@@ -705,6 +706,108 @@ function drawToken(
     }
 
     drawWound(ctx, token, inner, time, motion, wounds);
+
+    // Every value over every badge, so the next badge down never covers one.
+    const badges = conditionBadges(token, base);
+
+    for (const badge of badges)
+        drawBadge(ctx, badge);
+
+    for (const badge of badges)
+        drawBadgeValue(ctx, badge);
+
+}
+
+/** A condition on a token as it shows: a small round badge on its ring, see conditionBadges. */
+export interface Badge extends Point
+{
+    tokenId: string;
+    radius: number;
+    kind: ConditionKind;
+    value?: number;
+}
+
+/** Degrees clockwise from the right: a side's lowest badge, above the HP under the token. */
+const badgeLowest = 35;
+/** And the highest, once a side is full, so the top two still have room between them. */
+const badgeHighest = -70;
+/** Between two badges on a side, while they fit. */
+const badgeStep = 40;
+
+/**
+ * Where a token's conditions sit: badges down its right side, then down its left in the mirrored
+ * slots, so both sides line up and the bottom stays free for the HP. A side has three slots from
+ * the bottom up, the first at the upper right, and more once there are over six, closer together
+ * and smaller so they never overlap. One the app does not know is left out.
+ */
+export function conditionBadges(token: Token, radius: number): Badge[]
+{
+    const shown = (token.conditions ?? []).flatMap((condition) =>
+    {
+        const kind = conditionKind(condition.id);
+
+        return kind ? [{ kind, value: condition.value }] : [];
+    });
+    const slots = Math.max(3, Math.ceil(shown.length / 2));
+    const step = Math.min(badgeStep, (badgeLowest - badgeHighest) / (slots - 1));
+    const size = radius * Math.min(0.3, 0.95 * Math.sin(((step / 2) * Math.PI) / 180));
+
+    return shown.map(({ kind, value }, index) =>
+    {
+        const right = ((badgeLowest - (slots - 1 - (index % slots)) * step) * Math.PI) / 180;
+        // The left mirrors the right across the token's middle.
+        const angle = index < slots ? right : Math.PI - right;
+
+        return { tokenId: token.id, x: token.x + Math.cos(angle) * radius, y: token.y + Math.sin(angle) * radius, radius: size, kind, value };
+    });
+}
+
+/** The badge on top under a point, the last token drawn winning, for its name on hover or tap. */
+export function conditionBadgeAt(tokens: Token[], grid: Grid, at: Point): Badge | undefined
+{
+    return tokens
+        .flatMap((token) => conditionBadges(token, tokenRadius(grid, token.size)))
+        .reverse()
+        .find((badge) => distance(badge, at) <= badge.radius * 1.2);
+}
+
+/** A badge's label, like Frightened 2. */
+export function badgeName(badge: Badge): string
+{
+    return badge.value === undefined ? badge.kind.name : `${badge.kind.name} ${badge.value}`;
+}
+
+/** The icon on the app's dark. */
+function drawBadge(ctx: CanvasRenderingContext2D, { x, y, radius, kind }: Badge)
+{
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = ground;
+    ctx.fill();
+    ctx.lineWidth = radius * 0.12;
+    ctx.strokeStyle = faded(ink, 0.6);
+    ctx.stroke();
+    ctx.fillStyle = ink;
+    drawIcon(ctx, kind.icon, { x, y }, radius * 1.1);
+}
+
+/** A badge's value, if it has one, in a small accent dot at its bottom right. */
+function drawBadgeValue(ctx: CanvasRenderingContext2D, { x, y, radius, value }: Badge)
+{
+    if (value === undefined)
+        return;
+
+    const dot = { x: x + radius * 0.75, y: y + radius * 0.75 };
+
+    ctx.beginPath();
+    ctx.arc(dot.x, dot.y, radius * 0.55, 0, Math.PI * 2);
+    ctx.fillStyle = accent;
+    ctx.fill();
+    ctx.fillStyle = ink;
+    ctx.font = `700 ${radius * 0.8}px 'JetBrains Mono Variable', ui-monospace, monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(value), dot.x, dot.y + radius * 0.05);
 }
 
 /** How long the own token stands still before its ring first shows, how long one pulse lasts, and

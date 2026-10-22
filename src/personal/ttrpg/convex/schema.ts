@@ -26,6 +26,9 @@ export const bloodSettingsValidator = v.object({ ground: v.boolean(), wounds: v.
 /** The game a session is played in, see GameSystem in types.ts. */
 export const systemValidator = v.union(v.literal('5e'), v.literal('pf2e'), v.literal('other'));
 
+/** A condition on a token, see Condition in types.ts. */
+export const conditionValidator = v.object({ id: v.string(), value: v.optional(v.number()) });
+
 /**
  * A scenario as the editor keeps it, see Scenario in types.ts. The saving and loading calls in
  * components/SessionEditor.tsx only type check while the two match.
@@ -150,6 +153,8 @@ export default defineSchema({
         ac: v.optional(v.number()),
         /** Passive Perception. */
         perception: v.optional(v.number()),
+        /** For everyone to see, kept to the session's list, see cleanConditions. */
+        conditions: v.optional(v.array(conditionValidator)),
     })
         .index('by_sessionId_and_userId', ['sessionId', 'userId'])
         .index('by_sessionId_and_scenarioId', ['sessionId', 'scenarioId'])

@@ -768,6 +768,13 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
                             return Promise.resolve();
                         }}
+                        system={system}
+                        onSetConditions={(id, conditions) =>
+                        {
+                            setTokens((current) => current.map((token) => (token.id === id ? { ...token, conditions } : token)));
+
+                            return Promise.resolve();
+                        }}
                         hidden={idle}
                     />
                 )}

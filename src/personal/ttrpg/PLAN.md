@@ -698,6 +698,14 @@ A player at 0 is down and stays on the map. Death saves are kept at the table, s
 - The GM sets them on anyone. A player only on themselves and their summons.
 - No durations: a condition stays until it is taken off. Rounds can count down once initiative (6)
   is built.
+- **Built.** The lists are in `content/conditions.ts`, shared with the server, which keeps what
+  it is sent to the session's list (`cleanConditions`, `play.setConditions`, `tokens.conditions`).
+  Players and Monsters have a Conditions button per row, next to the numbers; a phone has Your
+  conditions in its settings. Each press saves. Badges fill the token's right side from the upper
+  right down, then the left in the mirrored slots, leaving the bottom free for the HP, smaller
+  once there are over six, a value in a small accent dot. The mouse resting on one, or a finger
+  pressing it, names it in a pill. A token keeps what it has when the system changes, even what
+  the new list does not have, until it is changed. The test players take them too.
 
 ### 6. Initiative
 

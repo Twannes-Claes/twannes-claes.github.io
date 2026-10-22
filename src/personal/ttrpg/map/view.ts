@@ -21,6 +21,8 @@ import { distance, midpoint, onMap } from './geometry.ts';
 import { defaultBlood, stateOf } from './health.ts';
 import { extendPath, lineFeet, pathBlocked, pathFeet } from './path.ts';
 import {
+    badgeName,
+    conditionBadgeAt,
     drawHealth,
     drawHit,
     drawPill,
@@ -279,6 +281,12 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     let drops: (Drop & { start: number })[] = [];
     const lastDrop = new Map<string, Point>();
     let blood = defaultBlood;
+    /**
+     * Where the mouse rests or a finger last pressed, in world pixels, and the condition badge
+     * there, whose name shows beside it, see showBadgeAt.
+     */
+    let badgePoint: Point | null = null;
+    let badgeKey = '';
     /** When the phone's own token last stopped walking, for its ring, see drawPulse in map/render.ts. */
     let ownRestedAt = performance.now();
     /** Other screens' paths, see setDrafts. */
@@ -857,6 +865,12 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             }
         }
 
+        // The name of the condition badge the mouse rests on or a finger pressed, over the rest.
+        const badge = badgePoint && conditionBadgeAt(visible, scenario.grid, badgePoint);
+
+        if (badge)
+            drawPill(context, badgeName(badge), badge, camera.zoom, ground, pillScale());
+
         for (const draft of others)
             drawPill(context, `${draft.feet} ft`, draft.points[draft.points.length - 1], camera.zoom, draft.over ? tooFar : ground, pillScale());
 
@@ -984,6 +998,23 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         return [...shown]
             .reverse()
             .find((token) => distance(world, token) <= tokenRadius(current.grid, token.size) * 1.5);
+    };
+
+    /** Names the condition badge under a screen point, or none with null, redrawing on a change. */
+    const showBadgeAt = (screen: Point | null) =>
+    {
+        const shown = fogEnabled && !peek ? tokens.filter(seenByPlayers) : tokens;
+
+        badgePoint = screen && toWorld(camera, screen);
+
+        const badge = badgePoint && scenario ? conditionBadgeAt(shown, scenario.grid, badgePoint) : undefined;
+        const key = badge ? `${badge.tokenId} ${badge.kind.id}` : '';
+
+        if (key !== badgeKey)
+        {
+            badgeKey = key;
+            redraw();
+        }
     };
 
     const moveToken = (id: string, to: Point) =>
@@ -1140,6 +1171,10 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             return;
         }
 
+        // A finger has no hover: a press names the badge under it, until the next press or a pan.
+        if (event.pointerType !== 'mouse')
+            showBadgeAt(local(event));
+
         const idle = pointers.size === 0 && !dragging && !route && toolPointerId === null;
         const target = idle && targets && scenario ? tokenAt(local(event), scenario) : undefined;
 
@@ -1255,6 +1290,9 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         // The tool's own drag, or a mouse hovering, which tools use for their previews.
         if (pressed || (!previous && !dragging && !route))
         {
+            if (!pressed && event.pointerType === 'mouse')
+                showBadgeAt(local(event));
+
             if (tool && scenario)
             {
                 tool.move(toolPointer(event, scenario), pressed);
@@ -1277,6 +1315,9 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         const other = [...pointers].find(([id]) => id !== event.pointerId);
 
         pointers.set(event.pointerId, point);
+
+        if (badgeKey && distance(point, previous) > 0)
+            showBadgeAt(null);
 
         if (!other)
         {
@@ -1473,8 +1514,15 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     };
 
     const observer = new ResizeObserver(resize);
+    const leave = (event: PointerEvent) =>
+    {
+        if (event.pointerType === 'mouse')
+            showBadgeAt(null);
+
+    };
 
     observer.observe(canvas);
+    canvas.addEventListener('pointerleave', leave);
     canvas.addEventListener('pointerdown', down);
     canvas.addEventListener('pointermove', move);
     canvas.addEventListener('pointerup', up);
@@ -1714,6 +1762,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             letGo();
             window.clearTimeout(draftTimer);
             observer.disconnect();
+            canvas.removeEventListener('pointerleave', leave);
             canvas.removeEventListener('pointerdown', down);
             canvas.removeEventListener('pointermove', move);
             canvas.removeEventListener('pointerup', up);
