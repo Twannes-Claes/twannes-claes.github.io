@@ -23,6 +23,9 @@ export const fogSettingsValidator = v.object({
 /** Which blood shows, see BloodSettings in types.ts. */
 export const bloodSettingsValidator = v.object({ ground: v.boolean(), wounds: v.boolean() });
 
+/** The game a session is played in, see GameSystem in types.ts. */
+export const systemValidator = v.union(v.literal('5e'), v.literal('pf2e'), v.literal('other'));
+
 /**
  * A scenario as the editor keeps it, see Scenario in types.ts. The saving and loading calls in
  * components/SessionEditor.tsx only type check while the two match.
@@ -107,6 +110,8 @@ export default defineSchema({
         fogLook: v.optional(fogSettingsValidator),
         /** Which blood every screen shows, see BloodSettings in types.ts. Missing shows it all. */
         blood: v.optional(bloodSettingsValidator),
+        /** The game it is played in. Missing is 5e. */
+        system: v.optional(systemValidator),
     }).index('by_ownerId', ['ownerId']),
     /**
      * Who stands where while a session is played. Players' tokens carry their anonymous user, so a

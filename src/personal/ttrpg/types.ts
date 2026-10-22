@@ -300,7 +300,15 @@ export interface Live
     /** Which blood every screen shows, null until the game master changes it. */
     blood: BloodSettings | null;
     setBlood: (blood: BloodSettings) => Promise<void>;
+    system: GameSystem;
+    setSystem: (system: GameSystem) => Promise<void>;
 }
+
+/**
+ * The game a session is played in, set in the gear's Table tab. It only changes what the games
+ * do differently, see Game system in PLAN.md. Other plays as 5e.
+ */
+export type GameSystem = '5e' | 'pf2e' | 'other';
 
 /**
  * Which blood shows, set by the game master for the whole table from the gear in the editor, as

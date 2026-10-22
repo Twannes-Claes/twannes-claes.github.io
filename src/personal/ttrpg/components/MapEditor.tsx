@@ -2,9 +2,10 @@ import { faCheck, faHatWizard, faPen, faSnowflake, faTriangleExclamation, faTv }
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useEffectEvent, useRef, useState, type DragEvent, type MouseEvent } from 'react';
 
-import type { BloodSettings, Decal, FogSettings, HitKind, Live, PictureBytes, Ping, Point, PropPicture, Scenario, SharedHit, Store } from '../types';
+import type { BloodSettings, Decal, FogSettings, GameSystem, HitKind, Live, PictureBytes, Ping, Point, PropPicture, Scenario, SharedHit, Store } from '../types';
 
 import { blankScenario, demoTokens } from '../content/scenarios';
+import { gameSystems } from '../content/systems';
 import { defaultFogSettings } from '../map/fog';
 import { cleanStats, defaultBlood, downedPool, hitOn, withoutNumbers } from '../map/health';
 import { toggleDoor, type ToolId } from '../map/tools';
@@ -133,6 +134,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const [localDecals, setLocalDecals] = useState<Decal[]>([]);
     // Which blood shows: the session's when it is saved, this tab's in the demo.
     const [demoBlood, setDemoBlood] = useState(defaultBlood);
+    const [demoSystem, setDemoSystem] = useState<GameSystem>('5e');
     // The tokens picked for an attack or a heal, or null when not picking, see HitSheet.
     const [targets, setTargets] = useState<string[] | null>(null);
     const [fogDraft, setFogDraft] = useState<FogSettings | null>(null);
@@ -377,6 +379,9 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
             setDemoBlood({ ...blood, ...change });
 
     };
+
+    const system = live ? live.system : demoSystem;
+    const setSystem = (next: GameSystem) => (live ? fail(live.setSystem(next)) : setDemoSystem(next));
 
     const clearDecals = () =>
     {
@@ -781,29 +786,47 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                     onChange={setScreen}
                     hidden={idle}
                     table={
-                        <section className="ttrpg-shortcuts" aria-label="Blood">
-                            <h3 className="ttrpg-subhead">Blood</h3>
-                            <div className="ttrpg-settings__choices">
-                                <button
-                                    type="button"
-                                    className="ttrpg-segment"
-                                    aria-pressed={blood.ground}
-                                    title="Trails behind badly hurt tokens, and a pool where a monster falls"
-                                    onClick={() => setBlood({ ground: !blood.ground })}
-                                >
-                                    On the ground
-                                </button>
-                                <button
-                                    type="button"
-                                    className="ttrpg-segment"
-                                    aria-pressed={blood.wounds}
-                                    title="Red rising in a hurt token, and drips once it is bloodied"
-                                    onClick={() => setBlood({ wounds: !blood.wounds })}
-                                >
-                                    On tokens
-                                </button>
-                            </div>
-                        </section>
+                        <>
+                            <section className="ttrpg-shortcuts" aria-label="Game system">
+                                <h3 className="ttrpg-subhead">Game system</h3>
+                                <div className="ttrpg-settings__choices">
+                                    {gameSystems.map((choice) => (
+                                        <button
+                                            key={choice.id}
+                                            type="button"
+                                            className="ttrpg-segment"
+                                            aria-pressed={system === choice.id}
+                                            onClick={() => setSystem(choice.id)}
+                                        >
+                                            {choice.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            </section>
+                            <section className="ttrpg-shortcuts" aria-label="Blood">
+                                <h3 className="ttrpg-subhead">Blood</h3>
+                                <div className="ttrpg-settings__choices">
+                                    <button
+                                        type="button"
+                                        className="ttrpg-segment"
+                                        aria-pressed={blood.ground}
+                                        title="Trails behind badly hurt tokens, and a pool where a monster falls"
+                                        onClick={() => setBlood({ ground: !blood.ground })}
+                                    >
+                                        On the ground
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="ttrpg-segment"
+                                        aria-pressed={blood.wounds}
+                                        title="Red rising in a hurt token, and drips once it is bloodied"
+                                        onClick={() => setBlood({ wounds: !blood.wounds })}
+                                    >
+                                        On tokens
+                                    </button>
+                                </div>
+                            </section>
+                        </>
                     }
                 />
             </div>

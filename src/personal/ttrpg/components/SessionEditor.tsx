@@ -97,6 +97,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const resetFog = useMutation(api.play.resetFog);
     const setFogLook = useMutation(api.play.setFogLook);
     const setBlood = useMutation(api.play.setBlood);
+    const setSystem = useMutation(api.sessions.setSystem);
     const startSession = useMutation(api.play.start);
     const endSession = useMutation(api.play.end);
     const freezeSession = useMutation(api.play.freeze);
@@ -189,6 +190,8 @@ function Session({ sessionId, debug }: SessionEditorProps)
             setFogLook: (look) => friendly(setFogLook({ sessionId: id, look })),
             blood: status.blood,
             setBlood: (blood) => friendly(setBlood({ sessionId: id, blood })),
+            system: status.system,
+            setSystem: (system) => friendly(setSystem({ sessionId: id, system })),
         }
         : undefined;
 

@@ -5,7 +5,7 @@ import { demoOgre, demoScenario } from '../content/scenarios';
 import type { Id } from './_generated/dataModel';
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireHost, requireSession } from './access';
-import { scenarioValidator } from './schema';
+import { scenarioValidator, systemValidator } from './schema';
 import { refreshSight, tokensOf } from './sight';
 import { dropFile, totalBytes } from './usage';
 
@@ -118,6 +118,18 @@ export const create = mutation({
             order: [],
             updatedAt: Date.now(),
         });
+    },
+});
+
+/** The host changes the game a session is played in, see GameSystem in types.ts. */
+export const setSystem = mutation({
+    args: { sessionId: v.id('sessions'), system: systemValidator },
+    handler: async (ctx, { sessionId, system }) =>
+    {
+        await requireSession(ctx, sessionId);
+        await ctx.db.patch('sessions', sessionId, { system });
+
+        return null;
     },
 });
 

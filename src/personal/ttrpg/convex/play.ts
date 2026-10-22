@@ -186,6 +186,7 @@ export const status = query({
             kicked: session.kicked?.includes(userId) === true,
             fogLook: session.fogLook ?? null,
             blood: session.blood ?? null,
+            system: session.system ?? '5e',
             password: host ? (session.password ?? '') : null,
         };
     },

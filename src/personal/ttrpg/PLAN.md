@@ -691,8 +691,13 @@ A player at 0 is down and stays on the map. Death saves are kept at the table, s
 
 ### 5. Conditions
 
-- A fixed list, shown as small icons on the token, for players and monsters alike.
+- A fixed list per game system (11): the 5e conditions with exhaustion's levels, or the
+  Pathfinder 2e ones with their values, like Frightened 2. Other uses the 5e list.
+- Shown as small round badges on the token's edge, Font Awesome icons, the name on hover or tap.
+  Everyone sees them on any token they can see, monsters too, as at the table.
 - The GM sets them on anyone. A player only on themselves and their summons.
+- No durations: a condition stays until it is taken off. Rounds can count down once initiative (6)
+  is built.
 
 ### 6. Initiative
 
@@ -758,10 +763,13 @@ Built into play mode neatly, it should look and feel good.
 
 ### 11. Game system
 
-- Each session has a system, picked when it is made and changeable later: **5e**, **Pathfinder
-  2e** or **Other**.
-- It only changes the few things the games do differently: the cone's shape (16) and the
-  initiative hint (6). The rest of the app stays the same for every system.
+- Each session has a system, a table setting in the gear: **D&D 5e**, **Pathfinder 2e** or
+  **Other**.
+- It only changes the few things the games do differently: the conditions (5), the cone's shape
+  (16) and the initiative hint (6). The rest of the app stays the same for every system.
+- **Built**, before 5, which needs it. `sessions.system`, missing for 5e, set in the gear's
+  Table tab (`sessions.setSystem`), not in the new session form. `play.status` hands it to the
+  editor; the names are in `content/systems.ts`. Nothing reads it yet, the conditions are first.
 
 ### 12. Props the GM can move
 
