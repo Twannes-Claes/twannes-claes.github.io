@@ -36,6 +36,8 @@ interface MapCanvasProps
     own?: string | null;
     /** Hears where a token dragged freely lands: anything in edit mode, monsters in play. */
     onTokenMove?: (id: string, to: Point) => void;
+    /** Hears the monsters the erase tool took, already asked about. */
+    onMonstersErase?: (ids: string[]) => void;
     /** Hears a path a player let go of. */
     onPathEnd?: (move: PendingMove) => void;
     /** Hears every change a tool makes to the scenario. */
@@ -88,7 +90,12 @@ interface MapCanvasProps
     blood?: BloodSettings;
     /** The token whose turn it is in a fight, ringed, see Initiative. */
     turn?: string | null;
+    /** Hears a preset dragged from the library and let go over the map, see PresetLibrary.tsx. */
+    onPresetDrop?: (presetId: string, at: Point) => void;
 }
+
+/** What a preset tile carries while it is dragged, its id. */
+export const presetDragType = 'application/x-ttrpg-preset';
 
 /**
  * The map, filling the screen. Drawing, gestures and tools live in map/; this only mounts the
@@ -108,6 +115,7 @@ export function MapCanvas({
     peek,
     own = null,
     onTokenMove,
+    onMonstersErase,
     onPathEnd,
     onScenarioChange,
     onStats,
@@ -131,12 +139,14 @@ export function MapCanvas({
     decals = noDecals,
     blood = defaultBlood,
     turn = null,
+    onPresetDrop,
 }: MapCanvasProps)
 {
     const canvas = useRef<HTMLCanvasElement>(null);
     const view = useRef<MapView | null>(null);
     // The view is made once, so it calls the latest handlers through these rather than the first.
     const tokenMoved = useEffectEvent((id: string, to: Point) => onTokenMove?.(id, to));
+    const monstersErased = useEffectEvent((ids: string[]) => onMonstersErase?.(ids));
     const scenarioChanged = useEffectEvent((next: Scenario) => onScenarioChange?.(next));
     const pathEnded = useEffectEvent((move: PendingMove) => onPathEnd?.(move));
     const measured = useEffectEvent((stats: FrameStats) => onStats?.(stats));
@@ -159,6 +169,7 @@ export function MapCanvas({
 
         const created = createMapView(canvas.current, {
             onTokenMove: (id, to) => tokenMoved(id, to),
+            onMonstersErase: (ids) => monstersErased(ids),
             onScenarioChange: (next) => scenarioChanged(next),
             onPathEnd: (move) => pathEnded(move),
             onStats: (stats) => measured(stats),
@@ -312,7 +323,27 @@ export function MapCanvas({
 
     return (
         <>
-            <canvas ref={canvas} className="ttrpg-map" aria-label={`Battle map: ${scenario.name}`} />
+            <canvas
+                ref={canvas}
+                className="ttrpg-map"
+                aria-label={`Battle map: ${scenario.name}`}
+                onDragOver={(event) =>
+                {
+                    if (onPresetDrop && event.dataTransfer.types.includes(presetDragType))
+                        event.preventDefault();
+
+                }}
+                onDrop={(event) =>
+                {
+                    const presetId = event.dataTransfer.getData(presetDragType);
+
+                    if (!onPresetDrop || !presetId || !view.current)
+                        return;
+
+                    event.preventDefault();
+                    onPresetDrop(presetId, view.current.worldAt({ x: event.clientX, y: event.clientY }));
+                }}
+            />
             {/* The demo's picture is free to use with attribution, so the public demo credits its
                 maker. Sessions are played in private, so the example session and its copies
                 show the map alone. */}

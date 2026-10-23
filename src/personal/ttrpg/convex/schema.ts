@@ -167,10 +167,15 @@ export default defineSchema({
         perception: v.optional(v.number()),
         /** For everyone to see, kept to the session's list, see cleanConditions. */
         conditions: v.optional(v.array(conditionValidator)),
+        /** A monster that goes down at 0 HP instead of dying. For the host, like the numbers. */
+        downs: v.optional(v.boolean()),
+        /** The preset a monster was placed from, for its stat block in the GM view. */
+        presetId: v.optional(v.id('presets')),
     })
         .index('by_sessionId_and_userId', ['sessionId', 'userId'])
         .index('by_sessionId_and_scenarioId', ['sessionId', 'scenarioId'])
-        .index('by_avatarId', ['avatarId']),
+        .index('by_avatarId', ['avatarId'])
+        .index('by_presetId', ['presetId']),
     /**
      * What the party has seen of each scenario of a session, see SharedFog in types.ts. Its own
      * table, so the frequent fog saves never rewrite the scenario.
@@ -304,4 +309,18 @@ export default defineSchema({
         .index('by_ownerId', ['ownerId'])
         .index('by_ownerId_and_hash', ['ownerId', 'hash'])
         .index('by_storageId', ['storageId']),
+    /** The monster presets of each game master, stat blocks in Markdown, see presets.ts. */
+    presets: defineTable({
+        ownerId: v.id('users'),
+        name: v.string(),
+        markdown: v.string(),
+        downs: v.boolean(),
+        /** The ring of every monster placed from it. */
+        color: v.string(),
+        /** A 256 px picture in Convex storage, which monsters placed from it show too. */
+        avatar: v.optional(v.string()),
+        avatarId: v.optional(v.id('_storage')),
+    })
+        .index('by_ownerId', ['ownerId'])
+        .index('by_avatarId', ['avatarId']),
 });

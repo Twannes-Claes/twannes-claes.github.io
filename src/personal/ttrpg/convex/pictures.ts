@@ -23,9 +23,9 @@ const maxPictureBytes = 15 * 1024 * 1024;
 export const pictureTypes = ['image/webp', 'image/png', 'image/jpeg'];
 
 /**
- * Whether a stored file already belongs to a prop, a map or a token. A storage id is part of the
- * file's public address, so without this a host could register someone else's file as their own
- * and then delete it.
+ * Whether a stored file already belongs to a prop, a map, a token or a preset. A storage id is part
+ * of the file's public address, so without this a host could register someone else's file as their
+ * own and then delete it.
  */
 async function claimed(ctx: QueryCtx, storageId: Id<'_storage'>): Promise<boolean>
 {
@@ -41,8 +41,12 @@ async function claimed(ctx: QueryCtx, storageId: Id<'_storage'>): Promise<boolea
         .query('tokens')
         .withIndex('by_avatarId', (q) => q.eq('avatarId', storageId))
         .first();
+    const preset = await ctx.db
+        .query('presets')
+        .withIndex('by_avatarId', (q) => q.eq('avatarId', storageId))
+        .first();
 
-    return prop !== null || map !== null || avatar !== null;
+    return prop !== null || map !== null || avatar !== null || preset !== null;
 }
 
 /**

@@ -4,7 +4,7 @@ import { ConvexError } from 'convex/values';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import type { Decal, Draft, Live, PictureBytes, PropPicture, Scenario, SharedMark, Token } from '../types';
+import type { Decal, Draft, Live, PictureBytes, Preset, PropPicture, Scenario, SharedMark, Token } from '../types';
 
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
@@ -43,8 +43,8 @@ function friendly(call: Promise<unknown>): Promise<void>
     );
 }
 
-/** A monster's picture, shrunk like a player's and uploaded, or nothing without one. */
-function monsterPicture(picture: Blob | null): Promise<Id<'_storage'> | undefined>
+/** A preset's picture, shrunk like a player's and uploaded, or nothing without one. */
+function presetPicture(picture: Blob | null): Promise<Id<'_storage'> | undefined>
 {
     if (!picture)
         return Promise.resolve(undefined);
@@ -60,6 +60,8 @@ const noTokens: Token[] = [];
 const noDrafts: Draft[] = [];
 const noMarks: SharedMark[] = [];
 const noDecals: Decal[] = [];
+const noPresets: Preset[] = [];
+const noMonsters: Live['monsters'] = [];
 
 /**
  * A saved session in the editor: loaded once when it opens, then the editor holds it and saves
@@ -93,6 +95,12 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const decals = useQuery(api.play.decals, following ? { sessionId: id } : 'skip');
     const drafts = useQuery(api.play.drafts, following ? { sessionId: id } : 'skip');
     const marks = useQuery(api.play.marks, following ? { sessionId: id } : 'skip');
+    const presets = useQuery(api.presets.list, following ? {} : 'skip');
+    const monsters = useQuery(api.play.monsters, following ? { sessionId: id } : 'skip');
+    const placeMonster = useMutation(api.play.placeMonster);
+    const setMonster = useMutation(api.play.setMonster);
+    const savePreset = useMutation(api.presets.save);
+    const removePreset = useMutation(api.presets.remove);
     const saveFog = useMutation(api.play.saveFog);
     const resetFog = useMutation(api.play.resetFog);
     const setFogLook = useMutation(api.play.setFogLook);
@@ -106,7 +114,6 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const openScenario = useMutation(api.play.open);
     const moveToken = useMutation(api.play.move);
     const kickPlayer = useMutation(api.play.kick);
-    const addNpc = useMutation(api.play.addMonster);
     const hideNpc = useMutation(api.play.hide);
     const removeNpc = useMutation(api.play.removeMonster);
     const setStats = useMutation(api.play.setStats);
@@ -162,17 +169,10 @@ function Session({ sessionId, debug }: SessionEditorProps)
             move: (tokenId, to, path) =>
                 friendly(moveToken({ tokenId: tokenId as Id<'tokens'>, x: to.x, y: to.y, path })),
             kick: (tokenId) => friendly(kickPlayer({ tokenId: tokenId as Id<'tokens'> })),
-            addMonster: ({ picture, ...monster }, at) =>
-                friendly(
-                    monsterPicture(picture)
-                        .then((storageId) => addNpc({ sessionId: id, ...monster, x: at.x, y: at.y, storageId }))
-                        .then((added) =>
-                        {
-                            if (!added)
-                                throw new ConvexError('That picture was refused. Pick another one.');
-
-                        }),
-                ),
+            monsters: monsters ?? noMonsters,
+            placeMonster: (presetId, scenarioId, at) =>
+                friendly(placeMonster({ sessionId: id, scenarioId, presetId: presetId as Id<'presets'>, x: at.x, y: at.y })),
+            setMonster: (tokenId, monster) => friendly(setMonster({ tokenId: tokenId as Id<'tokens'>, ...monster })),
             hide: (tokenId, hidden) => friendly(hideNpc({ tokenId: tokenId as Id<'tokens'>, hidden })),
             removeMonster: (tokenId) => friendly(removeNpc({ tokenId: tokenId as Id<'tokens'> })),
             setStats: (tokenId, stats) => friendly(setStats({ tokenId: tokenId as Id<'tokens'>, ...stats })),
@@ -200,6 +200,22 @@ function Session({ sessionId, debug }: SessionEditorProps)
             setInitiative: (fight) => friendly(setInitiative({ sessionId: id, initiative: fight })),
             upNext: status.upNext,
             setUpNext: (on) => friendly(setUpNext({ sessionId: id, upNext: on })),
+            presets: presets ?? noPresets,
+            savePreset: (preset, picture, presetId) =>
+                presetPicture(picture)
+                    .then((storageId) => savePreset({ ...preset, storageId, presetId: presetId as Id<'presets'> | undefined }))
+                    .then((saved) =>
+                    {
+                        if (!saved)
+                            throw new ConvexError('That picture was refused. Pick another one.');
+
+                        return saved;
+                    })
+                    .catch((reason: unknown) =>
+                    {
+                        throw new Error(explain(reason, 'That preset did not save. Try again.'));
+                    }),
+            removePreset: (presetId) => friendly(removePreset({ presetId: presetId as Id<'presets'> })),
         }
         : undefined;
 

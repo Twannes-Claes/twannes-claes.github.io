@@ -1,19 +1,22 @@
 import { faCheck, faDiceD20, faHatWizard, faPen, faSnowflake, faTriangleExclamation, faTv } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useEffect, useEffectEvent, useRef, useState, type DragEvent, type MouseEvent } from 'react';
+import { useEffect, useEffectEvent, useState, type DragEvent, type MouseEvent } from 'react';
 
-import type { BloodSettings, Decal, FogSettings, GameSystem, HitKind, Initiative, Live, PictureBytes, Ping, Point, PropPicture, Scenario, SharedHit, Store, Token } from '../types';
+import type { BloodSettings, Decal, FogSettings, GameSystem, HitKind, Initiative, Live, MonsterControls, PictureBytes, Ping, Point, Preset, PropPicture, Scenario, SharedHit, Store, Token } from '../types';
 
+import { cleanConditions } from '../content/conditions';
 import { blankScenario, demoTokens } from '../content/scenarios';
+import { demoOgrePreset } from '../content/statBlocks';
 import { gameSystems } from '../content/systems';
 import { defaultFogSettings } from '../map/fog';
 import { cleanStats, defaultBlood, downedPool, hitOn, withoutNumbers } from '../map/health';
 import { nextTurn } from '../map/initiative';
+import { monsterFrom } from '../map/presets';
 import { toggleDoor, type ToolId } from '../map/tools';
 import { scenarioFromUvtt } from '../map/uvtt';
 import type { FrameStats, PendingMove } from '../map/view';
 import { confirmAction } from '../services/confirm';
-import { baseName } from '../services/images';
+import { baseName, toAvatar } from '../services/images';
 import { listenForDoors, type DoorChange } from '../services/tableChannel';
 
 import { Spinner, Toast, Toasts } from './Feedback';
@@ -23,9 +26,10 @@ import { GridPanel } from './GridPanel';
 import { InitiativePanel } from './InitiativePanel';
 import { LiveControls, Players } from './LiveControls';
 import { MapCanvas } from './MapCanvas';
-import { Monsters } from './Monsters';
+import { MonsterList, Monsters } from './Monsters';
 import { MoveSheet } from './MoveSheet';
 import { PlayDock, type PlayTool } from './PlayDock';
+import { PresetLibrary } from './PresetLibrary';
 import { PropLibrary } from './PropLibrary';
 import { RulerPicker } from './RulerPicker';
 import { ScenarioList } from './ScenarioList';
@@ -154,14 +158,14 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     // Which blood shows: the session's when it is saved, this tab's in the demo.
     const [demoBlood, setDemoBlood] = useState(defaultBlood);
     const [demoSystem, setDemoSystem] = useState<GameSystem>('5e');
+    // The demo's monster presets, kept in this tab, starting with the ogre on its map.
+    const [demoPresets, setDemoPresets] = useState<Preset[]>(() => [demoOgrePreset]);
     // The fight off a live map, with the test players, and whether Up next is on in the demo.
     const [localFight, setLocalFight] = useState<Initiative | null>(null);
     const [demoUpNext, setDemoUpNext] = useState(false);
     // The tokens picked for an attack or a heal, or null when not picking, see HitSheet.
     const [targets, setTargets] = useState<string[] | null>(null);
     const [fogDraft, setFogDraft] = useState<FogSettings | null>(null);
-    // The middle of the screen, where a new monster goes. A ref: it changes every frame.
-    const viewCenter = useRef<Point | null>(null);
     const [stats, setStats] = useState<FrameStats | null>(null);
     const [screen, setScreen] = useScreenSettings();
     const playing = mode !== 'edit';
@@ -313,19 +317,111 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     // The map being played shows the players' tokens, live. Any other map, or a session not
     // started, previews play mode with the two test players.
     const liveMap = live && live.live && live.activeScenarioId === active.id ? live : null;
-    const shown = liveMap ? liveMap.tokens : tokens;
+    // A saved session's monsters stand on their map whether it is played or not, beside the test
+    // players, see placeMonster in convex/play.ts. The demo's are in this tab with the players.
+    const monstersHere = liveMap
+        ? liveMap.tokens.filter((token) => token.kind === 'npc')
+        : live
+            ? live.monsters.filter((monster) => monster.scenarioId === active.id)
+            : tokens.filter((token) => token.kind === 'npc');
+    const shown = liveMap ? liveMap.tokens : live ? [...tokens.filter((token) => token.kind === 'player'), ...monstersHere] : tokens;
     const isFrozen = liveMap ? liveMap.frozen : frozen;
 
     const fail = (promise: Promise<void>) => void promise.catch((reason: Error) => message.error(reason.message));
 
+    const changeMonster = (id: string, change: (token: Token) => Token) =>
+    {
+        setTokens((current) => current.map((token) => (token.id === id ? change(token) : token)));
+
+        return Promise.resolve();
+    };
+
+    // The demo's presets and monsters, done here in the tab the way the server does them for a
+    // saved session, and never sent anywhere, so all of it can be tried without an account.
+    const demoMonsters: MonsterControls = {
+        system: demoSystem,
+        presets: demoPresets,
+        savePreset: async (preset, picture, id) =>
+        {
+            const avatar = picture ? URL.createObjectURL(await toAvatar(picture)) : undefined;
+            const saved = id ?? crypto.randomUUID();
+
+            setDemoPresets((current) =>
+            {
+                const was = current.find((other) => other.id === saved);
+                const next = { ...preset, id: saved, avatar: avatar ?? was?.avatar };
+
+                return (was ? current.map((other) => (other.id === saved ? next : other)) : [...current, next]).sort((a, b) => a.name.localeCompare(b.name));
+            });
+
+            if (avatar)
+                setTokens((current) => current.map((token) => (token.presetId === saved ? { ...token, avatar } : token)));
+
+            return saved;
+        },
+        removePreset: (id) =>
+        {
+            setDemoPresets((current) => current.filter((preset) => preset.id !== id));
+            setTokens((current) => current.map((token) => (token.presetId === id ? { ...token, presetId: undefined, avatar: undefined } : token)));
+
+            return Promise.resolve();
+        },
+        placeMonster: (presetId, scenarioId, at) =>
+        {
+            const preset = demoPresets.find((other) => other.id === presetId);
+
+            // The demo's tokens are the open map's, so a drop only lands there.
+            if (preset && scenarioId === active.id)
+            {
+                setTokens((current) => [
+                    ...current,
+                    { id: crypto.randomUUID(), presetId, ...monsterFrom(preset, active.grid, at, new Set(current.map((token) => token.name))) },
+                ]);
+            }
+
+            return Promise.resolve();
+        },
+        setMonster: (id, { name, color, downs }) =>
+            changeMonster(id, (token) => ({ ...token, name: name.trim().slice(0, 30) || token.name, color, downs: downs || undefined })),
+        hide: (id, hidden) => changeMonster(id, (token) => ({ ...token, hidden })),
+        removeMonster: (id) =>
+        {
+            setTokens((current) => current.filter((token) => token.id !== id));
+
+            return Promise.resolve();
+        },
+        setStats: (id, stats) => changeMonster(id, (token) => ({ ...token, ...cleanStats(stats) })),
+        setConditions: (id, conditions) => changeMonster(id, (token) => ({ ...token, conditions: cleanConditions(demoSystem, conditions) })),
+    };
+    const monsterControls = live ?? demoMonsters;
+
     const moveToken = (id: string, to: Point) =>
     {
-        if (liveMap)
-            fail(liveMap.move(id, to));
+        const saved = liveMap ?? (live && monstersHere.some((monster) => monster.id === id) ? live : null);
+
+        if (saved)
+            fail(saved.move(id, to));
         else
             setTokens((current) => current.map((token) => (token.id === id ? { ...token, ...to } : token)));
 
     };
+
+    // Monsters leave the map for good, unlike the walls and props undo brings back, so whatever
+    // calls this asks first: the erase tool, or the bin beside one in the Monsters panel.
+    const removeMonsters = (ids: string[]) =>
+    {
+        for (const id of ids)
+            fail(monsterControls.removeMonster(id));
+
+    };
+
+    const eraseMonster = (monster: Token) =>
+        void confirmAction(`Remove ${monster.name} from the map?`, 'Remove').then((yes) =>
+        {
+            if (yes)
+                removeMonsters([monster.id]);
+
+        });
 
     const walker = pending ? shown.find((token) => token.id === pending.id) : undefined;
 
@@ -697,14 +793,12 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 frozen={isFrozen}
                 peek={mode === 'gm'}
                 onTokenMove={moveToken}
+                onMonstersErase={removeMonsters}
                 onPathEnd={setPending}
                 onPathCancel={() => setPending(null)}
                 onScenarioChange={changeScenario}
                 onStats={showStats ? setStats : undefined}
-                onView={(center) =>
-                {
-                    viewCenter.current = center;
-                }}
+                onPresetDrop={playing ? undefined : (presetId, at) => fail(monsterControls.placeMonster(presetId, active.id, at))}
                 onToolCancel={putToolAway}
                 shared={liveMap ? liveMap.fog : null}
                 onExplored={liveMap ? (fog, forget) => fail(liveMap.saveFog(fog, forget)) : undefined}
@@ -926,6 +1020,25 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                         onUndo={history.undo}
                         onRedo={history.redo}
                     />
+                    {tool === 'monsters' && (
+                        <PresetLibrary
+                            presets={monsterControls.presets}
+                            system={system}
+                            monsters={monstersHere}
+                            onSave={monsterControls.savePreset}
+                            onRemove={(preset) => monsterControls.removePreset(preset.id).then(() => message.done(`Deleted ${preset.name}.`))}
+                            onDone={message.done}
+                            onError={message.error}
+                        >
+                            <MonsterList
+                                controls={monsterControls}
+                                monsters={monstersHere}
+                                onRemove={eraseMonster}
+                                onError={message.error}
+                                statBlockClass="ttrpg-statblock-panel ttrpg-statblock-panel--beside"
+                            />
+                        </PresetLibrary>
+                    )}
                     {tool === 'props' && (
                         <PropLibrary
                             pictures={library}
@@ -972,7 +1085,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                         activeId={active.id}
                         onScenario={select}
                         hidden={idle}
-                        onMonsters={liveMap ? () => togglePanel('monsters') : undefined}
+                        onMonsters={() => togglePanel('monsters')}
                         monstersOpen={panel === 'monsters'}
                         onFog={() => togglePanel('fog')}
                         fogOpen={panel === 'fog'}
@@ -1012,12 +1125,12 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 <InitiativePanel fight={fight} tokens={shown} system={system} onChange={setFight} onClose={() => setPanel(null)} />
             )}
 
-            {mode === 'gm' && !pending && !idle && liveMap && panel === 'monsters' && (
+            {mode === 'gm' && !pending && !idle && panel === 'monsters' && (
                 <Monsters
-                    live={liveMap}
-                    at={() => viewCenter.current ?? active.spawn}
+                    controls={monsterControls}
+                    monsters={monstersHere}
                     onClose={() => setPanel(null)}
-                    onDone={message.done}
+                    onRemove={eraseMonster}
                     onError={message.error}
                 />
             )}

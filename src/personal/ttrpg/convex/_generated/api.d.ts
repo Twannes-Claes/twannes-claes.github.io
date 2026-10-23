@@ -14,6 +14,7 @@ import type * as hosts from "../hosts.js";
 import type * as http from "../http.js";
 import type * as pictures from "../pictures.js";
 import type * as play from "../play.js";
+import type * as presets from "../presets.js";
 import type * as sessions from "../sessions.js";
 import type * as sight from "../sight.js";
 import type * as usage from "../usage.js";
@@ -31,6 +32,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   pictures: typeof pictures;
   play: typeof play;
+  presets: typeof presets;
   sessions: typeof sessions;
   sight: typeof sight;
   usage: typeof usage;

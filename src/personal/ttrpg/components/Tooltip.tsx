@@ -147,12 +147,17 @@ export function TooltipHost()
             // A warning is read out, as the browser's own would be; a title is already the label.
             role={tip.invalid ? 'alert' : undefined}
             aria-hidden={tip.invalid ? undefined : true}
+            // A popover, so it shows in the top layer, above an open dialog and its backdrop.
+            popover="manual"
             // Centred on the element, but slid along to stay on screen, which needs its width. The
             // control size zooms the tip, its place included, so the place is divided back.
             ref={(node) =>
             {
                 if (!node)
                     return;
+
+                if (!node.matches(':popover-open'))
+                    node.showPopover();
 
                 const zoom = parseFloat(getComputedStyle(node).zoom) || 1;
                 const half = node.getBoundingClientRect().width / 2;

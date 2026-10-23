@@ -1,4 +1,4 @@
-import { faShieldHalved, faSkull, type IconDefinition } from '@fortawesome/free-solid-svg-icons';
+import { faEyeSlash, faShieldHalved, faSkull, type IconDefinition } from '@fortawesome/free-solid-svg-icons';
 
 import type { CreatureSize, Decal, Grid, HealthState, Point, Scenario, Token } from '../types';
 import { conditionKind, type ConditionKind } from '../content/conditions.ts';
@@ -709,6 +709,9 @@ function drawToken(
 
     drawWound(ctx, token, inner, time, motion, wounds);
 
+    if (token.hidden)
+        drawHidden(ctx, token, inner, radius);
+
     // Every value over every badge, so the next badge down never covers one.
     const badges = conditionBadges(token, base);
 
@@ -718,6 +721,33 @@ function drawToken(
     for (const badge of badges)
         drawBadgeValue(ctx, badge);
 
+}
+
+/**
+ * A monster the GM keeps from the players, as only the GM's screens get it: dimmed, an eye struck
+ * through over it, unless the skull of a downed one is there already, and a dashed line around it.
+ */
+function drawHidden(ctx: CanvasRenderingContext2D, token: Lifted, inner: number, radius: number)
+{
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(token.x, token.y, inner, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgb(18 17 19 / 0.5)';
+    ctx.fill();
+
+    if (stateOf(token) !== 'down')
+    {
+        ctx.fillStyle = faded(ink, 0.8);
+        drawIcon(ctx, faEyeSlash, token, inner * 0.9);
+    }
+
+    ctx.beginPath();
+    ctx.arc(token.x, token.y, radius * 1.1, 0, Math.PI * 2);
+    ctx.setLineDash([radius * 0.18, radius * 0.12]);
+    ctx.lineWidth = radius * 0.06;
+    ctx.strokeStyle = faded(ink, 0.7);
+    ctx.stroke();
+    ctx.restore();
 }
 
 /** A condition on a token as it shows: a small round badge on its ring, see conditionBadges. */

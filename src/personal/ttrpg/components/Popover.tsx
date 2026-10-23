@@ -31,9 +31,10 @@ export function Popover({ title, onClose, className, dismissOnOutside = false, c
 {
     const panel = useRef<HTMLElement>(null);
 
+    // Esc in a dialog opened from it, like a preset being written, closes only the dialog.
     useKeydown((event) =>
     {
-        if (event.key === 'Escape')
+        if (event.key === 'Escape' && !document.querySelector('dialog[open]'))
             onClose();
 
     });

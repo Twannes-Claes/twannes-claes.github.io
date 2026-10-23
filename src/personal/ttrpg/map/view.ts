@@ -95,6 +95,8 @@ export interface MapViewOptions
 {
     /** A token dragged freely, in edit mode or a monster in play mode, landed here. */
     onTokenMove?: (id: string, to: Point) => void;
+    /** Monsters the erase tool took, already asked about, to take off the map. */
+    onMonstersErase?: (ids: string[]) => void;
     /** A player let go of a path they drew, see PendingMove. */
     onPathEnd?: (move: PendingMove) => void;
     /** Called with the scenario a tool changed, see map/tools.ts. */
@@ -166,6 +168,8 @@ export interface MapView
     setBlood: (blood: BloodSettings) => void;
     /** The token whose turn it is in a fight, ringed, or null. */
     setTurn: (id: string | null) => void;
+    /** The world point under a point of the page, like where a preset was dropped. */
+    worldAt: (client: Point) => Point;
     /** Other screens' paths, drawn faintly in their token's colour, see Draft. */
     setDrafts: (drafts: Draft[]) => void;
     /** Other screens' rulers and areas, in their player's colour, see Mark. */
@@ -1133,6 +1137,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         zoom: camera.zoom,
         scenario: current,
         seen: (point) => peek || seenGround(point),
+        monsters: tokens.filter((token) => token.kind === 'npc'),
     });
 
     /**
@@ -1642,7 +1647,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             if (marked || markTimer)
                 shareMark(null);
 
-            tool = createTool(id, changeScenario, placing, reveal, snap, shareMark);
+            tool = createTool(id, changeScenario, placing, reveal, snap, shareMark, (ids) => options.onMonstersErase?.(ids));
             toolPointerId = null;
             // The tool's cursor, or the stylesheet's grab hand when there is no tool.
             canvas.style.cursor = tool ? tool.cursor : '';
@@ -1695,6 +1700,12 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         {
             turn = id;
             redraw();
+        },
+        worldAt: (client) =>
+        {
+            const box = canvas.getBoundingClientRect();
+
+            return toWorld(camera, { x: client.x - box.left, y: client.y - box.top });
         },
         setDecals: (next) =>
         {

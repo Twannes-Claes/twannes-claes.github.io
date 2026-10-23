@@ -189,7 +189,8 @@ html:has(.ttrpg) {
     clip-path: inset(50%);
 }
 
-.ttrpg-segment:has(.ttrpg-hidden-input:focus-visible) {
+.ttrpg-segment:has(.ttrpg-hidden-input:focus-visible),
+.ttrpg-icon-button:has(.ttrpg-hidden-input:focus-visible) {
     outline: 2px solid var(--ttrpg-accent);
     outline-offset: 2px;
 }
@@ -457,7 +458,17 @@ html:has(.ttrpg) {
     /* Wide enough for four choices beside their name, see GridPanel.tsx. */
     width: 21.5rem;
     max-width: calc(100% - 96px);
+    /* No taller than the screen. Viewport units do not zoom with the control size, so the screen
+       is divided by it. A panel that can grow scrolls inside, see .ttrpg-presets. */
+    max-height: calc(100dvh / var(--ttrpg-ui, 1) - 88px);
     padding: 1rem;
+}
+
+/* The Monsters panel in Edit, which grows with a monster opened: the title stays and the rest
+   scrolls, with the bar in the padding like a popover's, between the rounded corners. */
+.ttrpg-properties.ttrpg-presets {
+    display: flex;
+    flex-direction: column;
 }
 
 /*
@@ -561,11 +572,12 @@ html:has(.ttrpg) {
  */
 .ttrpg-editor,
 .ttrpg-player,
-.ttrpg-popover {
+.ttrpg-popover,
+.ttrpg-confirm {
     user-select: none;
 }
 
-:is(.ttrpg-editor, .ttrpg-player, .ttrpg-popover) :is(input, textarea) {
+:is(.ttrpg-editor, .ttrpg-player, .ttrpg-popover, .ttrpg-confirm) :is(input, textarea) {
     user-select: text;
 }
 
@@ -809,6 +821,59 @@ html:has(.ttrpg) {
     .ttrpg-library__remove {
         opacity: 1;
     }
+}
+
+/* The monster presets, three to a row, each its token's look with the name under it, see
+   PresetLibrary.tsx. Dragged onto the map, clicked to edit. */
+.ttrpg-library--presets {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.ttrpg-preset-tile {
+    display: grid;
+    justify-items: center;
+    gap: 0.35rem;
+    aspect-ratio: auto;
+    padding: 0.6rem 0.4rem 0.45rem;
+    cursor: grab;
+}
+
+.ttrpg-preset-tile:active {
+    cursor: grabbing;
+}
+
+.ttrpg-preset-tile .ttrpg-preset-face {
+    width: 70%;
+}
+
+.ttrpg-preset-tile__name {
+    width: 100%;
+    overflow: hidden;
+    color: var(--ttrpg-ink);
+    font-size: 0.75rem;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* A preset as its monsters look on the map: the picture in a ring of its colour, or the initial. */
+.ttrpg-preset-face {
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border: 3px solid;
+    border-radius: 50%;
+    color: #fff;
+    font-weight: 700;
+}
+
+.ttrpg-preset-face img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* A drag carries the tile, not the picture on its own. */
+    pointer-events: none;
 }
 
 /* How much of the plan's storage is used, under the props. The track is a slider's, the props
@@ -2072,8 +2137,157 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
 }
 
 a.ttrpg-row__main:hover,
-a.ttrpg-row__main:focus-visible {
+a.ttrpg-row__main:focus-visible,
+button.ttrpg-row__main:hover,
+button.ttrpg-row__main:focus-visible,
+button.ttrpg-row__main[aria-expanded='true'] {
     background: rgb(255 255 255 / 0.05);
+}
+
+/* A row that opens under itself, like a monster in the Monsters list. */
+button.ttrpg-row__main {
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+/* A row that opens has its card's frame while closed too, unseen, so opening only colours it in
+   and nothing in the row moves. The buttons at the end keep clear of the border. */
+.ttrpg-row:has(> button.ttrpg-row__main[aria-expanded]) {
+    padding-right: 4px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    transition:
+        background-color 150ms var(--ttrpg-ease),
+        border-color 150ms var(--ttrpg-ease);
+}
+
+/* An opened row is a card of its own, the row on top and what to change under a hairline, so it
+   is clear where it ends and the next row starts. */
+.ttrpg-row--open {
+    border-color: var(--ttrpg-edge);
+    background: rgb(255 255 255 / 0.04);
+}
+
+.ttrpg-row--open > button.ttrpg-row__main {
+    background: none;
+}
+
+/* An opened monster or player: tabs for what to change, and the one picked, see RowEditor.tsx. */
+.ttrpg-row-edit {
+    display: grid;
+    flex-basis: 100%;
+    gap: 0.75rem;
+    padding: 0 0.75rem 0.75rem;
+    border-top: 1px solid var(--ttrpg-edge);
+    overflow: clip;
+    /* An even glide: the app's quick-start ease jumps most of a tall height in the first frames. */
+    animation: ttrpg-row-open 240ms cubic-bezier(0.4, 0, 0.2, 1);
+    /* Lets the height grow to auto. Without it, as in Firefox, it shows at once and only fades. */
+    interpolate-size: allow-keywords;
+}
+
+/* What opens under a row grows from nothing to its height, so the panel unfolds rather than jumps:
+   down in Edit, and up in the GM view's panel, which stands on the dock. */
+@keyframes ttrpg-row-open {
+    from {
+        height: 0;
+        padding-bottom: 0;
+        opacity: 0;
+    }
+}
+
+/* Folding back the way it came, then RowEditor is taken off, see useOpenRow. */
+.ttrpg-row-edit--closing {
+    animation: ttrpg-row-close 200ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes ttrpg-row-close {
+    to {
+        height: 0;
+        padding-bottom: 0;
+        opacity: 0;
+    }
+}
+
+/* Next to instant rather than none, as the end of the fold is what takes the editor off. */
+@media (prefers-reduced-motion: reduce) {
+    .ttrpg-row-edit {
+        animation-duration: 1ms;
+    }
+}
+
+/* Every tab in the same cell, so the space is the tallest form's and switching never jumps. */
+.ttrpg-row-edit__body {
+    display: grid;
+}
+
+.ttrpg-row-edit__pane {
+    grid-area: 1 / 1;
+    min-width: 0;
+}
+
+.ttrpg-row-edit__pane--away {
+    visibility: hidden;
+}
+
+/* Lends no height, and scrolls in what the forms make, like the conditions. */
+.ttrpg-row-edit__pane--scrolls {
+    height: 0;
+    min-height: 100%;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+/* Plain words with a line under the picked one, lighter than a row of buttons. */
+.ttrpg-tabs {
+    display: flex;
+    align-items: center;
+    gap: 0.125rem;
+    border-bottom: 1px solid var(--ttrpg-edge);
+}
+
+.ttrpg-tabs__tab {
+    align-self: stretch;
+    margin-bottom: -1px;
+    padding: 0.55rem 0.45rem 0.45rem;
+    border-bottom: 2px solid transparent;
+    color: var(--ttrpg-muted);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.ttrpg-tabs__tab:hover,
+.ttrpg-tabs__tab:focus-visible {
+    color: var(--ttrpg-ink);
+}
+
+.ttrpg-tabs__tab[aria-pressed='true'] {
+    border-bottom-color: var(--ttrpg-accent);
+    color: var(--ttrpg-ink);
+}
+
+.ttrpg-row-edit__pane > :is(.ttrpg-stats-form, .ttrpg-conditions) {
+    padding: 0;
+}
+
+/* Two to a row in the narrow card, half as long. One with levels takes the whole row while it is
+   on, for its minus and plus; a long name shortens itself rather than spill over. */
+.ttrpg-row-edit .ttrpg-conditions {
+    grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+    /* The next one fills the hole a full-row one leaves beside the one before it. */
+    grid-auto-flow: dense;
+}
+
+.ttrpg-row-edit .ttrpg-condition:has(.ttrpg-condition__value) {
+    grid-column: 1 / -1;
+}
+
+.ttrpg-row-edit .ttrpg-condition > .ttrpg-segment {
+    overflow: hidden;
+    font-size: 0.8rem;
+    text-overflow: ellipsis;
 }
 
 .ttrpg-row__name,
@@ -2132,6 +2346,11 @@ a.ttrpg-row__main:focus-visible {
 .ttrpg-row--hidden .ttrpg-row__main {
     color: var(--ttrpg-muted);
     font-style: italic;
+}
+
+/* Italics lean out past their box, which the name's clipping would cut off. */
+.ttrpg-row--hidden .ttrpg-row__name {
+    padding-right: 0.2em;
 }
 
 /* Whose turn it is in the initiative order, in the purple of their ring on the map. */
@@ -2208,6 +2427,210 @@ a.ttrpg-row__main:focus-visible {
     gap: 0.5rem;
 }
 
+/* Writing a monster preset, see PresetDialog.tsx: the Markdown beside the stat block it makes,
+   one above the other on a phone. */
+.ttrpg-preset {
+    width: min(64rem, calc(100% - 32px));
+    height: min(44rem, calc(100dvh / var(--ttrpg-ui, 1) - 32px));
+}
+
+.ttrpg-preset[open] {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    padding: 1.25rem;
+}
+
+.ttrpg-preset__actions {
+    display: flex;
+    gap: 2px;
+}
+
+/* The picture and ring every monster from it gets, above the stat block. */
+.ttrpg-preset__look {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.ttrpg-preset__look .ttrpg-preset-face {
+    flex: none;
+    width: 48px;
+}
+
+/* A long picture name shortens itself, rather than squeezing the ring beside it to nothing. */
+.ttrpg-preset__look .ttrpg-segment {
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+.ttrpg-preset__look .ttrpg-segment span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ttrpg-preset__ring {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--ttrpg-muted);
+    font-size: 0.875rem;
+}
+
+/* Like the colour fields in the panels, with the browser's swatch filling it, rounded to match. */
+.ttrpg-preset__ring input {
+    flex: none;
+    width: 4rem;
+    height: 36px;
+    padding: 3px;
+    border: 1px solid var(--ttrpg-edge);
+    border-radius: 10px;
+    background: var(--ttrpg-well);
+    cursor: pointer;
+}
+
+.ttrpg-preset__ring input::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+.ttrpg-preset__ring input::-webkit-color-swatch {
+    border: 0;
+    border-radius: 7px;
+}
+
+.ttrpg-preset__ring input::-moz-color-swatch {
+    border: 0;
+    border-radius: 7px;
+}
+
+.ttrpg-preset__panes {
+    display: grid;
+    flex: 1;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.875rem;
+    min-height: 0;
+}
+
+.ttrpg-preset__markdown,
+.ttrpg-preset__preview {
+    min-height: 0;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--ttrpg-edge);
+    border-radius: 12px;
+    background: var(--ttrpg-well);
+    overflow-y: auto;
+}
+
+.ttrpg-preset__markdown {
+    color: var(--ttrpg-ink);
+    font-family: var(--ttrpg-mono);
+    font-size: 0.8rem;
+    line-height: 1.6;
+    resize: none;
+}
+
+.ttrpg-preset__foot {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+/* The skull switch on the left, the actions on the right. */
+.ttrpg-preset__foot > :first-child {
+    margin-right: auto;
+}
+
+@media (width < 640px) {
+    .ttrpg-preset__panes {
+        grid-template-columns: none;
+        grid-template-rows: 1fr 1fr;
+    }
+}
+
+/* A placed monster's stat block, beside the monsters in the top left, see Monsters.tsx. */
+.ttrpg-statblock-panel {
+    top: 72px;
+    left: 16px;
+    width: min(24rem, calc(100% - 32px));
+    max-height: calc(100dvh / var(--ttrpg-ui, 1) - 96px);
+    translate: none;
+}
+
+/* In Edit, to the right of the Monsters panel beside the rail, see .ttrpg-properties. */
+.ttrpg-statblock-panel--beside {
+    left: calc(80px + 21.5rem + 12px);
+    width: min(24rem, calc(100% - 21.5rem - 108px));
+}
+
+/* Too narrow for both side by side, it goes over the panel instead. */
+@media (width < 60rem) {
+    .ttrpg-statblock-panel--beside {
+        left: 16px;
+        width: min(24rem, calc(100% - 32px));
+    }
+}
+
+/* A stat block as its Markdown has it, see StatBlock.tsx. Selectable, to copy a line out. */
+.ttrpg-statblock {
+    display: grid;
+    gap: 0.6rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    user-select: text;
+}
+
+.ttrpg-statblock__name {
+    color: var(--ttrpg-ink);
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.ttrpg-statblock__section {
+    padding-bottom: 0.2rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--ttrpg-accent) 70%, transparent);
+    color: color-mix(in srgb, var(--ttrpg-accent) 45%, var(--ttrpg-ink));
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.ttrpg-statblock__line {
+    display: block;
+}
+
+.ttrpg-statblock strong {
+    font-weight: 650;
+}
+
+.ttrpg-statblock ul {
+    padding-left: 1.1rem;
+    list-style: disc;
+}
+
+.ttrpg-statblock hr {
+    border: 0;
+    border-top: 2px solid color-mix(in srgb, var(--ttrpg-accent) 70%, transparent);
+}
+
+.ttrpg-statblock table {
+    width: 100%;
+    font-size: 0.8rem;
+    text-align: center;
+    border-collapse: collapse;
+}
+
+.ttrpg-statblock th {
+    font-weight: 650;
+}
+
+.ttrpg-statblock :is(th, td) {
+    padding: 0.15rem 0.25rem;
+}
+
 /* Who made the demo's map, which its licence asks for, quietly in the bottom left. Under the
    panels, so the dock covers it rather than the other way round on a narrow screen. */
 .ttrpg-credit {
@@ -2231,6 +2654,11 @@ a.ttrpg-row__main:focus-visible {
 .ttrpg-tip {
     position: fixed;
     z-index: 50;
+    /* Shown as a popover, in the top layer above an open dialog, without the browser's popover
+       box: centred in the screen with a margin and a scrollbar. */
+    inset: auto;
+    margin: 0;
+    overflow: visible;
     /* A row, so the key caps sit in the middle of the words rather than on their baseline. */
     display: flex;
     align-items: center;

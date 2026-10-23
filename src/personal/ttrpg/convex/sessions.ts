@@ -1,6 +1,7 @@
 import { ConvexError, v } from 'convex/values';
 
 import { demoOgre, demoScenario } from '../content/scenarios';
+import { demoOgreStatBlock } from '../content/statBlocks';
 
 import type { Id } from './_generated/dataModel';
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
@@ -72,8 +73,18 @@ export async function addExample(ctx: MutationCtx, ownerId: Id<'users'>): Promis
     });
 
     await ctx.db.insert('scenarios', { sessionId, scenario });
-    // A real monster, so the GM can drag, hide or remove it once the session runs on this map.
-    await ctx.db.insert('tokens', { sessionId, scenarioId: scenario.id, ...demoOgre(scenario.grid) });
+    // A real monster from a real preset, so the GM sees both sides: the library in Edit, and the
+    // ogre on the map to drag, hide or open the stat block of. An Ogre preset already there is it.
+    const ogre = demoOgre(scenario.grid);
+    const presets = await ctx.db
+        .query('presets')
+        .withIndex('by_ownerId', (q) => q.eq('ownerId', ownerId))
+        .take(300);
+    const presetId =
+        presets.find((preset) => preset.name === ogre.name)?._id ??
+        (await ctx.db.insert('presets', { ownerId, name: ogre.name, markdown: demoOgreStatBlock, downs: false, color: ogre.color }));
+
+    await ctx.db.insert('tokens', { sessionId, scenarioId: scenario.id, ...ogre, presetId });
 
     return sessionId;
 }

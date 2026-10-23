@@ -1,6 +1,7 @@
 import {
     faArrowPointer,
     faBorderAll,
+    faDragon,
     faDrawPolygon,
     faEraser,
     faLocationDot,
@@ -21,6 +22,7 @@ const tools: { id: ToolId; label: string; key: string; icon: IconDefinition }[] 
     { id: 'walls', label: 'Walls and doors', key: 'w', icon: faDrawPolygon },
     { id: 'erase', label: 'Erase', key: 'e', icon: faEraser },
     { id: 'props', label: 'Props', key: 'p', icon: faTree },
+    { id: 'monsters', label: 'Monsters', key: 'm', icon: faDragon },
     { id: 'spawn', label: 'Spawn point', key: 's', icon: faLocationDot },
     { id: 'align', label: 'Grid', key: 'g', icon: faBorderAll },
 ];

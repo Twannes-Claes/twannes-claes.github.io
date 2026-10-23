@@ -132,6 +132,25 @@ export interface Token
     state?: HealthState;
     /** What it suffers from, for everyone to see, see Condition. */
     conditions?: Condition[];
+    /** A monster that goes down at 0 HP like a player instead of dying. Only for the GM. */
+    downs?: boolean;
+    /** The preset a monster was placed from, for its stat block, see Preset. */
+    presetId?: string;
+}
+
+/** A monster's stat block in the GM's library, for all their sessions, see Monster presets. */
+export interface Preset
+{
+    id: string;
+    /** From its # heading, see statsOf in content/statBlocks.ts. */
+    name: string;
+    markdown: string;
+    /** What a monster placed from it starts with, see Token. */
+    downs: boolean;
+    /** The ring of every monster placed from it. */
+    color: string;
+    /** Its picture, which the monsters placed from it show too. */
+    avatar?: string;
 }
 
 /**
@@ -271,8 +290,12 @@ export interface Live
     move: (id: string, to: Point, path?: Point[]) => Promise<void>;
     /** Removes a player from the table until the session starts again. */
     kick: (tokenId: string) => Promise<void>;
-    /** Adds a monster or NPC to the map being played, around a point. */
-    addMonster: (monster: NewMonster, at: Point) => Promise<void>;
+    /** Every monster of the session on all its maps, for Edit and a GM view not yet started. */
+    monsters: (Token & { scenarioId: string })[];
+    /** Puts a monster from a preset on a map, hidden, around a point. */
+    placeMonster: (presetId: string, scenarioId: string, at: Point) => Promise<void>;
+    /** Renames a monster, changes its ring, or whether it goes down at 0. */
+    setMonster: (tokenId: string, monster: Pick<Token, 'name' | 'color'> & { downs: boolean }) => Promise<void>;
     hide: (tokenId: string, hidden: boolean) => Promise<void>;
     removeMonster: (tokenId: string) => Promise<void>;
     /** Sets any token's HP, AC and Perception. */
@@ -323,7 +346,21 @@ export interface Live
     /** Whoever comes after the current turn hears so. */
     upNext: boolean;
     setUpNext: (on: boolean) => Promise<void>;
+    /** The game master's monster presets, by name. */
+    presets: Preset[];
+    /** Adds a preset, or with an id changes that one, with a new picture or null. Gives its id. */
+    savePreset: (preset: Omit<Preset, 'id' | 'avatar'>, picture: Blob | null, id?: string) => Promise<string>;
+    removePreset: (id: string) => Promise<void>;
 }
+
+/**
+ * What the Monsters panels work with: a saved session's, see Live, or the demo's, kept in the tab
+ * without any server, see demoMonsters in MapEditor.tsx.
+ */
+export type MonsterControls = Pick<
+    Live,
+    'system' | 'presets' | 'savePreset' | 'removePreset' | 'placeMonster' | 'setMonster' | 'hide' | 'removeMonster' | 'setStats' | 'setConditions'
+>;
 
 /**
  * A fight in initiative, see map/initiative.ts. Only the GM gets it whole; a phone only hears
@@ -429,20 +466,6 @@ export interface Draft
     /** Centre to centre, from where the token stands. */
     points: Point[];
     feet: number;
-}
-
-/** What the game master fills in to add a monster, see components/Monsters.tsx. */
-export interface NewMonster
-{
-    name: string;
-    color: string;
-    size: CreatureSize;
-    hidden: boolean;
-    /** Any picture the browser can read. Null shows the name's initial. */
-    picture: Blob | null;
-    /** Left out, the monster has no numbers and shows no damage. */
-    maxHp?: number;
-    ac?: number;
 }
 
 /** One battle map of a session, see PLAN.md. */

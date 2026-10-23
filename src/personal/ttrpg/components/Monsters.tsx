@@ -1,239 +1,205 @@
-import { faEye, faEyeSlash, faHeart, faImage, faListCheck, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faBookOpen, faCheck, faEye, faEyeSlash, faSkull, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useActionState, useState } from 'react';
 
-import type { CreatureSize, Live, Point } from '../types';
+import type { MonsterControls, Token } from '../types';
 
-import { confirmAction } from '../services/confirm';
+import { unhurried } from '../services/busy';
 
 import { ConditionPicker } from './ConditionPicker';
+import { Spinner } from './Feedback';
 import { Popover } from './Popover';
+import { RowEditor } from './RowEditor';
+import { useOpenRow } from './useOpenRow';
+import { StatBlock } from './StatBlock';
 import { StatChips, StatsForm } from './StatsForm';
-
-const sizes: CreatureSize[] = ['tiny', 'small', 'medium', 'large', 'huge', 'gargantuan'];
-
-const capital = (word: string) => word[0].toUpperCase() + word.slice(1);
 
 interface MonstersProps
 {
-    live: Live;
-    /** Where a new monster goes: the middle of the game master's screen. */
-    at: () => Point;
+    controls: MonsterControls;
+    /** The monsters on the open map, whether the session runs or not. */
+    monsters: Token[];
     onClose: () => void;
-    /** Hears what worked, for the editor's toast. */
-    onDone: (message: string) => void;
+    /** Takes one off the map, after asking. */
+    onRemove: (monster: Token) => void;
     onError: (message: string) => void;
 }
 
-/**
- * The game master's monsters and NPCs on the map being played, opened from the play dock. Adding
- * one puts it in the middle of the screen, so pan there first; drag it from there. Hidden ones
- * stay off every player's screen and the Player view, and only show in the GM view.
- */
-export function Monsters({ live, at, onClose, onDone, onError }: MonstersProps)
+/** A monster's name, ring and whether it goes down at 0, to change under its row. */
+function DetailsForm({ monster, onSave }: { monster: Token; onSave: (details: { name: string; color: string; downs: boolean }) => Promise<void> })
 {
-    const monsters = live.tokens.filter((token) => token.kind === 'npc');
-    // Kept after each add, so a pack of goblins needs only their names.
-    const [size, setSize] = useState<CreatureSize>('medium');
-    const [hidden, setHidden] = useState(false);
-    const [pictureName, setPictureName] = useState('');
-    // The monster whose numbers or conditions are open under its row.
-    const [editing, setEditing] = useState<{ id: string; what: 'numbers' | 'conditions' } | null>(null);
-    const toggleEditing = (id: string, what: 'numbers' | 'conditions') =>
-        setEditing((was) => (was?.id === id && was.what === what ? null : { id, what }));
-
-    // The form clears itself after each one, so a pack of goblins is quick to add.
-    const [failure, add, adding] = useActionState((_: string, form: FormData) =>
-    {
-        const picture = form.get('picture');
-        // An empty field is left out, rather than read as 0.
-        const number = (field: string) => (form.get(field) ? Number(form.get(field)) : undefined);
-        const monster = {
-            name: String(form.get('name')),
-            color: String(form.get('color')),
-            size,
-            hidden,
-            picture: picture instanceof File && picture.size > 0 ? picture : null,
-            maxHp: number('maxHp'),
-            ac: number('ac'),
-        };
-
-        return live
-            .addMonster(monster, at())
-            .then(() =>
-            {
-                onDone(`${monster.name.trim()} is on the map${monster.hidden ? ', hidden' : ''}.`);
-                // The form empties its file field itself, so the name shown goes with it.
-                setPictureName('');
-
-                return '';
-            })
-            .catch((reason: Error) => reason.message);
-    }, '');
-
-    const remove = (id: string, name: string) =>
-    {
-        void confirmAction(`Remove ${name} from the map?`, 'Remove')
-            .then(async (yes) =>
-            {
-                if (!yes)
-                    return;
-
-                await live.removeMonster(id);
-                onDone(`${name} is off the map.`);
-            })
-            .catch((reason: Error) => onError(reason.message));
-    };
+    const [downs, setDowns] = useState(monster.downs === true);
+    const [failure, save, saving] = useActionState(
+        (_: string, form: FormData) =>
+            unhurried(onSave({ name: String(form.get('name')), color: String(form.get('color')), downs }))
+                .then(() => '')
+                .catch((reason: Error) => reason.message),
+        '',
+    );
 
     return (
-        <Popover title="Monsters" className="ttrpg-dock-panel" onClose={onClose}>
-            <form action={add} className="ttrpg-popover__body ttrpg-settings">
-                <label>
-                    Name
-                    <input name="name" maxLength={30} autoComplete="off" required />
-                </label>
-                <div className="ttrpg-settings__group" role="group" aria-label="Size">
-                    Size
-                    <div className="ttrpg-settings__choices">
-                        {sizes.map((choice) => (
-                            <button
-                                key={choice}
-                                type="button"
-                                className="ttrpg-segment"
-                                aria-pressed={size === choice}
-                                aria-label={capital(choice)}
-                                title={capital(choice)}
-                                onClick={() => setSize(choice)}
-                            >
-                                {choice[0].toUpperCase()}
-                            </button>
-                        ))}
-                    </div>
+        <form key={`${monster.name} ${monster.color}`} action={save} className="ttrpg-stats-form ttrpg-settings">
+            <label>
+                Name
+                <input name="name" maxLength={30} autoComplete="off" defaultValue={monster.name} required />
+            </label>
+            <label>
+                Ring
+                <input name="color" type="color" defaultValue={monster.color} />
+            </label>
+            <div className="ttrpg-settings__group" role="group" aria-label="At 0 HP">
+                At 0 HP
+                <div className="ttrpg-settings__choices">
+                    <button type="button" className="ttrpg-segment" aria-pressed={!downs} onClick={() => setDowns(false)}>
+                        Dies
+                    </button>
+                    <button type="button" className="ttrpg-segment" aria-pressed={downs} onClick={() => setDowns(true)}>
+                        <FontAwesomeIcon icon={faSkull} />
+                        Goes down
+                    </button>
                 </div>
-                <label>
-                    Ring
-                    <input name="color" type="color" defaultValue="#b4443c" />
-                </label>
-                <div className="ttrpg-settings__group" role="group" aria-label="Numbers">
-                    Numbers
-                    <div className="ttrpg-fields">
-                        <label className="ttrpg-field" title="Left empty, it shows no damage">
-                            HP
-                            <input name="maxHp" type="number" inputMode="numeric" min={1} max={9999} />
-                        </label>
-                        <label className="ttrpg-field">
-                            AC
-                            <input name="ac" type="number" inputMode="numeric" min={0} max={50} />
-                        </label>
-                    </div>
-                </div>
-                <div className="ttrpg-settings__group" role="group" aria-label="Picture">
-                    Picture
-                    <label className="ttrpg-segment">
-                        <FontAwesomeIcon icon={faImage} />
-                        <span>{pictureName || 'Choose a picture'}</span>
-                        <input
-                            name="picture"
-                            type="file"
-                            accept="image/*"
-                            className="ttrpg-hidden-input"
-                            onChange={(event) => setPictureName(event.target.files?.[0]?.name ?? '')}
-                        />
-                    </label>
-                </div>
-                <div className="ttrpg-settings__group" role="group" aria-label="Players see it">
-                    Players
-                    <div className="ttrpg-settings__choices">
-                        <button type="button" className="ttrpg-segment" aria-pressed={!hidden} onClick={() => setHidden(false)}>
-                            <FontAwesomeIcon icon={faEye} />
-                            See it
-                        </button>
-                        <button type="button" className="ttrpg-segment" aria-pressed={hidden} onClick={() => setHidden(true)}>
-                            <FontAwesomeIcon icon={faEyeSlash} />
-                            Hidden
-                        </button>
-                    </div>
-                </div>
-                {failure && (
-                    <p className="ttrpg-error" role="alert">
-                        {failure}
-                    </p>
-                )}
-                <button type="submit" className="ttrpg-segment ttrpg-segment--block ttrpg-segment--confirm" disabled={adding}>
-                    <FontAwesomeIcon icon={faPlus} />
-                    {adding ? 'Adding' : 'Add to the middle of the screen'}
-                </button>
-            </form>
-
-            {monsters.length > 0 && (
-                <div className="ttrpg-popover__body">
-                    <h3 className="ttrpg-subhead">{`On this map · ${monsters.length}`}</h3>
-                    <ul className="ttrpg-rows">
-                        {monsters.map((monster) => (
-                            <li key={monster.id} className={`ttrpg-row${monster.hidden ? ' ttrpg-row--hidden' : ''}`}>
-                                <span className="ttrpg-row__main ttrpg-row__main--swatch">
-                                    <span className="ttrpg-swatch" style={{ background: monster.color }} />
-                                    {/* The name, with the numbers under it. */}
-                                    <span className="ttrpg-row__text">
-                                        <span className="ttrpg-row__name">{monster.name}</span>
-                                        <StatChips token={monster} />
-                                    </span>
-                                </span>
-                                <button
-                                    type="button"
-                                    className="ttrpg-icon-button ttrpg-icon-button--small"
-                                    aria-label={`Numbers of ${monster.name}`}
-                                    aria-pressed={editing?.id === monster.id && editing.what === 'numbers'}
-                                    title="HP, AC and Perception"
-                                    onClick={() => toggleEditing(monster.id, 'numbers')}
-                                >
-                                    <FontAwesomeIcon icon={faHeart} />
-                                </button>
-                                <button
-                                    type="button"
-                                    className="ttrpg-icon-button ttrpg-icon-button--small"
-                                    aria-label={`Conditions of ${monster.name}`}
-                                    aria-pressed={editing?.id === monster.id && editing.what === 'conditions'}
-                                    title="Conditions"
-                                    onClick={() => toggleEditing(monster.id, 'conditions')}
-                                >
-                                    <FontAwesomeIcon icon={faListCheck} />
-                                </button>
-                                <button
-                                    type="button"
-                                    className="ttrpg-icon-button ttrpg-icon-button--small"
-                                    aria-label={monster.hidden ? `Show ${monster.name}` : `Hide ${monster.name}`}
-                                    aria-pressed={monster.hidden === true}
-                                    title={monster.hidden ? 'Show to the players' : 'Hide from the players'}
-                                    onClick={() =>
-                                        live.hide(monster.id, !monster.hidden).catch((reason: Error) => onError(reason.message))}
-                                >
-                                    <FontAwesomeIcon icon={monster.hidden ? faEyeSlash : faEye} />
-                                </button>
-                                <button
-                                    type="button"
-                                    className="ttrpg-icon-button ttrpg-icon-button--small"
-                                    aria-label={`Remove ${monster.name}`}
-                                    title="Remove"
-                                    onClick={() => remove(monster.id, monster.name)}
-                                >
-                                    <FontAwesomeIcon icon={faTrash} />
-                                </button>
-                                {editing?.id === monster.id && editing.what === 'numbers' && (
-                                    <StatsForm token={monster} onSave={(stats) => live.setStats(monster.id, stats)} />
-                                )}
-                                {editing?.id === monster.id && editing.what === 'conditions' && (
-                                    <ConditionPicker
-                                        system={live.system}
-                                        conditions={monster.conditions ?? []}
-                                        onChange={(conditions) => live.setConditions(monster.id, conditions)}
-                                    />
-                                )}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
+            </div>
+            {failure && (
+                <p className="ttrpg-error" role="alert">
+                    {failure}
+                </p>
             )}
+            <button type="submit" className="ttrpg-segment ttrpg-segment--block ttrpg-segment--confirm" disabled={saving}>
+                {saving ? <Spinner /> : <FontAwesomeIcon icon={faCheck} />}
+                {saving ? 'Saving' : 'Save'}
+            </button>
+        </form>
+    );
+}
+
+interface MonsterListProps
+{
+    controls: MonsterControls;
+    /** The monsters on the open map, whether the session runs or not. */
+    monsters: Token[];
+    /** Takes one off the map, after asking. */
+    onRemove: (monster: Token) => void;
+    onError: (message: string) => void;
+    /** Where an open stat block sits: beside the Edit panel, or in the top left over the map. */
+    statBlockClass?: string;
+}
+
+/**
+ * The monsters on the open map, in the GM view's Monsters panel and under the presets in Edit.
+ * A row shows the name, the numbers and whether players see it; a click opens it underneath, with
+ * its numbers, conditions and details to change, and its stat block.
+ */
+export function MonsterList({ controls, monsters, onRemove, onError, statBlockClass = 'ttrpg-statblock-panel' }: MonsterListProps)
+{
+    // The one monster opened under its row, and the one folding away.
+    const rows = useOpenRow();
+    // The preset whose stat block is open beside the panel.
+    const [reading, setReading] = useState<string | null>(null);
+    const read = controls.presets.find((preset) => preset.id === reading);
+
+
+    return (
+        <>
+            <ul className="ttrpg-rows">
+                {monsters.map((monster) => (
+                    <li key={monster.id} className={`ttrpg-row${monster.hidden ? ' ttrpg-row--hidden' : ''}${rows.open === monster.id ? ' ttrpg-row--open' : ''}`}>
+                        <button
+                            type="button"
+                            className="ttrpg-row__main ttrpg-row__main--swatch"
+                            aria-expanded={rows.open === monster.id}
+                            onClick={() => rows.toggle(monster.id)}
+                        >
+                            <span className="ttrpg-swatch" style={{ background: monster.color }} />
+                            {/* The name, with the numbers under it. */}
+                            <span className="ttrpg-row__text">
+                                <span className="ttrpg-row__name">{monster.name}</span>
+                                <StatChips token={monster} />
+                            </span>
+                        </button>
+                        {controls.presets.some((preset) => preset.id === monster.presetId) && (
+                            <button
+                                type="button"
+                                className="ttrpg-icon-button ttrpg-icon-button--small"
+                                aria-label={`Stat block of ${monster.name}`}
+                                aria-pressed={reading === monster.presetId}
+                                title="Stat block"
+                                onClick={() => setReading(reading === monster.presetId ? null : (monster.presetId ?? null))}
+                            >
+                                <FontAwesomeIcon icon={faBookOpen} />
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            className="ttrpg-icon-button ttrpg-icon-button--small"
+                            aria-label={monster.hidden ? `Show ${monster.name}` : `Hide ${monster.name}`}
+                            aria-pressed={monster.hidden === true}
+                            title={monster.hidden ? 'Show to the players' : 'Hide from the players'}
+                            onClick={() => controls.hide(monster.id, !monster.hidden).catch((reason: Error) => onError(reason.message))}
+                        >
+                            <FontAwesomeIcon icon={monster.hidden ? faEyeSlash : faEye} />
+                        </button>
+                        <button
+                            type="button"
+                            className="ttrpg-icon-button ttrpg-icon-button--small"
+                            aria-label={`Remove ${monster.name}`}
+                            title="Remove"
+                            onClick={() => onRemove(monster)}
+                        >
+                            <FontAwesomeIcon icon={faTrash} />
+                        </button>
+                        {(rows.open === monster.id || rows.closing === monster.id) && (
+                            <RowEditor
+                                closing={rows.open !== monster.id}
+                                onClosed={rows.folded}
+                                tabs={[
+                                    { id: 'numbers', label: 'Numbers', content: <StatsForm token={monster} onSave={(next) => controls.setStats(monster.id, next)} /> },
+                                    {
+                                        id: 'conditions',
+                                        label: 'Conditions',
+                                        scrolls: true,
+                                        content: (
+                                            <ConditionPicker
+                                                system={controls.system}
+                                                conditions={monster.conditions ?? []}
+                                                onChange={(conditions) => controls.setConditions(monster.id, conditions)}
+                                            />
+                                        ),
+                                    },
+                                    { id: 'details', label: 'Details', content: <DetailsForm monster={monster} onSave={(details) => controls.setMonster(monster.id, details)} /> },
+                                ]}
+                            />
+                        )}
+                    </li>
+                ))}
+            </ul>
+
+            {read && (
+                <Popover title="Stat block" className={statBlockClass} onClose={() => setReading(null)}>
+                    <div className="ttrpg-popover__body">
+                        <StatBlock markdown={read.markdown} />
+                    </div>
+                </Popover>
+            )}
+        </>
+    );
+}
+
+/**
+ * The monsters and NPCs on the open map, from the play dock in the GM view, whether the session
+ * runs or not, see MonsterList. They come onto the map from the presets in Edit, see
+ * PresetLibrary.tsx.
+ */
+export function Monsters({ controls, monsters, onClose, onRemove, onError }: MonstersProps)
+{
+    return (
+        <Popover title="Monsters" className="ttrpg-dock-panel" onClose={onClose}>
+            <div className="ttrpg-popover__body">
+                {monsters.length === 0 ? (
+                    <p className="ttrpg-empty">No monsters on this map. Drag one on from the Monsters tool in Edit.</p>
+                ) : (
+                    <MonsterList controls={controls} monsters={monsters} onRemove={onRemove} onError={onError} />
+                )}
+            </div>
         </Popover>
     );
 }

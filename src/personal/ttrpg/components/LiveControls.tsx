@@ -2,8 +2,6 @@ import {
     faArrowUpRightFromSquare,
     faCloud,
     faEye,
-    faHeart,
-    faListCheck,
     faPlay,
     faQrcode,
     faStop,
@@ -22,6 +20,8 @@ import { confirmAction } from '../services/confirm';
 import { ConditionPicker } from './ConditionPicker';
 import { Spinner } from './Feedback';
 import { Popover } from './Popover';
+import { RowEditor } from './RowEditor';
+import { useOpenRow } from './useOpenRow';
 import { StatChips, StatsForm } from './StatsForm';
 import { useKeydown } from './useKeys';
 
@@ -71,10 +71,8 @@ interface PlayersProps
 export function Players({ tokens, onSetStats, system, onSetConditions, onKick, onQr, hidden = false }: PlayersProps)
 {
     const [open, setOpen] = useState(false);
-    // The player whose numbers or conditions are open under their row.
-    const [editing, setEditing] = useState<{ id: string; what: 'numbers' | 'conditions' } | null>(null);
-    const toggleEditing = (id: string, what: 'numbers' | 'conditions') =>
-        setEditing((was) => (was?.id === id && was.what === what ? null : { id, what }));
+    // The one player opened under their row, and the one folding away.
+    const rows = useOpenRow();
     const players = tokens.filter((token) => token.kind === 'player');
 
     return (
@@ -98,34 +96,19 @@ export function Players({ tokens, onSetStats, system, onSetConditions, onKick, o
                     ) : (
                         <ul className="ttrpg-rows">
                             {players.map((player) => (
-                                <li key={player.id} className="ttrpg-row">
-                                    <span className="ttrpg-row__main ttrpg-row__main--swatch">
+                                <li key={player.id} className={`ttrpg-row${rows.open === player.id ? ' ttrpg-row--open' : ''}`}>
+                                    <button
+                                        type="button"
+                                        className="ttrpg-row__main ttrpg-row__main--swatch"
+                                        aria-expanded={rows.open === player.id}
+                                        onClick={() => rows.toggle(player.id)}
+                                    >
                                         <span className="ttrpg-swatch" style={{ background: player.color }} />
                                         {/* The name, with the numbers under it. */}
                                         <span className="ttrpg-row__text">
                                             <span className="ttrpg-row__name">{player.name}</span>
                                             <StatChips token={player} />
                                         </span>
-                                    </span>
-                                    <button
-                                        type="button"
-                                        className="ttrpg-icon-button ttrpg-icon-button--small"
-                                        aria-label={`Numbers of ${player.name}`}
-                                        aria-pressed={editing?.id === player.id && editing.what === 'numbers'}
-                                        title="HP, AC and Perception"
-                                        onClick={() => toggleEditing(player.id, 'numbers')}
-                                    >
-                                        <FontAwesomeIcon icon={faHeart} />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="ttrpg-icon-button ttrpg-icon-button--small"
-                                        aria-label={`Conditions of ${player.name}`}
-                                        aria-pressed={editing?.id === player.id && editing.what === 'conditions'}
-                                        title="Conditions"
-                                        onClick={() => toggleEditing(player.id, 'conditions')}
-                                    >
-                                        <FontAwesomeIcon icon={faListCheck} />
                                     </button>
                                     {onKick && (
                                         <button
@@ -138,14 +121,25 @@ export function Players({ tokens, onSetStats, system, onSetConditions, onKick, o
                                             <FontAwesomeIcon icon={faUserXmark} />
                                         </button>
                                     )}
-                                    {editing?.id === player.id && editing.what === 'numbers' && (
-                                        <StatsForm token={player} onSave={(stats) => onSetStats(player.id, stats)} />
-                                    )}
-                                    {editing?.id === player.id && editing.what === 'conditions' && (
-                                        <ConditionPicker
-                                            system={system}
-                                            conditions={player.conditions ?? []}
-                                            onChange={(conditions) => onSetConditions(player.id, conditions)}
+                                    {(rows.open === player.id || rows.closing === player.id) && (
+                                        <RowEditor
+                                            closing={rows.open !== player.id}
+                                            onClosed={rows.folded}
+                                            tabs={[
+                                                { id: 'numbers', label: 'Numbers', content: <StatsForm token={player} onSave={(stats) => onSetStats(player.id, stats)} /> },
+                                                {
+                                                    id: 'conditions',
+                                                    label: 'Conditions',
+                                                    scrolls: true,
+                                                    content: (
+                                                        <ConditionPicker
+                                                            system={system}
+                                                            conditions={player.conditions ?? []}
+                                                            onChange={(conditions) => onSetConditions(player.id, conditions)}
+                                                        />
+                                                    ),
+                                                },
+                                            ]}
                                         />
                                     )}
                                 </li>

@@ -761,6 +761,25 @@ Built into play mode neatly, it should look and feel good.
   is down like a player (skull, lying in a pool of blood, healable) instead of dying and leaving
   the map. Off by default, so monsters still die. For an NPC the party wants to save, or a foe to
   question.
+- Every monster comes from a preset: the library is the **Monsters** tool (M) in Edit, tiles with
+  the preset's picture in its ring. A tile is dragged onto any map, whether the session runs or
+  not, and the monster starts hidden. Clicking a tile edits it.
+- The GM view's Monsters list shows the open map's monsters before the session starts too, and
+  changes each one's name, ring, Goes down at 0, numbers and conditions.
+- **Built.** Presets are the `presets` table (`convex/presets.ts`), Markdown as the SRD and
+  Homebrewery write it, with a ring colour and a picture that the monsters placed from it share.
+  `content/statBlocks.ts` holds a template per system, reads the name from the `#` heading and AC,
+  HP, speed, size and passive Perception from the labelled lines (10 and the modifier in
+  Pathfinder), and splits the rest into blocks for `components/StatBlock.tsx`, text only. The
+  library is `components/PresetLibrary.tsx`; a tile opens `components/PresetDialog.tsx`, the
+  Markdown beside its stat block, and `.md` files upload as a preset each. A drop on the map calls
+  `play.placeMonster`, which numbers a second of the same name; `play.monsters` gives the host
+  every map's monsters. A monster keeps its `presetId`, sent to the host only, and its row opens
+  the stat block in the top left. Goes down at 0 is `tokens.downs`, used by `hitOn`, kept off
+  players' screens with the numbers. Deleting a preset leaves its monsters, with their initial.
+  How a preset becomes a monster is `monsterFrom` in `map/presets.ts`, shared with the demo, which
+  keeps its presets and monsters in the tab and sends nothing anywhere (`demoMonsters` in
+  `MapEditor.tsx`); the Monsters panels take either through `MonsterControls`.
 
 ### 8. Summons and companions
 

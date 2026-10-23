@@ -5,6 +5,7 @@ import { useActionState } from 'react';
 import type { Stats, Token } from '../types';
 
 import { healthState } from '../map/health';
+import { unhurried } from '../services/busy';
 
 import { Spinner } from './Feedback';
 
@@ -56,14 +57,14 @@ export function StatsForm({ token, onSave }: StatsFormProps)
         const number = (field: string) => Number(form.get(field));
         const maxHp = number('maxHp');
 
-        return onSave({
+        return unhurried(onSave({
             // An empty HP field means full health, the usual reason to leave it.
             hp: form.get('hp') === '' ? maxHp : number('hp'),
             maxHp,
             tempHp: number('tempHp'),
             ac: number('ac'),
             perception: number('perception'),
-        })
+        }))
             .then(() => '')
             .catch((reason: Error) => reason.message);
     }, '');

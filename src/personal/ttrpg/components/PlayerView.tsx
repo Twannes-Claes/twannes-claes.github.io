@@ -155,6 +155,7 @@ function JoinForm({ sessionId, name }: JoinFormProps)
     const authToken = useAuthToken();
     const [password, setPassword] = useState<string | null>(null);
     const [colour] = useState(() => ringColours[Math.floor(Math.random() * ringColours.length)]);
+    const [pictureName, setPictureName] = useState('');
 
     const [wrong, check, checking] = useActionState(
         (_: string, form: FormData) =>
@@ -184,6 +185,9 @@ function JoinForm({ sessionId, name }: JoinFormProps)
     {
         const picture = form.get('picture');
         const avatar = picture instanceof File && picture.size > 0 ? toAvatar(picture) : Promise.resolve(null);
+
+        // The form empties its file field itself once this is done, so the name shown goes now.
+        setPictureName('');
         const character = {
             sessionId,
             password: password ?? '',
@@ -250,10 +254,20 @@ function JoinForm({ sessionId, name }: JoinFormProps)
                     Ring colour
                     <input name="color" type="color" defaultValue={colour} />
                 </label>
-                <label className="ttrpg-field">
+                <div className="ttrpg-field">
                     Picture, from the camera or your photos
-                    <input name="picture" type="file" accept="image/*" />
-                </label>
+                    <label className="ttrpg-segment">
+                        <FontAwesomeIcon icon={faImage} />
+                        <span>{pictureName || 'Choose a picture'}</span>
+                        <input
+                            name="picture"
+                            type="file"
+                            accept="image/*"
+                            className="ttrpg-hidden-input"
+                            onChange={(event) => setPictureName(event.target.files?.[0]?.name ?? '')}
+                        />
+                    </label>
+                </div>
                 {/* Only you and the GM see these. The rest of the table sees how hurt you look. */}
                 <div className="ttrpg-fields">
                     <label className="ttrpg-field">

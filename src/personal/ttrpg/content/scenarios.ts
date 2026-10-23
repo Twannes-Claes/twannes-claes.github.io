@@ -4,6 +4,8 @@ import { cellCenter } from '../map/grid';
 import { footprintCenter } from '../map/size';
 import { spawnCells } from '../map/spawn';
 
+import { demoOgrePreset } from './statBlocks';
+
 /** Pixels per cell of a blank map, the size of a cell on a typical exported battle map. */
 const cell = 100;
 /** Pixels per cell of the demo's picture, which is 20 by 10 cells. */
@@ -102,7 +104,7 @@ const demoPlayers = [
  * only show once a player sees them. A saved example session gets it as a real monster, see
  * addExample in convex/sessions.ts.
  */
-export function demoOgre(grid: Grid): Omit<Token, 'id'>
+export function demoOgre(grid: Grid): Omit<Token, 'id' | 'presetId'>
 {
     return {
         kind: 'npc',
@@ -137,5 +139,5 @@ export function demoTokens(scenario: Scenario): Token[]
     if (scenario.background !== demoScenario.background)
         return players;
 
-    return [...players, { id: 'ogre', ...demoOgre(scenario.grid) }];
+    return [...players, { id: 'ogre', ...demoOgre(scenario.grid), presetId: demoOgrePreset.id }];
 }

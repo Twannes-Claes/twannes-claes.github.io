@@ -1,11 +1,11 @@
-import type { Mark, Point, Prop, PropPicture, Scenario, Wall } from '../types';
+import type { Mark, Point, Prop, PropPicture, Scenario, Token, Wall } from '../types';
 
 import { danger, door as doorColour, faded, ground, highlight, ink } from './colours.ts';
 import { boxOf, closestOnSegment, distance, distanceToSegment, onMap, segmentsTouch, type Area } from './geometry.ts';
 import { cellAt, cellCenter, cellLine, nearestCorner, snapPoint } from './grid.ts';
 import { lineFeet, pathFeet } from './path.ts';
 import { fromLocal, placedSize, propAt, propCorners, propHandles, snapCenter, snapSize } from './props.ts';
-import { drawPill, drawRoute } from './render.ts';
+import { drawPill, drawRoute, tokenRadius } from './render.ts';
 import { sightSegments, visibilityPolygon } from './visibility.ts';
 
 import { confirmAction } from '../services/confirm.ts';
@@ -26,6 +26,7 @@ export type ToolId =
     | 'spawn'
     | 'align'
     | 'props'
+    | 'monsters'
     | 'open-doors'
     | 'measure'
     | 'area'
@@ -60,7 +61,12 @@ export interface ToolPointer
     scenario: Scenario;
     /** Whether the players see a spot or have seen it, or the GM is peeking. True without fog. */
     seen: (point: Point) => boolean;
+    /** The monsters on this screen, which the erase tool takes too. */
+    monsters?: Token[];
 }
+
+/** Hears the monsters the erase tool took, once the GM said yes, see eraseTool. */
+export type EraseMonsters = (ids: string[]) => void;
 
 export interface MapTool
 {
@@ -872,11 +878,6 @@ export function wallInBox(wall: Wall, { left, top, right, bottom }: Area): boole
     );
 }
 
-/**
- * The eraser: click a wall to take it away, or drag a box from the floor and every wall it
- * touches goes when it is let go, once confirmed, as one step to undo. The walls about to go
- * show red.
- */
 /** "the wall", "3 walls", for the erase dialog. Empty for none. */
 function counted(count: number, noun: string): string
 {
@@ -886,24 +887,50 @@ function counted(count: number, noun: string): string
     return count === 1 ? `the ${noun}` : `${count} ${noun}s`;
 }
 
-function eraseTool(change: Change): MapTool
+/** A monster's outline in red, like a wall or a prop about to go. */
+function strokeMonster(ctx: CanvasRenderingContext2D, monster: Token, radius: number, zoom: number)
 {
-    let hover: { wall?: Wall; prop?: Prop } = {};
-    let drag: Drag | null = null;
+    ctx.beginPath();
+    ctx.arc(monster.x, monster.y, radius + 3 / zoom, 0, Math.PI * 2);
+    ctx.lineWidth = 3 / zoom;
+    ctx.strokeStyle = danger;
+    ctx.stroke();
+}
 
-    // The wall near the pointer before the prop under it, as walls are thin and props are big.
+/**
+ * The eraser: click a wall, a prop or a monster to take it away, or drag a box from the floor and
+ * everything in it goes when it is let go, once confirmed. Walls and props go as one step to undo;
+ * a monster lives beside the map rather than in it, so a click on one asks first, and eraseMonsters
+ * takes it off for good. What is about to go shows red.
+ */
+function eraseTool(change: Change, eraseMonsters: EraseMonsters): MapTool
+{
+    let hover: { wall?: Wall; prop?: Prop; monster?: Token } = {};
+    let drag: Drag | null = null;
+    // The monsters the last pointer saw, for drawing, which gets no pointer.
+    let monsters: Token[] = [];
+
+    // A monster on top, then the wall near the pointer before the prop under it, as walls are thin
+    // and props are big.
     const under = (pointer: ToolPointer) =>
     {
+        const { grid } = pointer.scenario;
+        // The last drawn is the one on top.
+        const monster = [...monsters].reverse().find((token) => distance(token, pointer.world) <= tokenRadius(grid, token.size));
+
+        if (monster)
+            return { monster };
+
         const wall = wallNear(pointer);
 
         return wall ? { wall } : { prop: propAt(pointer.scenario.props, pointer.world) };
     };
 
-    /** The walls in the box, and the props with their middle in it. */
+    /** The walls in the box, and the props and monsters with their middle in it. */
     const inBox = (scenario: Scenario) =>
     {
         if (!drag)
-            return { walls: [], props: [] };
+            return { walls: [], props: [], caught: [] };
 
         const box = boxOf(drag.start, drag.end);
         const inside = ({ x, y }: Point) => x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
@@ -914,22 +941,35 @@ function eraseTool(change: Change): MapTool
         return {
             walls: scenario.walls.filter((wall) => wallInBox(wall, box) || rings.has(wall.ring)),
             props: scenario.props.filter(inside),
+            caught: monsters.filter(inside),
         };
     };
 
     return {
         get cursor()
         {
-            return hover.wall || hover.prop ? 'pointer' : 'crosshair';
+            return hover.wall || hover.prop || hover.monster ? 'pointer' : 'crosshair';
         },
         down: (pointer) =>
         {
             const { scenario } = pointer;
-            const { wall, prop } = under(pointer);
+
+            monsters = pointer.monsters ?? [];
+
+            const { wall, prop, monster } = under(pointer);
 
             hover = {};
 
-            if (wall)
+            if (monster)
+            {
+                void confirmAction(`Remove ${monster.name} from the map?`, 'Remove').then((yes) =>
+                {
+                    if (yes)
+                        eraseMonsters([monster.id]);
+
+                });
+            }
+            else if (wall)
             {
                 const gone = withRing(scenario.walls, wall);
 
@@ -944,6 +984,8 @@ function eraseTool(change: Change): MapTool
         },
         move: (pointer, pressed) =>
         {
+            monsters = pointer.monsters ?? [];
+
             if (pressed && drag)
                 drag.end = pointer.world;
 
@@ -952,18 +994,23 @@ function eraseTool(change: Change): MapTool
         up: (pointer) =>
         {
             const { scenario } = pointer;
-            const { walls, props } = inBox(scenario);
+            const { walls, props, caught } = inBox(scenario);
             const doomed = new Set([...walls, ...props].map((thing) => thing.id));
-            const what = [counted(walls.length, 'wall'), counted(props.length, 'prop')].filter(Boolean).join(' and ');
+            const what = [counted(walls.length, 'wall'), counted(props.length, 'prop'), counted(caught.length, 'monster')]
+                .filter(Boolean)
+                .join(' and ');
 
             drag = null;
 
             // The dialog is modal, so nothing else changes the scenario while it asks.
-            if (doomed.size > 0)
+            if (what)
             {
                 void confirmAction(`Erase ${what} in the box?`, 'Erase').then((yes) =>
                 {
-                    if (yes)
+                    if (!yes)
+                        return;
+
+                    if (doomed.size > 0)
                     {
                         change({
                             ...scenario,
@@ -971,6 +1018,10 @@ function eraseTool(change: Change): MapTool
                             props: scenario.props.filter((prop) => !doomed.has(prop.id)),
                         });
                     }
+
+                    if (caught.length > 0)
+                        eraseMonsters(caught.map((monster) => monster.id));
+
                 });
             }
 
@@ -994,16 +1045,22 @@ function eraseTool(change: Change): MapTool
             if (hover.prop)
                 strokeProp(ctx, hover.prop, danger, 3 / zoom);
 
+            if (hover.monster)
+                strokeMonster(ctx, hover.monster, tokenRadius(scenario.grid, hover.monster.size), zoom);
+
             if (!drag)
                 return;
 
-            const { walls, props } = inBox(scenario);
+            const { walls, props, caught } = inBox(scenario);
 
             for (const wall of walls)
                 strokeWall(ctx, wall, danger, 7 / zoom);
 
             for (const prop of props)
                 strokeProp(ctx, prop, danger, 3 / zoom);
+
+            for (const monster of caught)
+                strokeMonster(ctx, monster, tokenRadius(scenario.grid, monster.size), zoom);
 
             drawBox(ctx, drag, zoom, danger, true);
         },
@@ -1271,6 +1328,7 @@ export function createTool(
     reveal: Reveal = () => {},
     snap = 1,
     share: ShareMark = () => {},
+    eraseMonsters: EraseMonsters = () => {},
 ): MapTool | null
 {
     switch (id)
@@ -1280,7 +1338,7 @@ export function createTool(
         case 'rings':
             return ringTool(change, snap);
         case 'erase':
-            return eraseTool(change);
+            return eraseTool(change, eraseMonsters);
         case 'doors':
             // A ring is no door.
             return wallClickTool(
@@ -1311,8 +1369,10 @@ export function createTool(
         case 'reveal-circle':
         case 'hide-circle':
             return revealCircleTool(reveal, id === 'hide-circle');
+        // Monsters come from their panel, dragged onto the map, so the map itself only pans.
         case 'select':
         case 'align':
+        case 'monsters':
             return null;
     }
 }

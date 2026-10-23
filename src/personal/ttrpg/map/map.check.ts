@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import type { Cell, Grid, Point, Scenario, Token, Wall } from '../types';
 import { cleanConditions } from '../content/conditions.ts';
+import { blocksOf, demoOgreStatBlock, spansOf, statBlockTemplates, statsOf } from '../content/statBlocks.ts';
 
 import { toScreen, toWorld, zoomAt } from './camera.ts';
 import { createExplored, markSeen, packedFlag, packSeen, wasSeen } from './fog.ts';
@@ -682,3 +683,30 @@ assert.deepEqual([order(orcGone), orcGone.turn], [['bo', 'ann', 'imp'], 'imp']);
 assert.deepEqual([wrapped.round, wrapped.turn], [2, 'bo']);
 assert.equal(withoutRoll(fight, 'bo', everyone).turn, 'ann');
 assert.deepEqual(order(withRoll(fight, { id: 'cy', kind: 'player' }, 15, kindOf, '5e')), ['bo', 'cy', 'ann', 'orc', 'imp']);
+
+// A stat block gives a token its numbers in either system, and shows as the blocks it is written in.
+assert.deepEqual(statsOf(statBlockTemplates['5e']), { name: 'Monster name', size: 'medium', ac: 12, maxHp: 11, speed: 30, perception: 12 });
+assert.deepEqual(statsOf(statBlockTemplates.pf2e), { name: 'Creature name', size: 'medium', ac: 16, maxHp: 20, speed: 25, perception: 16 });
+assert.deepEqual(statsOf('> ## Ogre\n> *Large giant*\n> **AC:** 11'), { name: '', size: 'large', ac: 11, maxHp: undefined, speed: undefined, perception: undefined });
+assert.deepEqual(
+    blocksOf('# Imp\n**AC** 13\n**HP** 10\n\n| A | B |\n|---|---|\n| 1 | 2 |\n- one\n---'),
+    [
+        { kind: 'heading', level: 1, text: 'Imp' },
+        { kind: 'lines', lines: ['**AC** 13', '**HP** 10'] },
+        { kind: 'table', head: ['A', 'B'], rows: [['1', '2']] },
+        { kind: 'list', items: ['one'] },
+        { kind: 'rule' },
+    ],
+);
+assert.deepEqual(spansOf('***Bite.*** *Hit:* 5 x * 2'), [
+    { text: 'Bite.', bold: true, italic: true },
+    { text: ' ' },
+    { text: 'Hit:', italic: true },
+    { text: ' 5 x * 2' },
+]);
+
+// A monster that goes down at 0 lies there like a player rather than dying.
+assert.deepEqual(hitOn({ kind: 'npc', hp: 5, maxHp: 30, downs: true }, 'attack', 9), { after: { hp: 0, tempHp: 0 }, died: false, downed: true });
+
+// The example session's ogre preset gives the numbers its token starts with.
+assert.deepEqual(statsOf(demoOgreStatBlock), { name: 'Ogre', size: 'large', ac: 11, maxHp: 59, speed: 40, perception: 8 });

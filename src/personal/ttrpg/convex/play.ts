@@ -7,6 +7,7 @@ import { distance } from '../map/geometry';
 import { cleanStats, downedPool, hitOn, withoutNumbers } from '../map/health';
 import { cleanFight, cleanRoll, hasRolled, nextTurn, upNext, withRoll } from '../map/initiative';
 import { pathBlocked } from '../map/path';
+import { monsterFrom } from '../map/presets';
 import { anchorAt, footprintCenter, footprintKeys } from '../map/size';
 import { spawnCells } from '../map/spawn';
 import { startWalk } from '../map/walk';
@@ -15,7 +16,7 @@ import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireSession, requireUser } from './access';
-import { bloodSettingsValidator, conditionValidator, fogSettingsValidator, initiativeValidator, sizeValidator } from './schema';
+import { bloodSettingsValidator, conditionValidator, fogSettingsValidator, initiativeValidator } from './schema';
 import { refreshSight, tokensOf, tokensOn } from './sight';
 import { dropFile } from './usage';
 import { storedPicture } from './pictures';
@@ -61,7 +62,6 @@ async function sessionOf(ctx: QueryCtx, sessionId: Id<'sessions'>): Promise<Doc<
     return session;
 }
 
-/** Whether a player's token is held back: a fight is on and it is not its turn, see Initiative. */
 /** A player held by the fight: everyone while the rolls come in, then all but whose turn it is. */
 function waitsTurn(session: Doc<'sessions'>, tokenId: Id<'tokens'>): boolean
 {
@@ -273,31 +273,57 @@ export const tokens = query({
             .filter((token) => host || token.kind === 'player' || (token.inSight === true && token.hidden !== true))
             .map((doc) =>
             {
-                const { kind, name, color, size, speed, avatar, x, y, path, movedAt, hidden, conditions } = doc;
-                const { hp, maxHp, tempHp, ac, perception } = doc;
-                const token = {
-                    id: doc._id,
-                    kind,
-                    name,
-                    color,
-                    size,
-                    speed,
-                    avatar,
-                    x,
-                    y,
-                    path,
-                    movedAt,
-                    hidden,
-                    hp,
-                    maxHp,
-                    tempHp,
-                    ac,
-                    perception,
-                    conditions,
-                };
+                // Only the host can open a stat block, so only the host hears which.
+                const token = { ...tokenOf(doc), presetId: host ? doc.presetId : undefined };
 
                 return host || doc.userId === userId ? token : withoutNumbers(token);
             });
+    },
+});
+
+/** A token as the host's screen gets it, everything but its storage and bookkeeping. */
+function tokenOf(doc: Doc<'tokens'>): Token
+{
+    const { kind, name, color, size, speed, avatar, x, y, path, movedAt, hidden, conditions } = doc;
+    const { hp, maxHp, tempHp, ac, perception, downs, presetId } = doc;
+
+    return {
+        id: doc._id,
+        kind,
+        name,
+        color,
+        size,
+        speed,
+        avatar,
+        x,
+        y,
+        path,
+        movedAt,
+        hidden,
+        hp,
+        maxHp,
+        tempHp,
+        ac,
+        perception,
+        conditions,
+        downs,
+        presetId,
+    };
+}
+
+/**
+ * Every monster of a session on all its maps, for its host: Edit and the GM view show a map's own
+ * whether the session runs or not, see placeMonster.
+ */
+export const monsters = query({
+    args: { sessionId: v.id('sessions') },
+    handler: async (ctx, { sessionId }) =>
+    {
+        await requireSession(ctx, sessionId);
+
+        return (await tokensOf(ctx, sessionId))
+            .filter((doc) => doc.kind === 'npc')
+            .map((doc) => ({ ...tokenOf(doc), scenarioId: doc.scenarioId }));
     },
 });
 
@@ -735,44 +761,22 @@ async function requireMonster(ctx: MutationCtx, tokenId: Id<'tokens'>): Promise<
 }
 
 /**
- * The host adds a monster or NPC to the map being played, lined up with the grid around a point,
- * the middle of their screen. The picture is uploaded first, see pictures.ts. Null when it was
- * refused.
+ * The host drags a preset onto a map, in Edit, whether the session runs or not, see monsterFrom in
+ * map/presets.ts and Monster staging in PLAN.md.
  */
-export const addMonster = mutation({
-    args: {
-        sessionId: v.id('sessions'),
-        name: v.string(),
-        color: v.string(),
-        size: sizeValidator,
-        hidden: v.boolean(),
-        x: v.number(),
-        y: v.number(),
-        storageId: v.optional(v.id('_storage')),
-        /** Without it the monster has no numbers, and shows no damage. */
-        maxHp: v.optional(v.number()),
-        ac: v.optional(v.number()),
-    },
-    handler: async (ctx, { sessionId, name, color, size, hidden, x, y, storageId, maxHp, ac }) =>
+export const placeMonster = mutation({
+    args: { sessionId: v.id('sessions'), scenarioId: v.string(), presetId: v.id('presets'), x: v.number(), y: v.number() },
+    handler: async (ctx, { sessionId, scenarioId, presetId, x, y }) =>
     {
-        // At full health. Passive Perception starts at 10, the score of an unskilled creature.
-        const stats = maxHp === undefined ? {} : cleanStats({ hp: maxHp, maxHp, tempHp: 0, ac: ac ?? 10, perception: 10 });
         const session = await requireSession(ctx, sessionId);
-        const monster = name.trim().slice(0, 30);
+        const preset = await ctx.db.get('presets', presetId);
+        const scenario = await scenarioOf(ctx, sessionId, scenarioId);
 
-        if (session.live !== true || !session.activeScenarioId)
-            throw new ConvexError('Start the session first.');
-
-        const scenario = await scenarioOf(ctx, sessionId, session.activeScenarioId);
+        if (!preset || preset.ownerId !== session.ownerId)
+            throw new ConvexError('That preset is gone.');
 
         if (!scenario)
             throw new ConvexError('That map is not saved yet. Wait for Saved and try again.');
-
-        if (!monster)
-            throw new ConvexError('The monster needs a name.');
-
-        if (!colourPattern.test(color))
-            throw new ConvexError('Pick a ring colour.');
 
         if (!onScenario(scenario, { x, y }))
             throw new ConvexError('That is off the map.');
@@ -782,32 +786,31 @@ export const addMonster = mutation({
         if (all.filter((token) => token.kind === 'npc').length >= maxMonsters)
             throw new ConvexError(`A session holds at most ${maxMonsters} monsters.`);
 
-        const avatar = storageId ? await storedPicture(ctx, storageId, maxAvatarBytes) : null;
+        const names = new Set(all.filter((token) => token.scenarioId === scenarioId).map((token) => token.name));
 
-        if (storageId && !avatar)
-            return null;
+        await ctx.db.insert('tokens', { sessionId, scenarioId, presetId, ...monsterFrom(preset, scenario.grid, { x, y }, names) });
 
-        const { grid } = scenario;
-        const spot = grid.type === 'none' ? { x, y } : footprintCenter(grid, anchorAt(grid, { x, y }, size), size);
+        return null;
+    },
+});
 
-        const tokenId = await ctx.db.insert('tokens', {
-            sessionId,
-            kind: 'npc',
-            name: monster,
-            color,
-            size,
-            speed: 30,
-            avatar: avatar ?? undefined,
-            avatarId: avatar ? storageId : undefined,
-            hidden,
-            scenarioId: session.activeScenarioId,
-            ...spot,
-            ...stats,
-        });
+/** The host renames a monster, changes its ring, or whether it goes down at 0 instead of dying. */
+export const setMonster = mutation({
+    args: { tokenId: v.id('tokens'), name: v.string(), color: v.string(), downs: v.boolean() },
+    handler: async (ctx, { tokenId, name, color, downs }) =>
+    {
+        await requireMonster(ctx, tokenId);
+        const monster = name.trim().slice(0, 30);
 
-        await refreshSight(ctx, sessionId, scenario);
+        if (!monster)
+            throw new ConvexError('The monster needs a name.');
 
-        return tokenId;
+        if (!colourPattern.test(color))
+            throw new ConvexError('Pick a ring colour.');
+
+        await ctx.db.patch('tokens', tokenId, { name: monster, color, downs: downs ? true : undefined });
+
+        return null;
     },
 });
 
