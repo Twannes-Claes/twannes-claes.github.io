@@ -2,10 +2,12 @@ import {
     faBroom,
     faCloud,
     faCompress,
+    faDiceD20,
     faDragon,
     faEye,
     faEyeSlash,
     faExpand,
+    faForwardStep,
     faCircle,
     faObjectGroup,
     faSnowflake,
@@ -53,6 +55,11 @@ interface PlayDockProps
     onAttack: () => void;
     /** Clears what killed monsters left on the map. Only while there is some, see Decal. */
     onClearDecals?: () => void;
+    /** Opens or closes the initiative, see InitiativePanel.tsx. */
+    onInitiative: () => void;
+    initiativeOpen: boolean;
+    /** Passes the turn on, only while the turns of a fight run. */
+    onNextTurn?: () => void;
 }
 
 /**
@@ -77,6 +84,9 @@ export function PlayDock({
     fogOpen,
     onAttack,
     onClearDecals,
+    onInitiative,
+    initiativeOpen,
+    onNextTurn,
 }: PlayDockProps)
 {
     const { fullscreen, toggle } = useFullscreen();
@@ -169,6 +179,25 @@ export function PlayDock({
                         </span>
                     )}
                 </span>
+            </div>
+            <div className="ttrpg-dock__group">
+                <button
+                    type="button"
+                    className="ttrpg-segment"
+                    aria-pressed={initiativeOpen}
+                    aria-expanded={initiativeOpen}
+                    title="Rolls, the order and whose turn it is"
+                    onClick={onInitiative}
+                >
+                    <FontAwesomeIcon icon={faDiceD20} />
+                    Initiative
+                </button>
+                {onNextTurn && (
+                    <button type="button" className="ttrpg-segment" title="Pass the turn on" onClick={onNextTurn}>
+                        <FontAwesomeIcon icon={faForwardStep} />
+                        Next
+                    </button>
+                )}
             </div>
             {onMonsters && (
                 <div className="ttrpg-dock__group">

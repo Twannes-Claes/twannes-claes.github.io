@@ -164,6 +164,8 @@ export interface MapView
     setDecals: (decals: Decal[]) => void;
     /** Which blood shows, see BloodSettings. */
     setBlood: (blood: BloodSettings) => void;
+    /** The token whose turn it is in a fight, ringed, or null. */
+    setTurn: (id: string | null) => void;
     /** Other screens' paths, drawn faintly in their token's colour, see Draft. */
     setDrafts: (drafts: Draft[]) => void;
     /** Other screens' rulers and areas, in their player's colour, see Mark. */
@@ -281,6 +283,8 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     let drops: (Drop & { start: number })[] = [];
     const lastDrop = new Map<string, Point>();
     let blood = defaultBlood;
+    /** The token whose turn it is, see setTurn. */
+    let turn: string | null = null;
     /**
      * Where the mouse rests or a finger last pressed, in world pixels, and the condition badge
      * there, whose name shows beside it, see showBadgeAt.
@@ -816,6 +820,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             time,
             decals: blood.ground ? shownDecals : [],
             wounds: blood.wounds,
+            turn,
             drops: drops.map((drop) => ({ ...drop, alpha: Math.min(1, (dropLife - (time - drop.start)) / dropFade) })),
             // The path's line goes under the tokens, so it never covers the one walking it.
             beneath: () =>
@@ -1684,6 +1689,11 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         setBlood: (next) =>
         {
             blood = next;
+            redraw();
+        },
+        setTurn: (id) =>
+        {
+            turn = id;
             redraw();
         },
         setDecals: (next) =>

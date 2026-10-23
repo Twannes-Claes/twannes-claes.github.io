@@ -98,6 +98,8 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const setFogLook = useMutation(api.play.setFogLook);
     const setBlood = useMutation(api.play.setBlood);
     const setSystem = useMutation(api.sessions.setSystem);
+    const setInitiative = useMutation(api.play.setInitiative);
+    const setUpNext = useMutation(api.play.setUpNext);
     const startSession = useMutation(api.play.start);
     const endSession = useMutation(api.play.end);
     const freezeSession = useMutation(api.play.freeze);
@@ -194,6 +196,10 @@ function Session({ sessionId, debug }: SessionEditorProps)
             setBlood: (blood) => friendly(setBlood({ sessionId: id, blood })),
             system: status.system,
             setSystem: (system) => friendly(setSystem({ sessionId: id, system })),
+            initiative: status.initiative,
+            setInitiative: (fight) => friendly(setInitiative({ sessionId: id, initiative: fight })),
+            upNext: status.upNext,
+            setUpNext: (on) => friendly(setUpNext({ sessionId: id, upNext: on })),
         }
         : undefined;
 

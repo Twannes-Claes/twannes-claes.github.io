@@ -316,6 +316,42 @@ export interface Live
     setBlood: (blood: BloodSettings) => Promise<void>;
     system: GameSystem;
     setSystem: (system: GameSystem) => Promise<void>;
+    /** The fight on the map being played, null while there is none. */
+    initiative: Initiative | null;
+    /** Sends the fight whole, see map/initiative.ts. Null ends it. */
+    setInitiative: (fight: Initiative | null) => Promise<void>;
+    /** Whoever comes after the current turn hears so. */
+    upNext: boolean;
+    setUpNext: (on: boolean) => Promise<void>;
+}
+
+/**
+ * A fight in initiative, see map/initiative.ts. Only the GM gets it whole; a phone only hears
+ * whether it rolled and whose turn it is, see PlayerFight.
+ */
+export interface Initiative
+{
+    /** The turns have begun. Before that the rolls come in. */
+    begun: boolean;
+    /** From 1 once begun. */
+    round: number;
+    /** Everyone taking part, in turn order. */
+    order: { tokenId: string; roll: number }[];
+    /** Whose turn it is, null before the turns begin. */
+    turn: string | null;
+}
+
+/**
+ * A fight as a phone or the Player view hears of it: whether the own token rolled, and whose turn
+ * it is, the token's id when players can see it, enemy when it is a monster they cannot.
+ */
+export interface PlayerFight
+{
+    begun: boolean;
+    rolled: boolean;
+    turn: string | 'enemy' | null;
+    /** The own token comes after the current turn, when the GM turned Up next on. */
+    upNext: boolean;
 }
 
 /**

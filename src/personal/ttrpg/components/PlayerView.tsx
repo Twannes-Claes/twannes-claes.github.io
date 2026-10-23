@@ -1,6 +1,8 @@
 import {
     faCompress,
+    faDiceD20,
     faExpand,
+    faForwardStep,
     faImage,
     faRightFromBracket,
     faSnowflake,
@@ -10,7 +12,7 @@ import { useAuthActions, useAuthToken, useConvexAuth } from '@convex-dev/auth/re
 import { useConvex, useMutation, useQuery } from 'convex/react';
 import { useActionState, useEffect, useState, type ReactNode } from 'react';
 
-import type { BloodSettings, FogSettings, GameSystem, HitKind, Scenario } from '../types';
+import type { BloodSettings, FogSettings, GameSystem, HitKind, PlayerFight, Scenario } from '../types';
 
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
@@ -28,6 +30,7 @@ import { Loading, Toast, Toasts } from './Feedback';
 import { MapCanvas } from './MapCanvas';
 import { AttackButton, HitSheet } from './HitSheet';
 import { MoveSheet } from './MoveSheet';
+import { RollSheet } from './RollSheet';
 import { RulerPicker, type Measure } from './RulerPicker';
 import { Settings } from './Settings';
 import { StatsForm } from './StatsForm';
@@ -116,7 +119,7 @@ function Player({ sessionId, table }: PlayerViewProps)
     }
 
     if (table && status.host)
-        return <Table sessionId={status.sessionId} mine={null} frozen={status.frozen} fogLook={status.fogLook} blood={status.blood} system={status.system} />;
+        return <Table sessionId={status.sessionId} mine={null} frozen={status.frozen} fogLook={status.fogLook} blood={status.blood} system={status.system} fight={status.fight} />;
 
     if (status.kicked)
     {
@@ -131,7 +134,7 @@ function Player({ sessionId, table }: PlayerViewProps)
     if (!status.mine)
         return <JoinForm sessionId={status.sessionId} name={status.name} />;
 
-    return <Table sessionId={status.sessionId} mine={status.mine} frozen={status.frozen} fogLook={status.fogLook} blood={status.blood} system={status.system} />;
+    return <Table sessionId={status.sessionId} mine={status.mine} frozen={status.frozen} fogLook={status.fogLook} blood={status.blood} system={status.system} fight={status.fight} />;
 }
 
 interface JoinFormProps
@@ -287,6 +290,8 @@ interface TableProps
     blood: BloodSettings | null;
     /** The session's game, whose conditions the player picks from. */
     system: GameSystem;
+    /** The fight as this screen hears of it, null while there is none. */
+    fight: PlayerFight | null;
 }
 
 /**
@@ -296,7 +301,7 @@ interface TableProps
  * fade out like the GM view's controls, and it saves what the party saw, so the fog is remembered
  * while the GM view is in Edit, see saveFog in convex/play.ts.
  */
-function Table({ sessionId, mine, frozen, fogLook, blood, system }: TableProps)
+function Table({ sessionId, mine, frozen, fogLook, blood, system, fight }: TableProps)
 {
     const onTable = mine === null;
     // What a press does with no ruler on: open doors on the table screen, as in the editor, or on
@@ -325,6 +330,8 @@ function Table({ sessionId, mine, frozen, fogLook, blood, system }: TableProps)
     const saveFog = useMutation(api.play.saveFog);
     const saveStats = useMutation(api.play.setStats);
     const saveConditions = useMutation(api.play.setConditions);
+    const rollInitiative = useMutation(api.play.rollInitiative);
+    const endTurn = useMutation(api.play.endTurn);
     const authToken = useAuthToken();
     const [pending, setPending] = useState<PendingMove | null>(null);
     // The map the path and targets were made on. When the GM opens another, they go: confirmed,
@@ -362,6 +369,23 @@ function Table({ sessionId, mine, frozen, fogLook, blood, system }: TableProps)
     const shown = doorMoved && doorMoved.from === scenario ? doorMoved.to : scenario;
 
     const failed = (reason: unknown) => message.error(explain(reason, 'That move did not go through. Try again.'));
+
+    // In a fight a phone waits for its turn to move or attack; it rolls first, see Initiative.
+    // Without a roll by Begin it sits the fight out, free to move, and only the GM can add it.
+    const myTurn = fight?.begun === true && fight.turn === mine;
+    const sitsOut = fight?.begun === true && !fight.rolled;
+    const held = frozen || (!onTable && fight !== null && !myTurn && !sitsOut);
+    const rolling = !onTable && mine !== null && fight !== null && !fight.begun && !fight.rolled;
+    const turnName = fight?.turn === 'enemy' ? 'Enemy' : tokens.find((candidate) => candidate.id === fight?.turn)?.name;
+
+    const sendRoll = (roll: number) =>
+        rollInitiative({ sessionId, roll }).then(
+            () => undefined,
+            (reason: unknown) =>
+            {
+                throw new Error(explain(reason, 'That roll did not go through. Try again.'));
+            },
+        );
 
     const picked = targets ? tokens.filter((candidate) => targets.includes(candidate.id)) : [];
 
@@ -462,16 +486,30 @@ function Table({ sessionId, mine, frozen, fogLook, blood, system }: TableProps)
             )}
 
             {/* Both corners make way for the move sheet and the hit sheet at the bottom. */}
-            {!pending && !targets && (
+            {!pending && !targets && !rolling && (
                 <div className={`ttrpg-panel ttrpg-corner ttrpg-corner--left${idle ? ' ttrpg-hidden' : ''}`}>
                     <RulerPicker
                         tool={tool}
                         onMeasure={(next) => setTool(next ?? resting)}
                         start
                     />
-                    {/* Frozen, players cannot attack, see hit in convex/play.ts. */}
-                    <AttackButton onClick={startTargets} disabled={frozen && !onTable} />
+                    {/* Frozen, or waiting for their turn, players cannot attack, see play.hit. */}
+                    <AttackButton onClick={startTargets} disabled={held && !onTable} />
+                    {myTurn && (
+                        <button
+                            type="button"
+                            className="ttrpg-segment ttrpg-segment--confirm"
+                            onClick={() => void endTurn({ sessionId }).catch((reason: unknown) => message.error(explain(reason, 'That did not go through. Try again.')))}
+                        >
+                            <FontAwesomeIcon icon={faForwardStep} />
+                            End turn
+                        </button>
+                    )}
                 </div>
+            )}
+
+            {rolling && !pending && !targets && (
+                <RollSheet title="Roll initiative" note={system === 'pf2e' ? 'Usually your Perception' : undefined} onSend={sendRoll} />
             )}
 
             {!onTable && !pending && !targets && (
@@ -546,7 +584,8 @@ function Table({ sessionId, mine, frozen, fogLook, blood, system }: TableProps)
                 placing={null}
                 fogEpoch={0}
                 pending={pending}
-                frozen={frozen}
+                frozen={held}
+                turn={fight?.turn === 'enemy' ? null : (fight?.turn ?? null)}
                 peek={false}
                 // Null in the Player view's window, where every token answers the GM.
                 own={mine}
@@ -589,6 +628,21 @@ function Table({ sessionId, mine, frozen, fogLook, blood, system }: TableProps)
                         Movement paused by the GM
                     </Toast>
                 )}
+                {fight && !fight.begun && (onTable || fight.rolled) && (
+                    <Toast kind="info" icon={faDiceD20}>
+                        Rolling for initiative
+                    </Toast>
+                )}
+                {fight?.begun && turnName && (
+                    <Toast kind="info" icon={faDiceD20}>
+                        {myTurn ? 'Your turn' : `${turnName}'s turn`}
+                    </Toast>
+                )}
+                {fight?.upNext && !myTurn && (
+                    <Toast kind="info" icon={faForwardStep}>
+                        You are up next
+                    </Toast>
+                )}
                 {uploading && <Toast kind="busy">Uploading your picture</Toast>}
                 {message.message && (
                     <Toast kind={message.message.kind} onClose={message.clear}>
@@ -611,7 +665,7 @@ function Table({ sessionId, mine, frozen, fogLook, blood, system }: TableProps)
 
             {screen.frameRate && stats && (
                 <p className="ttrpg-panel ttrpg-stats" aria-hidden="true">
-                    {`${stats.fps} fps · ${stats.frameMs.toFixed(1)} ms · worst ${stats.worstMs.toFixed(1)} ms`}
+                    {`${stats.fps} fps Â· ${stats.frameMs.toFixed(1)} ms Â· worst ${stats.worstMs.toFixed(1)} ms`}
                 </p>
             )}
         </main>

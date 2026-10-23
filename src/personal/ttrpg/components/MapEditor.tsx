@@ -1,13 +1,14 @@
-import { faCheck, faHatWizard, faPen, faSnowflake, faTriangleExclamation, faTv } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faDiceD20, faHatWizard, faPen, faSnowflake, faTriangleExclamation, faTv } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useEffectEvent, useRef, useState, type DragEvent, type MouseEvent } from 'react';
 
-import type { BloodSettings, Decal, FogSettings, GameSystem, HitKind, Live, PictureBytes, Ping, Point, PropPicture, Scenario, SharedHit, Store } from '../types';
+import type { BloodSettings, Decal, FogSettings, GameSystem, HitKind, Initiative, Live, PictureBytes, Ping, Point, PropPicture, Scenario, SharedHit, Store, Token } from '../types';
 
 import { blankScenario, demoTokens } from '../content/scenarios';
 import { gameSystems } from '../content/systems';
 import { defaultFogSettings } from '../map/fog';
 import { cleanStats, defaultBlood, downedPool, hitOn, withoutNumbers } from '../map/health';
+import { nextTurn } from '../map/initiative';
 import { toggleDoor, type ToolId } from '../map/tools';
 import { scenarioFromUvtt } from '../map/uvtt';
 import type { FrameStats, PendingMove } from '../map/view';
@@ -19,6 +20,7 @@ import { Spinner, Toast, Toasts } from './Feedback';
 import { FogPanel } from './FogPanel';
 import { AttackButton, HitSheet } from './HitSheet';
 import { GridPanel } from './GridPanel';
+import { InitiativePanel } from './InitiativePanel';
 import { LiveControls, Players } from './LiveControls';
 import { MapCanvas } from './MapCanvas';
 import { Monsters } from './Monsters';
@@ -43,6 +45,23 @@ type Mode = 'edit' | 'gm' | 'players';
 
 /** The map tool behind each kind of the walls tool, see WallPanel. */
 const wallTools: Record<WallKind, ToolId> = { wall: 'walls', ring: 'rings', change: 'doors' };
+
+/**
+ * The fight in a line, for its toast: rolling, or the round and whose turn it is. The Player view
+ * says Enemy for a hidden monster, as the players' screens do.
+ */
+function fightLine(fight: Initiative, tokens: Token[], asPlayers: boolean): string
+{
+    if (!fight.begun)
+        return 'Rolling for initiative';
+
+    const token = tokens.find((candidate) => candidate.id === fight.turn);
+
+    if (!token)
+        return `Round ${fight.round}`;
+
+    return `Round ${fight.round} · ${asPlayers && token.hidden ? 'Enemy' : token.name}'s turn`;
+}
 
 /** How long the editor waits after the last change before it saves. */
 const saveDelay = 1000;
@@ -124,7 +143,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const [frozen, setFrozen] = useState(false);
     const [playTool, setPlayTool] = useState<PlayTool>('open-doors');
     // The one panel open above the play dock.
-    const [panel, setPanel] = useState<'monsters' | 'fog' | null>(null);
+    const [panel, setPanel] = useState<'monsters' | 'fog' | 'initiative' | null>(null);
     // The fog's look: the session's when it is saved, this screen's in the demo. While a slider
     // moves, the draft shows here only, and letting go saves it, see FogPanel.
     const [demoFog, setDemoFog] = useState<FogSettings>(defaultFogSettings);
@@ -135,6 +154,9 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     // Which blood shows: the session's when it is saved, this tab's in the demo.
     const [demoBlood, setDemoBlood] = useState(defaultBlood);
     const [demoSystem, setDemoSystem] = useState<GameSystem>('5e');
+    // The fight off a live map, with the test players, and whether Up next is on in the demo.
+    const [localFight, setLocalFight] = useState<Initiative | null>(null);
+    const [demoUpNext, setDemoUpNext] = useState(false);
     // The tokens picked for an attack or a heal, or null when not picking, see HitSheet.
     const [targets, setTargets] = useState<string[] | null>(null);
     const [fogDraft, setFogDraft] = useState<FogSettings | null>(null);
@@ -382,6 +404,10 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
     const system = live ? live.system : demoSystem;
     const setSystem = (next: GameSystem) => (live ? fail(live.setSystem(next)) : setDemoSystem(next));
+    const fight = liveMap ? liveMap.initiative : localFight;
+    const setFight = (next: Initiative | null) => (liveMap ? fail(liveMap.setInitiative(next)) : setLocalFight(next));
+    const upNext = live ? live.upNext : demoUpNext;
+    const setUpNext = (on: boolean) => (live ? fail(live.setUpNext(on)) : setDemoUpNext(on));
 
     const clearDecals = () =>
     {
@@ -429,7 +455,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
     };
 
-    const togglePanel = (next: 'monsters' | 'fog') => setPanel((open) => (open === next ? null : next));
+    const togglePanel = (next: 'monsters' | 'fog' | 'initiative') => setPanel((open) => (open === next ? null : next));
 
     const fogSettings = fogDraft ?? (live ? (live.fogLook ?? defaultFogSettings) : demoFog);
 
@@ -507,6 +533,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
             }),
         );
         setLocalDecals([]);
+        setLocalFight(null);
         setPending(null);
         setTargets(null);
 
@@ -695,6 +722,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 hit={liveMap ? liveMap.lastHit : localHit}
                 decals={decals}
                 blood={blood}
+                turn={fight?.turn ?? null}
                 targets={targets}
                 onTarget={pickTarget}
             />
@@ -810,6 +838,20 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                                     ))}
                                 </div>
                             </section>
+                            <section className="ttrpg-shortcuts" aria-label="Initiative">
+                                <h3 className="ttrpg-subhead">Initiative</h3>
+                                <div className="ttrpg-settings__choices">
+                                    <button
+                                        type="button"
+                                        className="ttrpg-segment"
+                                        aria-pressed={upNext}
+                                        title="The phone of whoever goes after the current turn says so"
+                                        onClick={() => setUpNext(!upNext)}
+                                    >
+                                        Up next
+                                    </button>
+                                </div>
+                            </section>
                             <section className="ttrpg-shortcuts" aria-label="Blood">
                                 <h3 className="ttrpg-subhead">Blood</h3>
                                 <div className="ttrpg-settings__choices">
@@ -842,6 +884,11 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 {playing && isFrozen && (
                     <Toast kind="info" icon={faSnowflake}>
                         Movement paused by the GM
+                    </Toast>
+                )}
+                {playing && fight && (
+                    <Toast kind="info" icon={faDiceD20}>
+                        {fightLine(fight, shown, mode === 'players')}
                     </Toast>
                 )}
                 {busy && <Toast kind="busy">{busy}</Toast>}
@@ -931,6 +978,9 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                         fogOpen={panel === 'fog'}
                         onAttack={startTargets}
                         onClearDecals={blood.ground && decals.length > 0 ? clearDecals : undefined}
+                        onInitiative={() => togglePanel('initiative')}
+                        initiativeOpen={panel === 'initiative'}
+                        onNextTurn={fight?.begun ? () => setFight(nextTurn(fight, (id) => shown.some((token) => token.id === id))) : undefined}
                     />
                 )
             )}
@@ -956,6 +1006,10 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                     onResetFog={resetFog}
                     onClose={() => setPanel(null)}
                 />
+            )}
+
+            {mode === 'gm' && !pending && !idle && panel === 'initiative' && (
+                <InitiativePanel fight={fight} tokens={shown} system={system} onChange={setFight} onClose={() => setPanel(null)} />
             )}
 
             {mode === 'gm' && !pending && !idle && liveMap && panel === 'monsters' && (

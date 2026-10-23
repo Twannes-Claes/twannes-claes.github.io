@@ -26,6 +26,14 @@ export const bloodSettingsValidator = v.object({ ground: v.boolean(), wounds: v.
 /** The game a session is played in, see GameSystem in types.ts. */
 export const systemValidator = v.union(v.literal('5e'), v.literal('pf2e'), v.literal('other'));
 
+/** A fight in initiative, see Initiative in types.ts. */
+export const initiativeValidator = v.object({
+    begun: v.boolean(),
+    round: v.number(),
+    order: v.array(v.object({ tokenId: v.string(), roll: v.number() })),
+    turn: v.union(v.string(), v.null()),
+});
+
 /** A condition on a token, see Condition in types.ts. */
 export const conditionValidator = v.object({ id: v.string(), value: v.optional(v.number()) });
 
@@ -115,6 +123,10 @@ export default defineSchema({
         blood: v.optional(bloodSettingsValidator),
         /** The game it is played in. Missing is 5e. */
         system: v.optional(systemValidator),
+        /** The fight on the map being played, only for the host, see Initiative in types.ts. */
+        initiative: v.optional(initiativeValidator),
+        /** Whoever comes after the current turn hears so, see Up next in PLAN.md. */
+        upNext: v.optional(v.boolean()),
     }).index('by_ownerId', ['ownerId']),
     /**
      * Who stands where while a session is played. Players' tokens carry their anonymous user, so a

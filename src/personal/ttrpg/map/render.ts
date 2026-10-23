@@ -72,6 +72,8 @@ export interface Scene
     drops?: Drop[];
     /** False when the GM turned off the red and the drips on hurt tokens. The skull stays. */
     wounds?: boolean;
+    /** The token whose turn it is in a fight, which gets a glowing ring, see Initiative. */
+    turn?: string | null;
 }
 
 /**
@@ -844,6 +846,20 @@ function drawPulse(ctx: CanvasRenderingContext2D, token: Token, base: number, re
 }
 
 /** Where players appear: a dashed ring with a dot, in the accent colour. */
+/** A glowing ring in the app's light purple just outside a token, for whose turn it is. */
+function drawTurn(ctx: CanvasRenderingContext2D, token: Token, radius: number)
+{
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(token.x, token.y, radius * 1.14, 0, Math.PI * 2);
+    ctx.lineWidth = radius * 0.1;
+    ctx.strokeStyle = highlight;
+    ctx.shadowColor = highlight;
+    ctx.shadowBlur = radius * 0.6;
+    ctx.stroke();
+    ctx.restore();
+}
+
 function drawSpawn(ctx: CanvasRenderingContext2D, at: Point, radius: number)
 {
     ctx.beginPath();
@@ -866,7 +882,7 @@ function drawSpawn(ctx: CanvasRenderingContext2D, at: Point, radius: number)
  */
 export function render(
     ctx: CanvasRenderingContext2D,
-    { scenario, background, picture, tokens, editing, own, ownRestedAt, motion, fog, fogLook, time, beneath, decals = [], drops = [], wounds = true }: Scene,
+    { scenario, background, picture, tokens, editing, own, ownRestedAt, motion, fog, fogLook, time, beneath, decals = [], drops = [], wounds = true, turn = null }: Scene,
     camera: Camera,
     viewport: Viewport,
 )
@@ -987,6 +1003,9 @@ export function render(
         // Not while it walks: the lift and the trail of fog say enough, and a ring would chase it.
         if (token.id === own && token.lift === undefined)
             drawPulse(ctx, token, tokenRadius(grid, token.size), time - ownRestedAt, motion);
+
+        if (token.id === turn)
+            drawTurn(ctx, token, tokenRadius(grid, token.size));
 
         drawToken(ctx, token, tokenRadius(grid, token.size), token.avatar ? picture(token.avatar) : null, time, motion, wounds);
     }

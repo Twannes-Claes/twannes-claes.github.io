@@ -721,12 +721,33 @@ Built into play mode neatly, it should look and feel good.
 5. The order itself is only on the GM view.
 6. A turn ends with **End turn** on the phone or **Next** on the GM view, so the GM does not have
    to. A downed player keeps their turn.
-7. A player who joins mid-fight gets the pop-up and is slotted into the order.
+7. A player who joins mid-fight, or has no roll by Begin, sits the fight out and moves freely.
+   The GM can still type their roll to bring them in; their phone no longer asks for one.
 8. **End initiative** goes back to free movement. Freeze still works on top of it.
 9. In a Pathfinder session (see 11) the roll pop-up reminds the player that initiative is usually
    their Perception, as it is easy to forget.
 10. **Up next**, a session setting: the phone of whoever comes after the current turn says so, as a
     heads-up to plan their turn.
+11. **Ties** follow the system: players first in D&D 5e, monsters first in Pathfinder 2e, as its
+    rules say. The GM can swap any two neighbours in the order.
+12. The GM's initiative panel lists every player and every monster on the map, hidden ones too,
+    each with a roll field; the GM can type any roll, a player's too. A monster left empty sits
+    the fight out until it gets one.
+13. The GM presses **Begin** once the rolls are in. A roll the GM types later is slotted into the
+    order.
+14. Turns only hold back players: the GM moves and hits anything at any time, for corrections and
+    reactions.
+
+- **Built.** The rules live in `map/initiative.ts`, shared by the server, the GM view and the demo:
+  the order is a list, so swaps stay, and a token that is gone keeps its place until the next turn.
+  The fight is `sessions.initiative`, cleared by Start, End session and a map switch. The GM view
+  sends it whole (`play.setInitiative`) from the **Initiative** panel in the dock, with **Next**
+  beside it once the turns run; a phone sends only its own roll (`play.rollInitiative`) and its
+  End turn (`play.endTurn`). `play.status` gives the GM the fight and everyone else only what
+  concerns them (`fightFor`). `move`, `hit` and `draw` hold back every player while the rolls come
+  in, then those in the order whose turn it is not; a player without a roll sits out. The roll pop-up is `components/RollSheet.tsx`, for group
+  checks (17) too. Whose turn it is shows as a glowing ring on the map and in a toast; Up next is
+  in the gear's Table tab. In the demo the GM types the test players' rolls.
 
 ### 7. Monster presets
 

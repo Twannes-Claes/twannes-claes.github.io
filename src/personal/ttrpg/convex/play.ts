@@ -1,10 +1,11 @@
 import { getAuthUserId } from '@convex-dev/auth/server';
 import { ConvexError, v } from 'convex/values';
 
-import type { Decal, Draft, Point, Scenario, SharedHit, SharedMark, Token } from '../types';
+import type { Decal, Draft, PlayerFight, Point, Scenario, SharedHit, SharedMark, Token } from '../types';
 import { cleanConditions } from '../content/conditions';
 import { distance } from '../map/geometry';
 import { cleanStats, downedPool, hitOn, withoutNumbers } from '../map/health';
+import { cleanFight, cleanRoll, hasRolled, nextTurn, upNext, withRoll } from '../map/initiative';
 import { pathBlocked } from '../map/path';
 import { anchorAt, footprintCenter, footprintKeys } from '../map/size';
 import { spawnCells } from '../map/spawn';
@@ -14,7 +15,7 @@ import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireSession, requireUser } from './access';
-import { bloodSettingsValidator, conditionValidator, fogSettingsValidator, sizeValidator } from './schema';
+import { bloodSettingsValidator, conditionValidator, fogSettingsValidator, initiativeValidator, sizeValidator } from './schema';
 import { refreshSight, tokensOf, tokensOn } from './sight';
 import { dropFile } from './usage';
 import { storedPicture } from './pictures';
@@ -58,6 +59,16 @@ async function sessionOf(ctx: QueryCtx, sessionId: Id<'sessions'>): Promise<Doc<
         throw new ConvexError('That session does not exist.');
 
     return session;
+}
+
+/** Whether a player's token is held back: a fight is on and it is not its turn, see Initiative. */
+/** A player held by the fight: everyone while the rolls come in, then all but whose turn it is. */
+function waitsTurn(session: Doc<'sessions'>, tokenId: Id<'tokens'>): boolean
+{
+    const fight = session.initiative;
+
+    // Without a roll by Begin, a player sits the fight out and moves freely.
+    return fight !== undefined && (!fight.begun || (hasRolled(fight, tokenId) && fight.turn !== tokenId));
 }
 
 function ownToken(ctx: QueryCtx, sessionId: Id<'sessions'>, userId: Id<'users'>)
@@ -153,8 +164,33 @@ async function respawn(ctx: MutationCtx, session: Doc<'sessions'>, scenarioId: s
         });
     }
 
-    await ctx.db.patch('sessions', session._id, { activeScenarioId: scenarioId });
+    // A fight stays on the map it was fought on.
+    await ctx.db.patch('sessions', session._id, { activeScenarioId: scenarioId, initiative: undefined });
     await refreshSight(ctx, session._id, scenario);
+}
+
+/**
+ * A fight as a phone or the Player view hears of it, see PlayerFight: a monster's turn names it
+ * only when players can see it. Null while there is none.
+ */
+async function fightFor(ctx: QueryCtx, session: Doc<'sessions'>, mine: Id<'tokens'> | null): Promise<PlayerFight | null>
+{
+    const fight = session.initiative;
+
+    if (!fight || !session.activeScenarioId)
+        return null;
+
+    const here = await tokensOn(ctx, session._id, session.activeScenarioId);
+    const current = here.find((token) => token._id === fight.turn);
+    const shown = current && (current.kind === 'player' || (current.inSight === true && current.hidden !== true));
+    const alive = (id: string) => here.some((token) => token._id === id);
+
+    return {
+        begun: fight.begun,
+        rolled: mine !== null && hasRolled(fight, mine),
+        turn: current ? (shown ? current._id : 'enemy') : null,
+        upNext: mine !== null && session.upNext === true && upNext(fight, alive) === mine,
+    };
 }
 
 /**
@@ -188,6 +224,10 @@ export const status = query({
             fogLook: session.fogLook ?? null,
             blood: session.blood ?? null,
             system: session.system ?? '5e',
+            upNext: session.upNext === true,
+            // The whole fight only for the GM view; everyone else hears only what concerns them.
+            initiative: host ? (session.initiative ?? null) : null,
+            fight: await fightFor(ctx, session, mine?._id ?? null),
             password: host ? (session.password ?? '') : null,
         };
     },
@@ -504,6 +544,9 @@ export const move = mutation({
             if (session.live !== true || session.frozen === true)
                 throw new ConvexError('Movement is paused by the GM.');
 
+            if (waitsTurn(session, tokenId))
+                throw new ConvexError('Wait for your turn.');
+
             if (token.scenarioId !== session.activeScenarioId)
                 throw new ConvexError('That map is not being played.');
         }
@@ -587,7 +630,7 @@ export const start = mutation({
             throw new ConvexError('Keep the password under 50 characters.');
 
         // Starting again forgives whoever was removed: they still need the password.
-        await ctx.db.patch('sessions', sessionId, { live: true, password: secret, frozen: false, kicked: undefined });
+        await ctx.db.patch('sessions', sessionId, { live: true, password: secret, frozen: false, kicked: undefined, initiative: undefined });
 
         if (session.activeScenarioId !== scenarioId)
             await respawn(ctx, session, scenarioId);
@@ -933,6 +976,96 @@ export const setBlood = mutation({
     },
 });
 
+/** The host turns Up next on or off, see PLAN.md. */
+export const setUpNext = mutation({
+    args: { sessionId: v.id('sessions'), upNext: v.boolean() },
+    handler: async (ctx, { sessionId, upNext: on }) =>
+    {
+        await requireSession(ctx, sessionId);
+        await ctx.db.patch('sessions', sessionId, { upNext: on });
+
+        return null;
+    },
+});
+
+/**
+ * The host starts, runs and ends a fight, sending it whole, worked out on their screen with
+ * map/initiative.ts. Null ends it. A player's roll landing at the same moment can be lost; their
+ * phone then asks for it again.
+ */
+export const setInitiative = mutation({
+    args: { sessionId: v.id('sessions'), initiative: v.union(initiativeValidator, v.null()) },
+    handler: async (ctx, { sessionId, initiative }) =>
+    {
+        await requireSession(ctx, sessionId);
+        await ctx.db.patch('sessions', sessionId, { initiative: initiative ? cleanFight(initiative) : undefined });
+
+        return null;
+    },
+});
+
+/** Each token on the map being played by id, with its kind, for ties and who is still here. */
+async function kindsOn(ctx: QueryCtx, session: Doc<'sessions'>): Promise<Map<string, Token['kind']>>
+{
+    const here = session.activeScenarioId ? await tokensOn(ctx, session._id, session.activeScenarioId) : [];
+
+    return new Map(here.map((token) => [token._id as string, token.kind]));
+}
+
+/**
+ * A player's roll for their own token, slotted into the order. A second roll is left to the GM, and
+ * so is a late one once the turns have begun.
+ */
+export const rollInitiative = mutation({
+    args: { sessionId: v.id('sessions'), roll: v.number() },
+    handler: async (ctx, { sessionId, roll }) =>
+    {
+        const userId = await requireUser(ctx);
+        const session = await sessionOf(ctx, sessionId);
+        const own = await ownToken(ctx, sessionId, userId);
+        const value = cleanRoll(roll);
+
+        if (!own || !session.initiative || own.scenarioId !== session.activeScenarioId)
+            throw new ConvexError('There is no fight to roll for.');
+
+        if (value === null)
+            throw new ConvexError('Type the number you rolled.');
+
+        if (session.initiative.begun)
+            throw new ConvexError('The turns have begun. Ask the GM to add your roll.');
+
+        if (hasRolled(session.initiative, own._id))
+            return null;
+
+        const kinds = await kindsOn(ctx, session);
+        const fight = withRoll(session.initiative, { id: own._id, kind: own.kind }, value, (id) => kinds.get(id), session.system ?? '5e');
+
+        await ctx.db.patch('sessions', sessionId, { initiative: fight });
+
+        return null;
+    },
+});
+
+/** A player ends their own turn. Quietly nothing when it is not theirs, like a second press. */
+export const endTurn = mutation({
+    args: { sessionId: v.id('sessions') },
+    handler: async (ctx, { sessionId }) =>
+    {
+        const userId = await requireUser(ctx);
+        const session = await sessionOf(ctx, sessionId);
+        const own = await ownToken(ctx, sessionId, userId);
+
+        if (!own || !session.initiative || session.initiative.turn !== own._id)
+            return null;
+
+        const kinds = await kindsOn(ctx, session);
+
+        await ctx.db.patch('sessions', sessionId, { initiative: nextTurn(session.initiative, (id) => kinds.has(id)) });
+
+        return null;
+    },
+});
+
 /**
  * The host ends the session: phones say so, and the players leave the table with their tokens and
  * pictures, so the next start begins with nobody there. Monsters stay, they belong to the maps.
@@ -953,7 +1086,7 @@ export const end = mutation({
             await dropDraftOf(ctx, player._id);
         }
 
-        await ctx.db.patch('sessions', sessionId, { live: false, frozen: false });
+        await ctx.db.patch('sessions', sessionId, { live: false, frozen: false, initiative: undefined });
 
         const scenario = session.activeScenarioId ? await scenarioOf(ctx, sessionId, session.activeScenarioId) : null;
 
@@ -1154,7 +1287,9 @@ export const hit = mutation({
         const host = session.ownerId === userId;
         const scenarioId = session.activeScenarioId;
 
-        if (!host && !(await ownToken(ctx, sessionId, userId)))
+        const own = host ? null : await ownToken(ctx, sessionId, userId);
+
+        if (!host && !own)
             throw new ConvexError('Join the session to attack or heal.');
 
         if (!session.live || !scenarioId)
@@ -1162,6 +1297,9 @@ export const hit = mutation({
 
         if (!host && session.frozen === true)
             throw new ConvexError('The GM froze the table.');
+
+        if (own && waitsTurn(session, own._id))
+            throw new ConvexError('Wait for your turn.');
 
         const points = Number.isFinite(amount) ? Math.min(9999, Math.max(0, Math.round(amount))) : 0;
         const targets = [];
@@ -1294,7 +1432,7 @@ export const draw = mutation({
         if (!host && token.userId !== userId)
             throw new ConvexError('That is not your token.');
 
-        const allowed = session.live === true && token.scenarioId === session.activeScenarioId && (host || session.frozen !== true);
+        const allowed = session.live === true && token.scenarioId === session.activeScenarioId && (host || (session.frozen !== true && !waitsTurn(session, tokenId)));
         const scenario = points && allowed ? await scenarioOf(ctx, token.sessionId, token.scenarioId) : null;
 
         if (!points || !scenario)

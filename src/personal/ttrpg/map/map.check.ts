@@ -19,6 +19,7 @@ import {
     wrapOffset,
 } from './grid.ts';
 import { applyHit, cleanStats, healthState, hitOn, withoutNumbers } from './health.ts';
+import { begun, cleanRoll, newFight, nextTurn, swapped, upNext, withoutRoll, withRoll } from './initiative.ts';
 import { extendPath, pathBlocked, pathFeet } from './path.ts';
 import { placedSize, propAt, snapCenter, snapSize } from './props.ts';
 import { anchorAt, footprint, footprintCenter } from './size.ts';
@@ -648,3 +649,36 @@ assert.deepEqual(
     [{ id: 'blinded' }, { id: 'exhaustion', value: 6 }, { id: 'prone' }],
 );
 assert.deepEqual(cleanConditions('pf2e', [{ id: 'frightened' }, { id: 'dying', value: 0 }]), [{ id: 'dying', value: 1 }, { id: 'frightened', value: 1 }]);
+
+// Initiative: higher rolls first; a tie goes to players in 5e and to monsters in Pathfinder 2e.
+const kinds: Record<string, Token['kind']> = { ann: 'player', bo: 'player', orc: 'npc', imp: 'npc' };
+const kindOf = (id: string) => kinds[id];
+const roll = (system: 'pf2e' | '5e') =>
+    [
+        { id: 'orc', roll: 12 },
+        { id: 'ann', roll: 12 },
+        { id: 'bo', roll: 18 },
+        { id: 'imp', roll: 3 },
+    ].reduce((fight, { id, roll: value }) => withRoll(fight, { id, kind: kinds[id] }, value, kindOf, system), newFight);
+const order = (fight: typeof newFight) => fight.order.map((entry) => entry.tokenId);
+
+assert.deepEqual(order(roll('5e')), ['bo', 'ann', 'orc', 'imp']);
+assert.deepEqual(order(roll('pf2e')), ['bo', 'orc', 'ann', 'imp']);
+assert.deepEqual(order(swapped(roll('5e'), 'orc', true)), ['bo', 'orc', 'ann', 'imp']);
+assert.equal(cleanRoll(150.4), 99);
+assert.equal(cleanRoll(Number.NaN), null);
+
+// Turns skip whoever is gone and start a new round after the last; a new roll is slotted in.
+const everyone = () => true;
+const fight = begun(roll('5e'), everyone);
+
+assert.equal(fight.turn, 'bo');
+assert.equal(upNext(fight, everyone), 'ann');
+
+const orcGone = nextTurn(nextTurn(fight, everyone), (id) => id !== 'orc');
+const wrapped = nextTurn({ ...fight, turn: 'imp' }, everyone);
+
+assert.deepEqual([order(orcGone), orcGone.turn], [['bo', 'ann', 'imp'], 'imp']);
+assert.deepEqual([wrapped.round, wrapped.turn], [2, 'bo']);
+assert.equal(withoutRoll(fight, 'bo', everyone).turn, 'ann');
+assert.deepEqual(order(withRoll(fight, { id: 'cy', kind: 'player' }, 15, kindOf, '5e')), ['bo', 'cy', 'ann', 'orc', 'imp']);

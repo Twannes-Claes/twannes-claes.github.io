@@ -2134,6 +2134,28 @@ a.ttrpg-row__main:focus-visible {
     font-style: italic;
 }
 
+/* Whose turn it is in the initiative order, in the purple of their ring on the map. */
+.ttrpg-row--turn {
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--ttrpg-accent) 35%, transparent);
+}
+
+/* A roll in the initiative order, before the name, wide enough for -99. */
+.ttrpg-initiative__roll {
+    width: 3.25rem;
+    min-height: 32px;
+    /* Room from the edge of the turn's highlight. */
+    margin-inline-start: 0.25rem;
+    padding: 0.25rem 0.4rem;
+    border: 1px solid var(--ttrpg-edge);
+    border-radius: 8px;
+    background: var(--ttrpg-well);
+    color: var(--ttrpg-ink);
+    font-family: var(--ttrpg-mono);
+    font-size: 0.875rem;
+    text-align: center;
+}
+
 /* A session's name being renamed, in the place of its row. */
 .ttrpg-row__input {
     flex: 1;

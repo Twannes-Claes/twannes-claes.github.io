@@ -86,6 +86,8 @@ interface MapCanvasProps
     decals?: Decal[];
     /** Which blood shows, see BloodSettings. */
     blood?: BloodSettings;
+    /** The token whose turn it is in a fight, ringed, see Initiative. */
+    turn?: string | null;
 }
 
 /**
@@ -128,6 +130,7 @@ export function MapCanvas({
     onTarget,
     decals = noDecals,
     blood = defaultBlood,
+    turn = null,
 }: MapCanvasProps)
 {
     const canvas = useRef<HTMLCanvasElement>(null);
@@ -273,6 +276,11 @@ export function MapCanvas({
     {
         view.current?.setBlood(blood);
     }, [blood]);
+
+    useEffect(() =>
+    {
+        view.current?.setTurn(turn);
+    }, [turn]);
 
     // Again for another map, which drops the old map's decals, see setScenario in map/view.ts.
     useEffect(() =>
