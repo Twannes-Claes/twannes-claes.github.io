@@ -118,6 +118,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const removeNpc = useMutation(api.play.removeMonster);
     const setStats = useMutation(api.play.setStats);
     const setConditions = useMutation(api.play.setConditions);
+    const setSize = useMutation(api.play.setSize);
     const hit = useMutation(api.play.hit);
     const clearDecals = useMutation(api.play.clearDecals);
     const sendPing = useMutation(api.play.sendPing);
@@ -177,6 +178,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
             removeMonster: (tokenId) => friendly(removeNpc({ tokenId: tokenId as Id<'tokens'> })),
             setStats: (tokenId, stats) => friendly(setStats({ tokenId: tokenId as Id<'tokens'>, ...stats })),
             setConditions: (tokenId, conditions) => friendly(setConditions({ tokenId: tokenId as Id<'tokens'>, conditions })),
+            setSize: (tokenId, size) => friendly(setSize({ tokenId: tokenId as Id<'tokens'>, size })),
             lastHit: lastHit ?? null,
             hit: (tokenIds, kind, amount) => friendly(hit({ sessionId: id, tokenIds: tokenIds as Id<'tokens'>[], kind, amount })),
             decals: decals ?? noDecals,

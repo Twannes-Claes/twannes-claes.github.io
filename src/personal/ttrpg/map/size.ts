@@ -115,3 +115,12 @@ export function footprintKeys(grid: Grid, anchor: Cell, size: CreatureSize): Set
 {
     return new Set(footprint(grid, anchor, size).map(cellKey));
 }
+
+/**
+ * Where a token stands at another size, as near where it stood as the grid allows: a Large
+ * footprint is centred on a grid corner, a Medium one on a cell. Without a grid it stays put.
+ */
+export function resizedAt(grid: Grid, point: Point, size: CreatureSize): Point
+{
+    return grid.type === 'none' ? { x: point.x, y: point.y } : footprintCenter(grid, anchorAt(grid, point, size), size);
+}

@@ -2566,12 +2566,94 @@ button.ttrpg-row__main {
     width: min(24rem, calc(100% - 21.5rem - 108px));
 }
 
+/* In Edit with no panel open, opened from the right-click menu: just clear of the rail. */
+.ttrpg-statblock-panel--rail {
+    left: 80px;
+    width: min(24rem, calc(100% - 96px));
+}
+
 /* Too narrow for both side by side, it goes over the panel instead. */
 @media (width < 60rem) {
     .ttrpg-statblock-panel--beside {
         left: 16px;
         width: min(24rem, calc(100% - 32px));
     }
+}
+
+/* The GM view's right-click menu on a token, at the pointer, see TokenMenu.tsx. Placed in script,
+   so none of the popover's centring, and over the panels it may be opened beside. */
+.ttrpg-token-menu {
+    top: 0;
+    left: 0;
+    z-index: 21;
+    gap: 0.75rem;
+    max-height: calc(100dvh / var(--ttrpg-ui, 1) - 32px);
+    translate: none;
+    animation: ttrpg-menu-in 120ms var(--ttrpg-ease);
+}
+
+@keyframes ttrpg-menu-in {
+    from {
+        opacity: 0;
+        translate: 0 -4px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ttrpg-token-menu {
+        animation: none;
+    }
+}
+
+/* The token's row, its name lined up with the panel's edge and the close button hanging into the
+   padding, like a popover's title. */
+.ttrpg-token-menu__head {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    margin: -0.5rem -0.5rem 0 -0.75rem;
+}
+
+.ttrpg-token-menu__head:has(.ttrpg-chips) .ttrpg-swatch {
+    align-self: flex-start;
+    margin-top: calc((1lh - 12px) / 2);
+}
+
+/* What the GM does to a token most, each its icon over its name, like the sizes. Four slots
+   whatever the token offers, so a player's few are the same size as a monster's. */
+.ttrpg-token-menu__actions {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+}
+
+.ttrpg-token-menu__actions .ttrpg-segment,
+.ttrpg-sizes .ttrpg-segment {
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    min-height: 52px;
+    padding-inline: 0.375rem;
+}
+
+/* Shown at once: it opens with the menu, rather than unfolding under a row. */
+.ttrpg-token-menu .ttrpg-row-edit {
+    padding: 0.75rem 0 0;
+    animation: none;
+}
+
+/* A size a press, with how much of the grid it takes under its name. */
+.ttrpg-sizes {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    padding-block: 0.5rem 0.75rem;
+}
+
+.ttrpg-sizes__cells {
+    font-family: var(--ttrpg-mono);
+    font-size: 0.7rem;
+    opacity: 0.7;
 }
 
 /* A stat block as its Markdown has it, see StatBlock.tsx. Selectable, to copy a line out. */

@@ -1,3 +1,5 @@
+import type { Live } from '../types';
+
 export interface Question
 {
     message: string;
@@ -27,4 +29,19 @@ export function confirmAction(message: string, action: string): Promise<boolean>
         else
             resolve(false);
     });
+}
+
+/** Removes a player from the table after asking, from the Players list or the right-click menu. */
+export function kickPlayer(live: Pick<Live, 'kick'>, id: string, name: string, onDone: (message: string) => void, onError: (message: string) => void)
+{
+    void confirmAction(`Remove ${name} from the table? They cannot join again until the session starts again.`, 'Remove')
+        .then(async (yes) =>
+        {
+            if (!yes)
+                return;
+
+            await live.kick(id);
+            onDone(`${name} left the table.`);
+        })
+        .catch((reason: Error) => onError(reason.message));
 }

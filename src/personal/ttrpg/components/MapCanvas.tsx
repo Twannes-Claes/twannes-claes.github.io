@@ -90,6 +90,8 @@ interface MapCanvasProps
     blood?: BloodSettings;
     /** The token whose turn it is in a fight, ringed, see Initiative. */
     turn?: string | null;
+    /** Hears a right click on a token in play mode, with where on the page, to open its menu. */
+    onTokenMenu?: (id: string, client: Point) => void;
     /** Hears a preset dragged from the library and let go over the map, see PresetLibrary.tsx. */
     onPresetDrop?: (presetId: string, at: Point) => void;
 }
@@ -140,6 +142,7 @@ export function MapCanvas({
     blood = defaultBlood,
     turn = null,
     onPresetDrop,
+    onTokenMenu,
 }: MapCanvasProps)
 {
     const canvas = useRef<HTMLCanvasElement>(null);
@@ -158,6 +161,12 @@ export function MapCanvas({
     const drafted = useEffectEvent((id: string, points: Point[] | null, feet: number) => onDraft?.(id, points, feet));
     const markedOut = useEffectEvent((mark: Mark | null) => onMark?.(mark));
     const targeted = useEffectEvent((id: string) => onTarget?.(id));
+    const menuOpened = useEffectEvent((id: string, client: Point) =>
+    {
+        onTokenMenu?.(id, client);
+
+        return Boolean(onTokenMenu);
+    });
     // The last ping and hit seen, to tell a new one from the one already there.
     const lastPing = useRef<Ping | null | undefined>(undefined);
     const lastHit = useRef<SharedHit | null | undefined>(undefined);
@@ -181,6 +190,7 @@ export function MapCanvas({
             onDraft: (id, points, feet) => drafted(id, points, feet),
             onMark: (mark) => markedOut(mark),
             onTarget: (id) => targeted(id),
+            onTokenMenu: (id, client) => menuOpened(id, client),
         });
 
         view.current = created;

@@ -8,7 +8,7 @@ import { cleanStats, downedPool, hitOn, withoutNumbers } from '../map/health';
 import { cleanFight, cleanRoll, hasRolled, nextTurn, upNext, withRoll } from '../map/initiative';
 import { pathBlocked } from '../map/path';
 import { monsterFrom } from '../map/presets';
-import { anchorAt, footprintCenter, footprintKeys } from '../map/size';
+import { anchorAt, footprintCenter, footprintKeys, resizedAt } from '../map/size';
 import { spawnCells } from '../map/spawn';
 import { startWalk } from '../map/walk';
 
@@ -16,7 +16,7 @@ import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireSession, requireUser } from './access';
-import { bloodSettingsValidator, conditionValidator, fogSettingsValidator, initiativeValidator } from './schema';
+import { bloodSettingsValidator, conditionValidator, fogSettingsValidator, initiativeValidator, sizeValidator } from './schema';
 import { refreshSight, tokensOf, tokensOn } from './sight';
 import { dropFile } from './usage';
 import { storedPicture } from './pictures';
@@ -384,6 +384,32 @@ export const setConditions = mutation({
     },
 });
 
+/**
+ * The host sets any token's size, a player's too, from the right-click menu. It moves onto the
+ * grid for its new footprint; landing on someone is the GM's call, as with dragging.
+ */
+export const setSize = mutation({
+    args: { tokenId: v.id('tokens'), size: sizeValidator },
+    handler: async (ctx, { tokenId, size }) =>
+    {
+        const token = await ctx.db.get('tokens', tokenId);
+
+        if (!token)
+            throw new ConvexError('That token is gone.');
+
+        await requireSession(ctx, token.sessionId);
+        const scenario = await scenarioOf(ctx, token.sessionId, token.scenarioId);
+        const at = scenario ? resizedAt(scenario.grid, token, size) : token;
+
+        await ctx.db.patch('tokens', tokenId, { size, x: at.x, y: at.y });
+
+        if (scenario)
+            await refreshSight(ctx, token.sessionId, scenario);
+
+        return null;
+    },
+});
+
 /** Wrong passwords a session takes in a minute before it takes no more tries until it is over. */
 const maxMisses = 10;
 const missWindow = 60 * 1000;
@@ -442,8 +468,9 @@ export const join = mutation({
         maxHp: v.number(),
         ac: v.number(),
         perception: v.number(),
+        size: sizeValidator,
     },
-    handler: async (ctx, { sessionId, password, name, color, maxHp, ac, perception }) =>
+    handler: async (ctx, { sessionId, password, name, color, maxHp, ac, perception, size }) =>
     {
         const userId = await requireUser(ctx);
         // Joining at full health, with no temp HP yet.
@@ -470,7 +497,10 @@ export const join = mutation({
 
         if (existing)
         {
-            await ctx.db.patch('tokens', existing._id, { name: character, color, ...stats });
+            const stood = await scenarioOf(ctx, sessionId, existing.scenarioId);
+            const at = stood ? resizedAt(stood.grid, existing, size) : existing;
+
+            await ctx.db.patch('tokens', existing._id, { name: character, color, size, x: at.x, y: at.y, ...stats });
 
             return existing._id;
         }
@@ -486,7 +516,7 @@ export const join = mutation({
             throw new ConvexError('The table is full.');
 
         const here = all.filter((token) => token.scenarioId === session.activeScenarioId);
-        const [spot] = spawnSpots(scenario, [{ size: 'medium' }], here);
+        const [spot] = spawnSpots(scenario, [{ size }], here);
 
         const tokenId = await ctx.db.insert('tokens', {
             sessionId,
@@ -494,7 +524,7 @@ export const join = mutation({
             kind: 'player',
             name: character,
             color,
-            size: 'medium',
+            size,
             speed: 30,
             scenarioId: session.activeScenarioId,
             ...spot,

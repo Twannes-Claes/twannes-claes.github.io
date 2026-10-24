@@ -828,9 +828,20 @@ Built into play mode neatly, it should look and feel good.
 
 ### 13. The GM's right-click menu
 
-- In the GM view only, never on phones: a right click on a token opens a small menu with what the
-  GM does to it most. Hide or show, its numbers, its size, remove. Conditions (5) join it later.
+- In the GM view and Edit, never on phones: a right click on a token opens a small menu with what
+  the GM does to it most. Hide or show, its numbers, its size, remove. Conditions (5) join it later.
 - It replaces digging through the Players and Monsters lists for one token. Those lists stay.
+- **Built.** `components/TokenMenu.tsx` is the token's row as the lists show it opened, at the
+  pointer, flipped to stay on screen: Attack (starts picking with it picked), Hide, Stats (the
+  stat block in the top left, kept after the menu closes) and Remove, then Numbers, Conditions,
+  Size and Details. Size moves the token onto the grid for its new footprint (`resizedAt` in
+  `map/size.ts`, `play.setSize`). A right click with a tool mid drag or targets being picked
+  still cancels those first (`onTokenMenu` in `map/view.ts`); Esc, a press beside it, a right
+  click on empty ground or zooming the map closes it. A test player has no Remove, only a live one leaves the table.
+  In Edit it opens with the Move and Monsters tools, whose right click has nothing to cancel,
+  without Attack, and the stat block keeps clear of the rail and the Monsters panel. The Players
+  list has the same Size tab, and the join form asks for it, Medium first
+  (`components/SizePicker.tsx`, `size` on `play.join`).
 
 ### 14. Monster staging
 

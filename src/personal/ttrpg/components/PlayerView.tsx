@@ -12,7 +12,7 @@ import { useAuthActions, useAuthToken, useConvexAuth } from '@convex-dev/auth/re
 import { useConvex, useMutation, useQuery } from 'convex/react';
 import { useActionState, useEffect, useState, type ReactNode } from 'react';
 
-import type { BloodSettings, FogSettings, GameSystem, HitKind, PlayerFight, Scenario } from '../types';
+import type { BloodSettings, CreatureSize, FogSettings, GameSystem, HitKind, PlayerFight, Scenario } from '../types';
 
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
@@ -33,6 +33,7 @@ import { MoveSheet } from './MoveSheet';
 import { RollSheet } from './RollSheet';
 import { RulerPicker, type Measure } from './RulerPicker';
 import { Settings } from './Settings';
+import { SizePicker } from './SizePicker';
 import { StatsForm } from './StatsForm';
 import { useMessage } from './useMessage';
 import { useFullscreen, useIdle, useWakeLock } from './useScreen';
@@ -156,6 +157,7 @@ function JoinForm({ sessionId, name }: JoinFormProps)
     const [password, setPassword] = useState<string | null>(null);
     const [colour] = useState(() => ringColours[Math.floor(Math.random() * ringColours.length)]);
     const [pictureName, setPictureName] = useState('');
+    const [size, setSize] = useState<CreatureSize>('medium');
 
     const [wrong, check, checking] = useActionState(
         (_: string, form: FormData) =>
@@ -196,6 +198,7 @@ function JoinForm({ sessionId, name }: JoinFormProps)
             maxHp: Number(form.get('maxHp')),
             ac: Number(form.get('ac')),
             perception: Number(form.get('perception')),
+            size,
         };
 
         return avatar.then(
@@ -267,6 +270,10 @@ function JoinForm({ sessionId, name }: JoinFormProps)
                             onChange={(event) => setPictureName(event.target.files?.[0]?.name ?? '')}
                         />
                     </label>
+                </div>
+                <div className="ttrpg-field">
+                    Size
+                    <SizePicker size={size} onChange={setSize} />
                 </div>
                 {/* Only you and the GM see these. The rest of the table sees how hurt you look. */}
                 <div className="ttrpg-fields">

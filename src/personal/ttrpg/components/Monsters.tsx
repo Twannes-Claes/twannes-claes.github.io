@@ -26,7 +26,7 @@ interface MonstersProps
 }
 
 /** A monster's name, ring and whether it goes down at 0, to change under its row. */
-function DetailsForm({ monster, onSave }: { monster: Token; onSave: (details: { name: string; color: string; downs: boolean }) => Promise<void> })
+export function DetailsForm({ monster, onSave }: { monster: Token; onSave: (details: { name: string; color: string; downs: boolean }) => Promise<void> })
 {
     const [downs, setDowns] = useState(monster.downs === true);
     const [failure, save, saving] = useActionState(

@@ -12,10 +12,11 @@ import { defaultFogSettings } from '../map/fog';
 import { cleanStats, defaultBlood, downedPool, hitOn, withoutNumbers } from '../map/health';
 import { nextTurn } from '../map/initiative';
 import { monsterFrom } from '../map/presets';
+import { resizedAt } from '../map/size';
 import { toggleDoor, type ToolId } from '../map/tools';
 import { scenarioFromUvtt } from '../map/uvtt';
 import type { FrameStats, PendingMove } from '../map/view';
-import { confirmAction } from '../services/confirm';
+import { confirmAction, kickPlayer } from '../services/confirm';
 import { baseName, toAvatar } from '../services/images';
 import { listenForDoors, type DoorChange } from '../services/tableChannel';
 
@@ -29,11 +30,14 @@ import { MapCanvas } from './MapCanvas';
 import { MonsterList, Monsters } from './Monsters';
 import { MoveSheet } from './MoveSheet';
 import { PlayDock, type PlayTool } from './PlayDock';
+import { Popover } from './Popover';
 import { PresetLibrary } from './PresetLibrary';
 import { PropLibrary } from './PropLibrary';
 import { RulerPicker } from './RulerPicker';
 import { ScenarioList } from './ScenarioList';
 import { Settings } from './Settings';
+import { StatBlock } from './StatBlock';
+import { TokenMenu } from './TokenMenu';
 import { ToolRail } from './ToolRail';
 import { useHistory } from './useHistory';
 import { useMessage } from './useMessage';
@@ -165,6 +169,9 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const [demoUpNext, setDemoUpNext] = useState(false);
     // The tokens picked for an attack or a heal, or null when not picking, see HitSheet.
     const [targets, setTargets] = useState<string[] | null>(null);
+    // The token right-clicked in the GM view, with where, and the preset whose stat block it opened.
+    const [menu, setMenu] = useState<{ id: string; at: Point } | null>(null);
+    const [reading, setReading] = useState<string | null>(null);
     const [fogDraft, setFogDraft] = useState<FogSettings | null>(null);
     const [stats, setStats] = useState<FrameStats | null>(null);
     const [screen, setScreen] = useScreenSettings();
@@ -249,6 +256,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     {
         setTool(next);
         setPlacing(null);
+        setMenu(null);
     };
 
     // Shows label with a spinner while the work runs.
@@ -329,7 +337,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
     const fail = (promise: Promise<void>) => void promise.catch((reason: Error) => message.error(reason.message));
 
-    const changeMonster = (id: string, change: (token: Token) => Token) =>
+    const changeToken = (id: string, change: (token: Token) => Token) =>
     {
         setTokens((current) => current.map((token) => (token.id === id ? change(token) : token)));
 
@@ -382,18 +390,27 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
             return Promise.resolve();
         },
         setMonster: (id, { name, color, downs }) =>
-            changeMonster(id, (token) => ({ ...token, name: name.trim().slice(0, 30) || token.name, color, downs: downs || undefined })),
-        hide: (id, hidden) => changeMonster(id, (token) => ({ ...token, hidden })),
+            changeToken(id, (token) => ({ ...token, name: name.trim().slice(0, 30) || token.name, color, downs: downs || undefined })),
+        hide: (id, hidden) => changeToken(id, (token) => ({ ...token, hidden })),
         removeMonster: (id) =>
         {
             setTokens((current) => current.filter((token) => token.id !== id));
 
             return Promise.resolve();
         },
-        setStats: (id, stats) => changeMonster(id, (token) => ({ ...token, ...cleanStats(stats) })),
-        setConditions: (id, conditions) => changeMonster(id, (token) => ({ ...token, conditions: cleanConditions(demoSystem, conditions) })),
+        setStats: (id, stats) => changeToken(id, (token) => ({ ...token, ...cleanStats(stats) })),
+        setConditions: (id, conditions) => changeToken(id, (token) => ({ ...token, conditions: cleanConditions(demoSystem, conditions) })),
+        setSize: (id, size) => changeToken(id, (token) => ({ ...token, size, ...resizedAt(active.grid, token, size) })),
     };
     const monsterControls = live ?? demoMonsters;
+
+    // The test players off a live map, changed here in the tab.
+    const testPlayers: Pick<Live, 'setStats' | 'setConditions' | 'setSize'> = {
+        setStats: (id, stats) => changeToken(id, (token) => ({ ...token, ...cleanStats(stats) })),
+        setConditions: (id, conditions) => changeToken(id, (token) => ({ ...token, conditions })),
+        setSize: (id, size) => changeToken(id, (token) => ({ ...token, size, ...resizedAt(active.grid, token, size) })),
+    };
+    const playerControls = liveMap ?? testPlayers;
 
     const moveToken = (id: string, to: Point) =>
     {
@@ -551,7 +568,27 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
     };
 
-    const togglePanel = (next: 'monsters' | 'fog' | 'initiative') => setPanel((open) => (open === next ? null : next));
+    // The right-clicked token, gone with the token itself, a map switch or a fight that killed it.
+    // In Edit only with the tools a right click has nothing to cancel in, like a wall chain.
+    const menuOpens = mode === 'gm' || (mode === 'edit' && (tool === 'select' || tool === 'monsters'));
+    const menuToken = menu && menuOpens ? shown.find((token) => token.id === menu.id) : undefined;
+    // In Edit, clear of the rail, or beside the Monsters panel when it is open.
+    const statBlockBeside = mode !== 'edit' ? '' : tool === 'monsters' ? ' ttrpg-statblock-panel--beside' : ' ttrpg-statblock-panel--rail';
+    const menuAt = menu ? menu.at : { x: 0, y: 0 };
+    const menuMonster = menuToken?.kind === 'npc';
+    const menuControls = menuMonster ? monsterControls : playerControls;
+    const menuPreset = menuMonster ? monsterControls.presets.find((preset) => preset.id === menuToken.presetId) : undefined;
+    const readPreset = monsterControls.presets.find((preset) => preset.id === reading);
+    // A monster leaves the map, a live player the table; the test players stay.
+    const menuRemove = !menuToken
+        ? undefined
+        : menuMonster
+            ? () => eraseMonster(menuToken)
+            : liveMap
+                ? () => kickPlayer(liveMap, menuToken.id, menuToken.name, message.done, message.error)
+                : undefined;
+
+    const togglePanel = (next:'monsters' | 'fog' | 'initiative') => setPanel((open) => (open === next ? null : next));
 
     const fogSettings = fogDraft ?? (live ? (live.fogLook ?? defaultFogSettings) : demoFog);
 
@@ -587,6 +624,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
         setMode(next);
         setPending(null);
         setTargets(null);
+        setMenu(null);
         // A GM tool like Reveal has no button in the Player view to put it away with.
         setPlayTool('open-doors');
 
@@ -819,6 +857,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 turn={fight?.turn ?? null}
                 targets={targets}
                 onTarget={pickTarget}
+                onTokenMenu={menuOpens ? (id, at) => setMenu({ id, at }) : undefined}
             />
 
             <div
@@ -884,19 +923,11 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 {!(live && live.live) && (
                     <Players
                         tokens={tokens}
-                        onSetStats={(id, stats) =>
-                        {
-                            setTokens((current) => current.map((token) => (token.id === id ? { ...token, ...cleanStats(stats) } : token)));
-
-                            return Promise.resolve();
-                        }}
+                        onSetStats={testPlayers.setStats}
                         system={system}
-                        onSetConditions={(id, conditions) =>
-                        {
-                            setTokens((current) => current.map((token) => (token.id === id ? { ...token, conditions } : token)));
-
-                            return Promise.resolve();
-                        }}
+                        onSetConditions={testPlayers.setConditions}
+                        onSetSize={testPlayers.setSize}
+                        grid={active.grid}
                         hidden={idle}
                     />
                 )}
@@ -904,6 +935,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                     <LiveControls
                         live={live}
                         scenarioId={active.id}
+                        grid={active.grid}
                         onStarted={() => setMode('gm')}
                         onDone={message.done}
                         onError={message.error}
@@ -1133,6 +1165,42 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                     onRemove={eraseMonster}
                     onError={message.error}
                 />
+            )}
+
+            {menuToken && (
+                <TokenMenu
+                    token={menuToken}
+                    at={menuAt}
+                    grid={active.grid}
+                    system={system}
+                    onSetStats={(stats) => menuControls.setStats(menuToken.id, stats)}
+                    onSetConditions={(conditions) => menuControls.setConditions(menuToken.id, conditions)}
+                    onSetSize={(size) => menuControls.setSize(menuToken.id, size)}
+                    onHit={
+                        playing
+                            ? () =>
+                            {
+                                startTargets();
+                                setTargets([menuToken.id]);
+                                setMenu(null);
+                            }
+                            : undefined
+                    }
+                    onHide={menuMonster ? () => fail(monsterControls.hide(menuToken.id, !menuToken.hidden)) : undefined}
+                    onSetDetails={menuMonster ? (details) => monsterControls.setMonster(menuToken.id, details) : undefined}
+                    onStatBlock={menuPreset ? () => setReading(reading === menuPreset.id ? null : menuPreset.id) : undefined}
+                    statBlockOpen={Boolean(menuPreset) && reading === menuPreset?.id}
+                    onRemove={menuRemove}
+                    onClose={() => setMenu(null)}
+                />
+            )}
+
+            {mode !== 'players' && readPreset && (
+                <Popover title="Stat block" className={`ttrpg-statblock-panel${statBlockBeside}`} onClose={() => setReading(null)}>
+                    <div className="ttrpg-popover__body">
+                        <StatBlock markdown={readPreset.markdown} />
+                    </div>
+                </Popover>
             )}
 
             {showStats && stats && (

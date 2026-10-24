@@ -13,14 +13,15 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useActionState, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import type { Condition, GameSystem, Live, Stats, Token } from '../types';
+import type { Condition, CreatureSize, GameSystem, Grid, Live, Stats, Token } from '../types';
 
-import { confirmAction } from '../services/confirm';
+import { confirmAction, kickPlayer } from '../services/confirm';
 
 import { ConditionPicker } from './ConditionPicker';
 import { Spinner } from './Feedback';
 import { Popover } from './Popover';
 import { RowEditor } from './RowEditor';
+import { SizePicker } from './SizePicker';
 import { useOpenRow } from './useOpenRow';
 import { StatChips, StatsForm } from './StatsForm';
 import { useKeydown } from './useKeys';
@@ -36,6 +37,8 @@ interface LiveControlsProps
     live: Live;
     /** The map the session starts on: the one open in the editor. */
     scenarioId: string;
+    /** That map's grid, for the players' sizes. */
+    grid: Grid;
     /** Hears that the session started, so the editor can switch to the GM view. */
     onStarted: () => void;
     /** Hears what worked, for the editor's toast. */
@@ -56,6 +59,9 @@ interface PlayersProps
     /** The session's game, whose conditions the list offers. */
     system: GameSystem;
     onSetConditions: (tokenId: string, conditions: Condition[]) => Promise<void>;
+    onSetSize: (tokenId: string, size: CreatureSize) => Promise<void>;
+    /** The open map's grid, to show how much of it each size takes. */
+    grid: Grid;
     /** Removes one from the table, only in a live session. */
     onKick?: (tokenId: string, name: string) => void;
     /** Shows the QR code to join, only in a live session. */
@@ -68,7 +74,7 @@ interface PlayersProps
  * The Players button and its pop-out: who is at the table, with their numbers to change. Live
  * it lists who joined; before that the GM view's two test players, see demoTokens.
  */
-export function Players({ tokens, onSetStats, system, onSetConditions, onKick, onQr, hidden = false }: PlayersProps)
+export function Players({ tokens, onSetStats, system, onSetConditions, onSetSize, grid, onKick, onQr, hidden = false }: PlayersProps)
 {
     const [open, setOpen] = useState(false);
     // The one player opened under their row, and the one folding away.
@@ -139,6 +145,11 @@ export function Players({ tokens, onSetStats, system, onSetConditions, onKick, o
                                                         />
                                                     ),
                                                 },
+                                                {
+                                                    id: 'size',
+                                                    label: 'Size',
+                                                    content: <SizePicker size={player.size} grid={grid} onChange={(size) => onSetSize(player.id, size)} />,
+                                                },
                                             ]}
                                         />
                                     )}
@@ -164,7 +175,7 @@ export function Players({ tokens, onSetStats, system, onSetConditions, onKick, o
  * players join with; while live, the players at the table, with the QR code that leads to the
  * join page under them.
  */
-export function LiveControls({ live, scenarioId, onStarted, onDone, onError, hidden = false }: LiveControlsProps)
+export function LiveControls({ live, scenarioId, grid, onStarted, onDone, onError, hidden = false }: LiveControlsProps)
 {
     const [asking, setAsking] = useState(false);
     const [showQr, setShowQr] = useState(false);
@@ -186,19 +197,7 @@ export function LiveControls({ live, scenarioId, onStarted, onDone, onError, hid
         '',
     );
 
-    const kick = (id: string, name: string) =>
-    {
-        void confirmAction(`Remove ${name} from the table? They cannot join again until the session starts again.`, 'Remove')
-            .then(async (yes) =>
-            {
-                if (!yes)
-                    return;
-
-                await live.kick(id);
-                onDone(`${name} left the table.`);
-            })
-            .catch((reason: Error) => onError(reason.message));
-    };
+    const kick = (id: string, name: string) => kickPlayer(live, id, name, onDone, onError);
 
     const end = () =>
     {
@@ -290,6 +289,8 @@ export function LiveControls({ live, scenarioId, onStarted, onDone, onError, hid
                 onSetStats={live.setStats}
                 system={live.system}
                 onSetConditions={live.setConditions}
+                onSetSize={live.setSize}
+                grid={grid}
                 onKick={kick} onQr={() => setShowQr(true)} hidden={hidden}
             />
             <button type="button" className="ttrpg-segment" title="End the session for everyone" onClick={end}>

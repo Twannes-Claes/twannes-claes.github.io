@@ -302,6 +302,8 @@ export interface Live
     setStats: (tokenId: string, stats: Stats) => Promise<void>;
     /** Sets any token's conditions, see Condition. */
     setConditions: (tokenId: string, conditions: Condition[]) => Promise<void>;
+    /** Sets any token's size, moving it onto the grid for its new footprint, see resizedAt in map/size.ts. */
+    setSize: (tokenId: string, size: CreatureSize) => Promise<void>;
     /** The last attack or heal, null before any, see SharedHit. */
     lastHit: SharedHit | null;
     /** Deals damage to tokens, or heals them, see hit in convex/play.ts. */
@@ -359,7 +361,7 @@ export interface Live
  */
 export type MonsterControls = Pick<
     Live,
-    'system' | 'presets' | 'savePreset' | 'removePreset' | 'placeMonster' | 'setMonster' | 'hide' | 'removeMonster' | 'setStats' | 'setConditions'
+    'system' | 'presets' | 'savePreset' | 'removePreset' | 'placeMonster' | 'setMonster' | 'hide' | 'removeMonster' | 'setStats' | 'setConditions' | 'setSize'
 >;
 
 /**

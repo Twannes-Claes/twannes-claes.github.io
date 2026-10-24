@@ -118,6 +118,11 @@ export interface MapViewOptions
     /** A token pressed while picking targets, to add or take off, see setTargets. */
     onTarget?: (id: string) => void;
     /**
+     * A right click on a token, with nothing half done, at that point of the page.
+     * True when the page opened its menu, otherwise the click cancels as usual, see contextMenu.
+     */
+    onTokenMenu?: (id: string, client: Point) => boolean;
+    /**
      * A while after more of the map was seen, what has been seen in all, to share, see SharedFog.
      * At once with forget when the game master hid some, so every screen forgets it too.
      */
@@ -989,7 +994,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         draw(performance.now());
     };
 
-    const local = (event: PointerEvent | WheelEvent): Point =>
+    const local = (event: MouseEvent): Point =>
     {
         const box = canvas.getBoundingClientRect();
 
@@ -1476,10 +1481,17 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             return;
         }
 
+        const held = toolPointerId !== null;
+        // A token under the click opens its menu, unless the tool is mid drag or targets are being
+        // picked, where the click puts those away first.
+        const token = !held && !targets && scenario ? tokenAt(local(event), scenario) : undefined;
+
+        if (token && options.onTokenMenu?.(token.id, { x: event.clientX, y: event.clientY }))
+            return;
+
         if (!tool)
             return;
 
-        const held = toolPointerId !== null;
 
         toolPointerId = null;
 
