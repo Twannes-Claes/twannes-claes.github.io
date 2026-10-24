@@ -102,7 +102,7 @@ export function MonsterList({ controls, monsters, onRemove, onError, statBlockCl
         <>
             <ul className="ttrpg-rows">
                 {monsters.map((monster) => (
-                    <li key={monster.id} className={`ttrpg-row${monster.hidden ? ' ttrpg-row--hidden' : ''}${rows.open === monster.id ? ' ttrpg-row--open' : ''}`}>
+                    <li key={monster.id} className={`ttrpg-row${rows.open === monster.id ? ' ttrpg-row--open' : ''}`}>
                         <button
                             type="button"
                             className="ttrpg-row__main ttrpg-row__main--swatch"

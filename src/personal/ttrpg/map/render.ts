@@ -1,10 +1,10 @@
-import { faEyeSlash, faShieldHalved, faSkull, type IconDefinition } from '@fortawesome/free-solid-svg-icons';
+import { faEyeSlash, faShield, faSkull, type IconDefinition } from '@fortawesome/free-solid-svg-icons';
 
 import type { CreatureSize, Decal, Grid, HealthState, Point, Scenario, Token } from '../types';
 import { conditionKind, type ConditionKind } from '../content/conditions.ts';
 
 import { toWorld, type Camera } from './camera.ts';
-import { accent, blood, bloodDark, danger, door as doorColour, faded, ground, heal, highlight, ink, shield } from './colours.ts';
+import { accent, blood, bloodDark, danger, door as doorColour, faded, ground, heal, highlight, ink, steel, tempHp } from './colours.ts';
 import { drawFog, type FogLayers, type FogLook } from './fog.ts';
 import { distance, type Area } from './geometry.ts';
 import { cellAt, cellCenter, cellCorners, hexRadius } from './grid.ts';
@@ -466,18 +466,30 @@ function drawPillAt(
     return width;
 }
 
-/** The colour of a token's HP under it: warmer and redder the more hurt it is. */
-const healthText: Record<HealthState, string> = {
-    unhurt: ink,
+/** The colour of a token's HP and its bar, green when unhurt, warmer and redder the more hurt. */
+const healthColour: Record<HealthState, string> = {
+    unhurt: heal,
     hurt: doorColour,
     bloodied: danger,
     critical: danger,
-    down: faded(ink, 0.5),
+    down: faded(ink, 0.45),
+};
+
+/** The HP half of a token's plate, a wash of how hurt it is. */
+const healthWash: Record<HealthState, string> = {
+    unhurt: faded(heal, 0.13),
+    hurt: faded(doorColour, 0.15),
+    bloodied: faded(danger, 0.17),
+    critical: faded(danger, 0.22),
+    down: faded(ink, 0.05),
 };
 
 /**
- * A token's HP in a pill under it, like 23/30, for the screens that have its numbers: the GM
- * view for every token, a phone for its own. Nothing for a token without them.
+ * A token's numbers on a plate under it, for the screens that have them: the GM's for every token,
+ * a phone for its own. AC on the left behind a steel shield, on a steel wash. HP on the right in
+ * the colour of how hurt it is, on a wash of it, with temp HP after it as a blue +4 in a pill of
+ * its own while there is any. A bar along the bottom fills with the HP left. The shadow and edge
+ * of the page's tooltips, see .ttrpg-tip in styles/ttrpg.css. Nothing for a token without numbers.
  */
 export function drawHealth(ctx: CanvasRenderingContext2D, token: Lifted, radius: number, zoom: number, scale = 1)
 {
@@ -486,13 +498,81 @@ export function drawHealth(ctx: CanvasRenderingContext2D, token: Lifted, radius:
 
     const unit = scale / zoom;
     const state = healthState(token.hp, token.maxHp);
+    const fontSize = 14 * unit;
+    const iconSize = 12 * unit;
+    const height = 28 * unit;
+    const bar = 3 * unit;
+    const pad = 9 * unit;
+    const gap = 8 * unit;
 
-    const at = { x: token.x, y: token.y + radius + 4 * unit };
-    const width = drawPillAt(ctx, `${token.hp}/${token.maxHp}`, at, unit, ground, { centred: true, text: healthText[state] });
+    ctx.font = `600 ${fontSize}px 'JetBrains Mono Variable', ui-monospace, monospace`;
 
-    // Temp HP rides beside it as a blue shield, and goes once spent.
-    if (token.tempHp)
-        drawPillAt(ctx, String(token.tempHp), { x: at.x + width / 2 + 3 * unit, y: at.y }, unit, shield, { icon: faShieldHalved });
+    const ac = String(token.ac ?? 0);
+    const hp = `${token.hp}/${token.maxHp}`;
+    const temp = token.tempHp ? `+${token.tempHp}` : '';
+    const acWidth = ctx.measureText(ac).width;
+    const hpWidth = ctx.measureText(hp).width;
+    const tempPill = temp ? ctx.measureText(temp).width + 10 * unit : 0;
+    const acPart = pad + iconSize + 4 * unit + acWidth + gap;
+    const hpPart = gap + hpWidth + (temp ? 6 * unit + tempPill : 0) + pad;
+    const width = acPart + hpPart;
+    const left = token.x - width / 2;
+    const top = token.y + radius + 4 * unit;
+    const plate = new Path2D();
+
+    plate.roundRect(left, top, width, height, 8 * unit);
+
+    ctx.save();
+    ctx.shadowColor = 'rgb(0 0 0 / 0.5)';
+    ctx.shadowBlur = 16 * unit;
+    ctx.shadowOffsetY = 6 * unit;
+    ctx.fillStyle = ground;
+    ctx.fill(plate);
+    ctx.restore();
+
+    // The two washes and the bar, inside the plate's rounded corners.
+    ctx.save();
+    ctx.clip(plate);
+    ctx.fillStyle = faded(steel, 0.16);
+    ctx.fillRect(left, top, acPart, height - bar);
+    ctx.fillStyle = healthWash[state];
+    ctx.fillRect(left + acPart, top, hpPart, height - bar);
+    ctx.fillStyle = faded(ink, 0.1);
+    ctx.fillRect(left, top + height - bar, width, bar);
+    ctx.fillStyle = healthColour[state];
+    ctx.fillRect(left, top + height - bar, width * Math.min(1, Math.max(0, token.hp / token.maxHp)), bar);
+    ctx.restore();
+
+    ctx.lineWidth = unit;
+    ctx.strokeStyle = faded(ink, 0.2);
+    ctx.stroke(plate);
+
+    // The text sits in the middle of what the bar leaves.
+    const middle = top + (height - bar) / 2 + unit;
+    let x = left + pad;
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = steel;
+    drawIcon(ctx, faShield, { x: x + iconSize / 2, y: middle - unit }, iconSize);
+    x += iconSize + 4 * unit;
+    ctx.fillStyle = ink;
+    ctx.fillText(ac, x, middle);
+    x = left + acPart + gap;
+    ctx.fillStyle = healthColour[state];
+    ctx.fillText(hp, x, middle);
+
+    if (temp)
+    {
+        const pillLeft = x + hpWidth + 6 * unit;
+
+        ctx.beginPath();
+        ctx.roundRect(pillLeft, top + 5 * unit, tempPill, height - bar - 10 * unit, 5 * unit);
+        ctx.fillStyle = faded(tempHp, 0.2);
+        ctx.fill();
+        ctx.fillStyle = tempHp;
+        ctx.fillText(temp, pillLeft + 5 * unit, middle);
+    }
 }
 
 /**

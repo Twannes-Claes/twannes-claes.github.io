@@ -93,7 +93,7 @@ export interface PendingMove
 
 export interface MapViewOptions
 {
-    /** A token dragged freely, in edit mode or a monster in play mode, landed here. */
+    /** A token dragged freely, in edit mode or with Alt in play mode, landed here. */
     onTokenMove?: (id: string, to: Point) => void;
     /** Monsters the erase tool took, already asked about, to take off the map. */
     onMonstersErase?: (ids: string[]) => void;
@@ -1215,9 +1215,10 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         const token = own === null || pressed?.id === own ? pressed : undefined;
 
         // In play mode a token draws a path, a player's unless the game master froze movement, so
-        // the GM sees how far a monster gets too. A monster with Alt held drags freely. Everything
-        // in edit mode drags: that is the game master's hand.
-        const walksPath = token?.kind === 'player' || (token !== undefined && !event.altKey);
+        // the GM sees how far a monster gets too. On the GM's screens any token with Alt held drags
+        // freely; a phone always draws its path. Everything in edit mode drags: that is the game
+        // master's hand.
+        const walksPath = token !== undefined && (own !== null || !event.altKey);
 
         if (token && fogEnabled && walksPath)
         {

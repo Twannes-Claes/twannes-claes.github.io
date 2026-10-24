@@ -1,4 +1,4 @@
-import { faCheck, faShieldHalved } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faShield } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useActionState } from 'react';
 
@@ -18,7 +18,7 @@ interface StatsFormProps
 
 /**
  * A token's numbers as small chips under its name in a list: HP coloured by how hurt it is, temp HP
- * as the blue shield the map shows, AC and Passive Perception. Nothing for a token without them.
+ * as a blue +4 and AC behind a shield, as the map shows them, and Passive Perception. Nothing for a token without them.
  */
 export function StatChips({ token }: { token: Token })
 {
@@ -32,12 +32,12 @@ export function StatChips({ token }: { token: Token })
             </span>
             {Boolean(token.tempHp) && (
                 <span className="ttrpg-chip ttrpg-chip--temp" title="Temp HP">
-                    <FontAwesomeIcon icon={faShieldHalved} />
-                    {token.tempHp}
+                    +{token.tempHp}
                 </span>
             )}
-            <span className="ttrpg-chip" title="Armour Class">
-                AC {token.ac ?? 0}
+            <span className="ttrpg-chip ttrpg-chip--ac" title="Armour Class">
+                <FontAwesomeIcon icon={faShield} />
+                {token.ac ?? 0}
             </span>
             <span className="ttrpg-chip" title="Passive Perception">
                 PP {token.perception ?? 0}

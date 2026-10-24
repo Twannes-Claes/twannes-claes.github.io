@@ -144,7 +144,7 @@ export function TokenMenu({
             // The map's own menu is no use on the menu either.
             onContextMenu={(event) => event.preventDefault()}
         >
-            <div className={`ttrpg-token-menu__head${token.hidden ? ' ttrpg-row--hidden' : ''}`}>
+            <div className="ttrpg-token-menu__head">
                 <div className="ttrpg-row__main ttrpg-row__main--swatch">
                     <span className="ttrpg-swatch" style={{ background: token.color }} />
                     <span className="ttrpg-row__text">

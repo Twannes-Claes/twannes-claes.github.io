@@ -88,7 +88,7 @@ export function InitiativePanel({ fight, tokens, system, onChange, onClose }: In
                 {ordered.length === 0 && <p className="ttrpg-empty">No rolls yet.</p>}
                 <ol className="ttrpg-rows">
                     {ordered.map(({ token, roll }, index) => (
-                        <li key={token.id} className={`ttrpg-row${fight.turn === token.id ? ' ttrpg-row--turn' : ''}${token.hidden ? ' ttrpg-row--hidden' : ''}`}>
+                        <li key={token.id} className={`ttrpg-row${fight.turn === token.id ? ' ttrpg-row--turn' : ''}`}>
                             {rollField(token, roll)}
                             <span className="ttrpg-row__main ttrpg-row__main--swatch">
                                 <span className="ttrpg-swatch" style={{ background: token.color }} />
@@ -124,7 +124,7 @@ export function InitiativePanel({ fight, tokens, system, onChange, onClose }: In
                     <h3 className="ttrpg-subhead">Not in yet</h3>
                     <ul className="ttrpg-rows">
                         {waiting.map((token) => (
-                            <li key={token.id} className={`ttrpg-row${token.hidden ? ' ttrpg-row--hidden' : ''}`}>
+                            <li key={token.id} className="ttrpg-row">
                                 {rollField(token)}
                                 <span className="ttrpg-row__main ttrpg-row__main--swatch">
                                     <span className="ttrpg-swatch" style={{ background: token.color }} />

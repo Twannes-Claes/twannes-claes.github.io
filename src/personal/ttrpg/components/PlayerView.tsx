@@ -26,7 +26,7 @@ import { sendDoor } from '../services/tableChannel';
 
 import { Backend } from './Backend';
 import { ConditionPicker } from './ConditionPicker';
-import { Loading, Toast, Toasts } from './Feedback';
+import { Loading, Spinner, Toast, Toasts } from './Feedback';
 import { MapCanvas } from './MapCanvas';
 import { AttackButton, HitSheet } from './HitSheet';
 import { MoveSheet } from './MoveSheet';
@@ -145,16 +145,31 @@ interface JoinFormProps
     name: string;
 }
 
+/** A player already at the table, which someone whose phone forgot them can take back. */
+interface Character
+{
+    id: Id<'tokens'>;
+    name: string;
+    color: string;
+    avatar?: string;
+}
+
 /**
  * Joining in two short steps: the password the game master says out loud, then the character's
- * name, ring colour and picture. The token appears at the spawn point when it is done.
+ * name, ring colour and picture. The token appears at the spawn point when it is done. Someone
+ * coming back whose phone forgot them picks their character instead, see rejoin in convex/play.ts.
  */
 function JoinForm({ sessionId, name }: JoinFormProps)
 {
     const convex = useConvex();
     const join = useMutation(api.play.join);
+    const rejoin = useMutation(api.play.rejoin);
     const authToken = useAuthToken();
     const [password, setPassword] = useState<string | null>(null);
+    const [characters, setCharacters] = useState<Character[]>([]);
+    // The character being taken back, and why that did not work.
+    const [taking, setTaking] = useState<Id<'tokens'> | null>(null);
+    const [takeFailure, setTakeFailure] = useState('');
     const [colour] = useState(() => ringColours[Math.floor(Math.random() * ringColours.length)]);
     const [pictureName, setPictureName] = useState('');
     const [size, setSize] = useState<CreatureSize>('medium');
@@ -166,12 +181,13 @@ function JoinForm({ sessionId, name }: JoinFormProps)
 
             return convex
                 .mutation(api.play.check, { sessionId, password: typed })
-                .then((right) =>
+                .then((players) =>
                 {
-                    if (!right)
+                    if (!players)
                         return 'That is not the password. Ask the GM.';
 
                     setPassword(typed);
+                    setCharacters(players);
 
                     return '';
                 })
@@ -220,6 +236,22 @@ function JoinForm({ sessionId, name }: JoinFormProps)
         );
     }, '');
 
+    // Once it is back the page follows the token to the map, see Player.
+    const takeBack = (id: Id<'tokens'>) =>
+    {
+        setTaking(id);
+        setTakeFailure('');
+        rejoin({ sessionId, password: password ?? '', tokenId: id })
+            .then((tokenId) =>
+            {
+                if (!tokenId)
+                    setTakeFailure('The password changed. Reload the page and type the new one.');
+
+            })
+            .catch((reason: unknown) => setTakeFailure(explain(reason, 'That did not work. Check the connection and try again.')))
+            .finally(() => setTaking(null));
+    };
+
     if (password === null)
     {
         return (
@@ -246,8 +278,35 @@ function JoinForm({ sessionId, name }: JoinFormProps)
         <main className="ttrpg-dashboard ttrpg-player">
             <header className="ttrpg-dashboard__header">
                 <h1>Your character</h1>
-                <p>A name, a colour for the ring around your token, a picture, and a few numbers off your sheet.</p>
+                <p>
+                    {characters.length > 0
+                        ? 'Back at the table? Pick your character. New here? Make one below.'
+                        : 'A name, a colour for the ring around your token, a picture, and a few numbers off your sheet.'}
+                </p>
             </header>
+            {characters.length > 0 && (
+                <section className="ttrpg-panel ttrpg-card" aria-label="Back at the table">
+                    <h2>Back at the table</h2>
+                    <div className="ttrpg-characters">
+                        {characters.map((character) => (
+                            <button
+                                key={character.id}
+                                type="button"
+                                className="ttrpg-segment ttrpg-character"
+                                disabled={taking !== null}
+                                onClick={() => takeBack(character.id)}
+                            >
+                                <span className="ttrpg-sheet__avatar" style={{ borderColor: character.color }} aria-hidden="true">
+                                    {character.avatar ? <img src={character.avatar} alt="" /> : character.name.charAt(0)}
+                                </span>
+                                <span className="ttrpg-character__name">{character.name}</span>
+                                {taking === character.id && <Spinner />}
+                            </button>
+                        ))}
+                    </div>
+                    {takeFailure && <p className="ttrpg-error" role="alert">{takeFailure}</p>}
+                </section>
+            )}
             <form action={create} className="ttrpg-panel ttrpg-card">
                 <label className="ttrpg-field">
                     Name
@@ -677,8 +736,6 @@ function Table({ sessionId, mine, frozen, fogLook, blood, system, fight }: Table
             {targets && (
                 <HitSheet
                     targets={picked}
-                    // A player heals players only; the GM's table screen heals anyone.
-                    canHeal={onTable || picked.every((target) => target.kind === 'player')}
                     onApply={dealHit}
                     onCancel={() => setTargets(null)}
                 />

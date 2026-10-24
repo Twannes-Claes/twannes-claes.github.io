@@ -577,7 +577,9 @@ The canvas renders at the screen's real pixel density, so a 4K screen is sharp.
    are tried in rings, without passing through walls, with room for the token's full size.
 5. The phone shows the map centred on their token, with pinch to zoom and two finger pan.
 
-Come back on the same phone and you skip straight to step 5.
+Come back on the same phone and you skip straight to step 5. A phone that forgot you, after a
+closed browser or cleared data, lists the characters at the table after the password: pick yours
+to take it back rather than leave it behind and make a second (`play.rejoin`).
 
 ### Switching scenario
 
@@ -639,8 +641,8 @@ A player at 0 is down and stays on the map. Death saves are kept at the table, s
 - **Built.** The rules live in `map/health.ts`, shared by the server and every screen;
   `play.tokens` sends a screen without the numbers only each token's `state`. On the map, red
   rises from the bottom of a hurt token's picture, and a downed one is darkened with a skull. A
-  screen with the numbers shows HP in a pill under the token, in play only. The GM sets any
-  token's numbers from the heart button in the Players and Monsters lists, a player their own from
+  screen with the numbers shows a plate under the token in play: AC behind a shield, HP, temp HP
+  as a blue +4 and a bar of the HP left. The GM sets any token's numbers from the heart button in the Players and Monsters lists, a player their own from
   their phone's settings (`play.setStats`, `components/StatsForm.tsx`). A monster added without HP
   has no numbers and shows no damage.
 
@@ -648,7 +650,7 @@ A player at 0 is down and stays on the map. Death saves are kept at the table, s
 
 - A player or the GM selects one or more targets, picks **Attack** or **Heal** and enters the
   amount. The server applies it: a player never sees a monster's HP, only its state change.
-- Players can attack monsters and other players, and heal themselves and other players.
+- Players can attack and heal anyone they can see: monsters, NPCs, other players and themselves.
 - Every screen plays a short animation, drawn in code: a slash or flash on the target for an
   attack, a soft green glow for a heal.
 - A monster brought to 0 plays a death animation instead and disappears from the map.
@@ -658,7 +660,7 @@ A player at 0 is down and stays on the map. Death saves are kept at the table, s
   a sheet at the bottom (`components/HitSheet.tsx`) takes the amount with **Damage** or **Heal**
   for all of them at once. `play.hit` applies it with `hitOn` in `map/health.ts`: damage takes
   temp HP first, healing stops at max and never adds temp HP. A player only reaches tokens they
-  can see and heals players only. The last hit is one row per session in `hits`, like pings, and
+  can see, to hurt or heal. The last hit is one row per session in `hits`, like pings, and
   `play.lastHit` leaves out targets the players could not see, so a hit on a hidden monster gives
   nothing away. Off a live map the demo applies hits locally the same way.
 

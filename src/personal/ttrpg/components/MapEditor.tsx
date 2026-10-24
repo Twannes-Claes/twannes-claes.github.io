@@ -412,14 +412,17 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     };
     const playerControls = liveMap ?? testPlayers;
 
-    const moveToken = (id: string, to: Point) =>
+    // Dragged freely, or walked along a path: to the server for the live map's tokens and a saved
+    // session's monsters on any map, here for the test players and the demo.
+    const moveToken = (id: string, to: Point, path?: Point[]) =>
     {
         const saved = liveMap ?? (live && monstersHere.some((monster) => monster.id === id) ? live : null);
+        const walk = path ? { path, movedAt: Date.now() } : {};
 
         if (saved)
-            fail(saved.move(id, to));
+            fail(saved.move(id, to, path));
         else
-            setTokens((current) => current.map((token) => (token.id === id ? { ...token, ...to } : token)));
+            setTokens((current) => current.map((token) => (token.id === id ? { ...token, ...to, ...walk } : token)));
 
     };
 
@@ -449,20 +452,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
         if (!pending)
             return;
 
-        const end = pending.points[pending.points.length - 1];
-        const { id, points } = pending;
-
-        if (liveMap)
-            fail(liveMap.move(id, end, points));
-        else
-        {
-            setTokens((current) =>
-                current.map((token) =>
-                    token.id === id ? { ...token, ...end, path: points, movedAt: Date.now() } : token,
-                ),
-            );
-        }
-
+        moveToken(pending.id, pending.points[pending.points.length - 1], pending.points);
         setPending(null);
     };
 
@@ -1036,7 +1026,6 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
             {playing && targets && (
                 <HitSheet
                     targets={shown.filter((token) => targets.includes(token.id))}
-                    canHeal
                     onApply={dealHit}
                     onCancel={() => setTargets(null)}
                 />

@@ -1178,6 +1178,28 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
     object-fit: cover;
 }
 
+/* The players already at the table on the join form, to take one back, see JoinForm. */
+.ttrpg-characters {
+    display: grid;
+    gap: 6px;
+}
+
+.ttrpg-character {
+    gap: 0.75rem;
+    min-height: 56px;
+    padding: 0.4rem 0.75rem 0.4rem 0.4rem;
+    color: var(--ttrpg-ink);
+    font-size: 1rem;
+    text-align: left;
+}
+
+.ttrpg-character__name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* Cancel, Heal and Damage in one row. */
 .ttrpg-hit .ttrpg-popover__foot {
     grid-template-columns: repeat(3, 1fr);
@@ -1842,8 +1864,15 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
 }
 
 /* HP warms the more hurt it is, like the pill under a token, see healthText in map/render.ts. */
+/* The colours the map's plate under a token uses, see drawHealth in map/render.ts. */
 .ttrpg-chip--unhurt {
-    color: var(--ttrpg-ink);
+    background: color-mix(in srgb, #6fcf8e 14%, transparent);
+    color: #6fcf8e;
+}
+
+.ttrpg-chip--ac {
+    background: color-mix(in srgb, #a9bdd6 16%, transparent);
+    color: #a9bdd6;
 }
 
 .ttrpg-chip--hurt {
@@ -1856,9 +1885,10 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
     color: var(--ttrpg-danger);
 }
 
+/* The blue the map writes temp HP in, see tempHp in map/colours.ts. */
 .ttrpg-chip--temp {
-    background: #3f7fd0;
-    color: var(--ttrpg-ink);
+    background: color-mix(in srgb, #8db9f2 16%, transparent);
+    color: #8db9f2;
 }
 
 .ttrpg-field input,
@@ -2340,17 +2370,6 @@ button.ttrpg-row__main {
     height: 12px;
     border: 2px solid rgb(255 255 255 / 0.25);
     border-radius: 50%;
-}
-
-/* A monster the players cannot see, faded in the list. */
-.ttrpg-row--hidden .ttrpg-row__main {
-    color: var(--ttrpg-muted);
-    font-style: italic;
-}
-
-/* Italics lean out past their box, which the name's clipping would cut off. */
-.ttrpg-row--hidden .ttrpg-row__name {
-    padding-right: 0.2em;
 }
 
 /* Whose turn it is in the initiative order, in the purple of their ring on the map. */

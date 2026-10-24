@@ -444,14 +444,57 @@ async function tryPassword(ctx: MutationCtx, session: Doc<'sessions'>, password:
     return false;
 }
 
-/** Whether a password opens a live session, so the join page can ask it before the character. */
+/**
+ * Whether a password opens a live session, so the join page can ask it before the character. Null
+ * for a wrong one; otherwise the players at the table, so someone whose phone forgot them can take
+ * their character back, see rejoin.
+ */
 export const check = mutation({
     args: { sessionId: v.id('sessions'), password: v.string() },
     handler: async (ctx, { sessionId, password }) =>
     {
         await requireUser(ctx);
 
-        return await tryPassword(ctx, await sessionOf(ctx, sessionId), password);
+        if (!(await tryPassword(ctx, await sessionOf(ctx, sessionId), password)))
+            return null;
+
+        return (await tokensOf(ctx, sessionId))
+            .filter((token) => token.kind === 'player')
+            .map(({ _id, name, color, avatar }) => ({ id: _id, name, color, avatar }));
+    },
+});
+
+/**
+ * A player whose phone forgot them, after a closed browser or cleared data, signs in as someone
+ * new. Rather than make a second character beside the first, they take theirs back after the
+ * password. The phone it was on then gets the join form, where it can take it back in turn. Null
+ * for a wrong password, see tryPassword.
+ */
+export const rejoin = mutation({
+    args: { sessionId: v.id('sessions'), password: v.string(), tokenId: v.id('tokens') },
+    handler: async (ctx, { sessionId, password, tokenId }) =>
+    {
+        const userId = await requireUser(ctx);
+        const session = await sessionOf(ctx, sessionId);
+
+        if (session.kicked?.includes(userId))
+            throw new ConvexError('The GM removed you from this table.');
+
+        if (!(await tryPassword(ctx, session, password)))
+            return null;
+
+        const token = await ctx.db.get('tokens', tokenId);
+
+        if (!token || token.sessionId !== sessionId || token.kind !== 'player')
+            throw new ConvexError('That character has left the table.');
+
+        if (await ownToken(ctx, sessionId, userId))
+            throw new ConvexError('You are at the table already.');
+
+        await ctx.db.patch('tokens', tokenId, { userId });
+        await dropDraftOf(ctx, tokenId);
+
+        return tokenId;
     },
 });
 
@@ -1347,7 +1390,7 @@ export const hit = mutation({
 
             const seen = token.kind === 'player' || (token.inSight === true && token.hidden !== true);
 
-            if (!host && (!seen || (kind === 'heal' && token.kind !== 'player')))
+            if (!host && !seen)
                 continue;
 
             const { after, died, downed } = hitOn(token, kind, points);

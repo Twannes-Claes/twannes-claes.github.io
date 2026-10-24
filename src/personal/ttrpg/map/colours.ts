@@ -16,8 +16,10 @@ export const door = '#d8a657';
 export const danger = '#e0565b';
 /** Healing, the app's green for what worked. */
 export const heal = '#6fcf8e';
-/** Temp HP, the blue of a shield, which takes the hits first. */
-export const shield = '#3f7fd0';
+/** AC, the cool grey-blue of a steel shield. */
+export const steel = '#a9bdd6';
+/** Temp HP, a light blue that reads on a dark label: it takes the hits first. */
+export const tempHp = '#8db9f2';
 /** A path past the token's speed. */
 export const tooFar = '#b4443c';
 /** Dark and a little brown, as blood looks on the ground. */
