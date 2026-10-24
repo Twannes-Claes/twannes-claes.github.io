@@ -13,13 +13,18 @@ export function tokensOf(ctx: QueryCtx, sessionId: Id<'sessions'>)
         .take(200);
 }
 
-/** The tokens on one map of a session, so a move re-reads only the map being played. */
-export function tokensOn(ctx: QueryCtx, sessionId: Id<'sessions'>, scenarioId: string)
+/**
+ * The tokens on one map of a session, so a move re-reads only the map being played. Not the
+ * monsters on its tray, which are off the map for sight, turns and the players' screens alike.
+ */
+export async function tokensOn(ctx: QueryCtx, sessionId: Id<'sessions'>, scenarioId: string)
 {
-    return ctx.db
+    const here = await ctx.db
         .query('tokens')
         .withIndex('by_sessionId_and_scenarioId', (q) => q.eq('sessionId', sessionId).eq('scenarioId', scenarioId))
         .take(200);
+
+    return here.filter((token) => token.tray !== true);
 }
 
 /**

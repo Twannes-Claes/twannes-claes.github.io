@@ -151,6 +151,11 @@ export default defineSchema({
         movedAt: v.optional(v.number()),
         /** A monster the host keeps off the players' screens, whatever they can see. */
         hidden: v.optional(v.boolean()),
+        /**
+         * A monster waiting on its map's tray, off the grid, for the host only, see Monster
+         * staging in PLAN.md. Its x and y mean nothing until it is dragged onto the map.
+         */
+        tray: v.optional(v.boolean()),
         /** A monster a player can see right now, kept by sight.ts. Others are not sent to players. */
         inSight: v.optional(v.boolean()),
         /**

@@ -8,6 +8,8 @@ import { defaultBlood } from '../map/health';
 import type { ToolId } from '../map/tools';
 import { createMapView, type FrameStats, type MapView, type PendingMove } from '../map/view';
 
+import { carrying } from './carry';
+
 /** One empty list for screens without drafts, so its effect does not run on every render. */
 const noDrafts: Draft[] = [];
 const noMarks: SharedMark[] = [];
@@ -84,6 +86,10 @@ interface MapCanvasProps
     targets?: string[] | null;
     /** Hears a token pressed while picking targets. */
     onTarget?: (id: string) => void;
+    /** The tokens picked with the Select tool in Edit, or null without it, see setSelection. */
+    selection?: string[] | null;
+    /** Hears what the Select tool picks now. */
+    onSelect?: (ids: string[]) => void;
     /** What killed monsters left on the map, see Decal. */
     decals?: Decal[];
     /** Which blood shows, see BloodSettings. */
@@ -94,10 +100,14 @@ interface MapCanvasProps
     onTokenMenu?: (id: string, client: Point) => void;
     /** Hears a preset dragged from the library and let go over the map, see PresetLibrary.tsx. */
     onPresetDrop?: (presetId: string, at: Point) => void;
+    /** Hears a monster dragged off the tray and let go over the map, see Tray.tsx. */
+    onTrayDrop?: (tokenId: string, at: Point) => void;
 }
 
 /** What a preset tile carries while it is dragged, its id. */
 export const presetDragType = 'application/x-ttrpg-preset';
+/** What a monster on the tray carries while it is dragged, its id. */
+export const trayDragType = 'application/x-ttrpg-tray';
 
 /**
  * The map, filling the screen. Drawing, gestures and tools live in map/; this only mounts the
@@ -138,10 +148,13 @@ export function MapCanvas({
     hit,
     targets = null,
     onTarget,
+    selection = null,
+    onSelect,
     decals = noDecals,
     blood = defaultBlood,
     turn = null,
     onPresetDrop,
+    onTrayDrop,
     onTokenMenu,
 }: MapCanvasProps)
 {
@@ -161,6 +174,7 @@ export function MapCanvas({
     const drafted = useEffectEvent((id: string, points: Point[] | null, feet: number) => onDraft?.(id, points, feet));
     const markedOut = useEffectEvent((mark: Mark | null) => onMark?.(mark));
     const targeted = useEffectEvent((id: string) => onTarget?.(id));
+    const selected = useEffectEvent((ids: string[]) => onSelect?.(ids));
     const menuOpened = useEffectEvent((id: string, client: Point) =>
     {
         onTokenMenu?.(id, client);
@@ -190,6 +204,7 @@ export function MapCanvas({
             onDraft: (id, points, feet) => drafted(id, points, feet),
             onMark: (mark) => markedOut(mark),
             onTarget: (id) => targeted(id),
+            onSelect: (ids) => selected(ids),
             onTokenMenu: (id, client) => menuOpened(id, client),
         });
 
@@ -295,6 +310,11 @@ export function MapCanvas({
 
     useEffect(() =>
     {
+        view.current?.setSelection(selection);
+    }, [selection]);
+
+    useEffect(() =>
+    {
         view.current?.setBlood(blood);
     }, [blood]);
 
@@ -339,19 +359,41 @@ export function MapCanvas({
                 aria-label={`Battle map: ${scenario.name}`}
                 onDragOver={(event) =>
                 {
-                    if (onPresetDrop && event.dataTransfer.types.includes(presetDragType))
-                        event.preventDefault();
+                    const { types } = event.dataTransfer;
+                    const monster = carrying();
 
-                }}
-                onDrop={(event) =>
-                {
-                    const presetId = event.dataTransfer.getData(presetDragType);
-
-                    if (!onPresetDrop || !presetId || !view.current)
+                    if (!(onPresetDrop && types.includes(presetDragType)) && !(onTrayDrop && types.includes(trayDragType)))
                         return;
 
                     event.preventDefault();
-                    onPresetDrop(presetId, view.current.worldAt({ x: event.clientX, y: event.clientY }));
+
+                    // The monster as it would land, under the pointer, see setGhost in map/view.ts.
+                    if (monster && view.current)
+                        view.current.setGhost({ monster, at: view.current.worldAt({ x: event.clientX, y: event.clientY }) });
+
+                }}
+                onDragLeave={() => view.current?.setGhost(null)}
+                onDrop={(event) =>
+                {
+                    view.current?.setGhost(null);
+
+                    const presetId = event.dataTransfer.getData(presetDragType);
+                    const tokenId = event.dataTransfer.getData(trayDragType);
+                    const at = view.current?.worldAt({ x: event.clientX, y: event.clientY });
+
+                    if (!at)
+                        return;
+
+                    if (onPresetDrop && presetId)
+                    {
+                        event.preventDefault();
+                        onPresetDrop(presetId, at);
+                    }
+                    else if (onTrayDrop && tokenId)
+                    {
+                        event.preventDefault();
+                        onTrayDrop(tokenId, at);
+                    }
                 }}
             />
             {/* The demo's picture is free to use with attribution, so the public demo credits its

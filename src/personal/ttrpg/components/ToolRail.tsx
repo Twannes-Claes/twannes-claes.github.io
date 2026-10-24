@@ -8,6 +8,7 @@ import {
     faRotateLeft,
     faRotateRight,
     faTree,
+    faVectorSquare,
     type IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -19,6 +20,7 @@ import { typing, useKeydown } from './useKeys';
 /** The edit tools, with the key that picks each one. Space also picks Move around, see ToolRail. */
 const tools: { id: ToolId; label: string; key: string; icon: IconDefinition }[] = [
     { id: 'select', label: 'Move around', key: 'v', icon: faArrowPointer },
+    { id: 'pick', label: 'Select', key: 'b', icon: faVectorSquare },
     { id: 'walls', label: 'Walls and doors', key: 'w', icon: faDrawPolygon },
     { id: 'erase', label: 'Erase', key: 'e', icon: faEraser },
     { id: 'props', label: 'Props', key: 'p', icon: faTree },

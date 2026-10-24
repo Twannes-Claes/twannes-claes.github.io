@@ -1,6 +1,6 @@
 import { faCheck, faDiceD20, faHatWizard, faPen, faSnowflake, faTriangleExclamation, faTv } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useEffect, useEffectEvent, useState, type DragEvent, type MouseEvent } from 'react';
+import { useEffect, useEffectEvent, useRef, useState, type DragEvent, type MouseEvent } from 'react';
 
 import type { BloodSettings, Decal, FogSettings, GameSystem, HitKind, Initiative, Live, MonsterControls, PictureBytes, Ping, Point, Preset, PropPicture, Scenario, SharedHit, Store, Token } from '../types';
 
@@ -37,7 +37,9 @@ import { RulerPicker } from './RulerPicker';
 import { ScenarioList } from './ScenarioList';
 import { Settings } from './Settings';
 import { StatBlock } from './StatBlock';
+import { SelectPanel } from './SelectPanel';
 import { TokenMenu } from './TokenMenu';
+import { Tray } from './Tray';
 import { ToolRail } from './ToolRail';
 import { useHistory } from './useHistory';
 import { useMessage } from './useMessage';
@@ -72,6 +74,12 @@ function fightLine(fight: Initiative, tokens: Token[], asPlayers: boolean): stri
 }
 
 /** How long the editor waits after the last change before it saves. */
+/** A walk along a path from now, which every screen plays, see setTokens in map/view.ts. */
+function walkFromNow(path: Point[]): Pick<Token, 'path' | 'movedAt'>
+{
+    return { path, movedAt: Date.now() };
+}
+
 const saveDelay = 1000;
 const pictureFailed = 'That picture did not upload. Is it a PNG, WebP or JPEG?';
 
@@ -172,6 +180,8 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     // The token right-clicked in the GM view, with where, and the preset whose stat block it opened.
     const [menu, setMenu] = useState<{ id: string; at: Point } | null>(null);
     const [reading, setReading] = useState<string | null>(null);
+    // The tokens picked with the Select tool in Edit, see SelectPanel.
+    const [selected, setSelected] = useState<string[]>([]);
     const [fogDraft, setFogDraft] = useState<FogSettings | null>(null);
     const [stats, setStats] = useState<FrameStats | null>(null);
     const [screen, setScreen] = useScreenSettings();
@@ -257,6 +267,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
         setTool(next);
         setPlacing(null);
         setMenu(null);
+        setSelected([]);
     };
 
     // Shows label with a spinner while the work runs.
@@ -327,12 +338,15 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const liveMap = live && live.live && live.activeScenarioId === active.id ? live : null;
     // A saved session's monsters stand on their map whether it is played or not, beside the test
     // players, see placeMonster in convex/play.ts. The demo's are in this tab with the players.
-    const monstersHere = liveMap
-        ? liveMap.tokens.filter((token) => token.kind === 'npc')
+    // The ones on the map's tray are off it, see Tray.tsx; the live map's tokens never hold them.
+    const monstersOf = live ? live.monsters.filter((monster) => monster.scenarioId === active.id) : tokens.filter((token) => token.kind === 'npc');
+    const tray = monstersOf.filter((monster) => monster.tray === true);
+    const monstersHere = liveMap ? liveMap.tokens.filter((token) => token.kind === 'npc') : monstersOf.filter((monster) => monster.tray !== true);
+    const shown = liveMap
+        ? liveMap.tokens
         : live
-            ? live.monsters.filter((monster) => monster.scenarioId === active.id)
-            : tokens.filter((token) => token.kind === 'npc');
-    const shown = liveMap ? liveMap.tokens : live ? [...tokens.filter((token) => token.kind === 'player'), ...monstersHere] : tokens;
+            ? [...tokens.filter((token) => token.kind === 'player'), ...monstersHere]
+            : tokens.filter((token) => token.tray !== true);
     const isFrozen = liveMap ? liveMap.frozen : frozen;
 
     const fail = (promise: Promise<void>) => void promise.catch((reason: Error) => message.error(reason.message));
@@ -383,7 +397,12 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
             {
                 setTokens((current) => [
                     ...current,
-                    { id: crypto.randomUUID(), presetId, ...monsterFrom(preset, active.grid, at, new Set(current.map((token) => token.name))) },
+                    {
+                        id: crypto.randomUUID(),
+                        presetId,
+                        ...monsterFrom(preset, active.grid, at ?? active.spawn, new Set(current.map((token) => token.name))),
+                        tray: at ? undefined : true,
+                    },
                 ]);
             }
 
@@ -392,6 +411,8 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
         setMonster: (id, { name, color, downs }) =>
             changeToken(id, (token) => ({ ...token, name: name.trim().slice(0, 30) || token.name, color, downs: downs || undefined })),
         hide: (id, hidden) => changeToken(id, (token) => ({ ...token, hidden })),
+        stage: (id, at, hidden) =>
+            changeToken(id, (token) => ({ ...token, ...at, path: undefined, movedAt: undefined, tray: at ? undefined : true, hidden: at ? hidden : true })),
         removeMonster: (id) =>
         {
             setTokens((current) => current.filter((token) => token.id !== id));
@@ -412,12 +433,50 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     };
     const playerControls = liveMap ?? testPlayers;
 
+    // Where the last press let go on the page, to tell a monster dragged off the map onto the tray.
+    // Heard before the map hears it, so the drag it ends is judged from where it ended.
+    const letGo = useRef<Point | null>(null);
+
+    useEffect(() =>
+    {
+        const up = (event: PointerEvent) =>
+        {
+            letGo.current = { x: event.clientX, y: event.clientY };
+        };
+
+        window.addEventListener('pointerup', up, true);
+
+        return () => window.removeEventListener('pointerup', up, true);
+    }, []);
+
+    // A monster dragged off the map and let go over the tray goes onto it, hidden,
+    // rather than where it was let go. False for anything else.
+    const ontoTray = (id: string) =>
+    {
+        const at = letGo.current;
+        const box = document.querySelector('.ttrpg-tray:not(.ttrpg-hidden)')?.getBoundingClientRect();
+
+        if (!at || !box || at.x < box.left || at.x > box.right || at.y < box.top || at.y > box.bottom)
+            return false;
+
+        if (!monstersHere.some((monster) => monster.id === id))
+            return false;
+
+        setMenu(null);
+        fail(monsterControls.stage(id, null, true));
+
+        return true;
+    };
+
     // Dragged freely, or walked along a path: to the server for the live map's tokens and a saved
     // session's monsters on any map, here for the test players and the demo.
     const moveToken = (id: string, to: Point, path?: Point[]) =>
     {
         const saved = liveMap ?? (live && monstersHere.some((monster) => monster.id === id) ? live : null);
-        const walk = path ? { path, movedAt: Date.now() } : {};
+        const walk = path ? walkFromNow(path) : {};
+
+        if (!path && ontoTray(id))
+            return;
 
         if (saved)
             fail(saved.move(id, to, path));
@@ -442,6 +501,39 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 removeMonsters([monster.id]);
 
         });
+
+    // Off the tray onto the map, lined up with the grid, hidden like any monster placed.
+    const fromTray = (id: string, at: Point) =>
+    {
+        const monster = tray.find((other) => other.id === id);
+
+        if (!monster)
+            return;
+
+        setMenu(null);
+        fail(monsterControls.stage(id, resizedAt(active.grid, at, monster.size), true));
+    };
+
+    // What the Select tool's panel does to the picked monsters at once, see SelectPanel.
+    const pickedMonsters = monstersHere.filter((monster) => selected.includes(monster.id));
+
+    const hidePicked = (hidden: boolean) =>
+    {
+        for (const monster of pickedMonsters)
+        {
+            if ((monster.hidden === true) !== hidden)
+                fail(monsterControls.hide(monster.id, hidden));
+
+        }
+    };
+
+    const trayPicked = () =>
+    {
+        for (const monster of pickedMonsters)
+            fail(monsterControls.stage(monster.id, null, true));
+
+        setSelected((ids) => ids.filter((id) => !pickedMonsters.some((monster) => monster.id === id)));
+    };
 
     const walker = pending ? shown.find((token) => token.id === pending.id) : undefined;
 
@@ -560,8 +652,9 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
     // The right-clicked token, gone with the token itself, a map switch or a fight that killed it.
     // In Edit only with the tools a right click has nothing to cancel in, like a wall chain.
-    const menuOpens = mode === 'gm' || (mode === 'edit' && (tool === 'select' || tool === 'monsters'));
-    const menuToken = menu && menuOpens ? shown.find((token) => token.id === menu.id) : undefined;
+    const menuOpens = mode === 'gm' || (mode === 'edit' && (tool === 'select' || tool === 'pick' || tool === 'monsters'));
+    const menuToken = menu && menuOpens ? [...shown, ...tray].find((token) => token.id === menu.id) : undefined;
+    const menuOnTray = menuToken?.tray === true;
     // In Edit, clear of the rail, or beside the Monsters panel when it is open.
     const statBlockBeside = mode !== 'edit' ? '' : tool === 'monsters' ? ' ttrpg-statblock-panel--beside' : ' ttrpg-statblock-panel--rail';
     const menuAt = menu ? menu.at : { x: 0, y: 0 };
@@ -827,6 +920,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 onScenarioChange={changeScenario}
                 onStats={showStats ? setStats : undefined}
                 onPresetDrop={playing ? undefined : (presetId, at) => fail(monsterControls.placeMonster(presetId, active.id, at))}
+                onTrayDrop={playing ? undefined : fromTray}
                 onToolCancel={putToolAway}
                 shared={liveMap ? liveMap.fog : null}
                 onExplored={liveMap ? (fog, forget) => fail(liveMap.saveFog(fog, forget)) : undefined}
@@ -847,6 +941,8 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 turn={fight?.turn ?? null}
                 targets={targets}
                 onTarget={pickTarget}
+                selection={mode === 'edit' && tool === 'pick' ? selected : null}
+                onSelect={setSelected}
                 onTokenMenu={menuOpens ? (id, at) => setMenu({ id, at }) : undefined}
             />
 
@@ -1060,6 +1156,16 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                             />
                         </PresetLibrary>
                     )}
+                    {tool === 'pick' && (
+                        <SelectPanel
+                            picked={shown.filter((token) => selected.includes(token.id)).length}
+                            monsters={pickedMonsters.length}
+                            onHide={hidePicked}
+                            onTray={trayPicked}
+                            onAll={() => setSelected(shown.map((token) => token.id))}
+                            onClear={() => setSelected([])}
+                        />
+                    )}
                     {tool === 'props' && (
                         <PropLibrary
                             pictures={library}
@@ -1156,6 +1262,16 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 />
             )}
 
+            {/* In Edit only for now, with the tools that move monsters, so one can be dragged onto it
+                even while it is empty. */}
+            {mode === 'edit' && (tool === 'monsters' || tool === 'select' || tool === 'pick') && (
+                <Tray
+                    monsters={tray}
+                    onPresetDrop={tool === 'monsters' ? (presetId) => fail(monsterControls.placeMonster(presetId, active.id, null)) : undefined}
+                    onMenu={(id, at) => setMenu({ id, at })}
+                />
+            )}
+
             {menuToken && (
                 <TokenMenu
                     token={menuToken}
@@ -1166,7 +1282,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                     onSetConditions={(conditions) => menuControls.setConditions(menuToken.id, conditions)}
                     onSetSize={(size) => menuControls.setSize(menuToken.id, size)}
                     onHit={
-                        playing
+                        playing && !menuOnTray
                             ? () =>
                             {
                                 startTargets();
@@ -1175,7 +1291,16 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                             }
                             : undefined
                     }
-                    onHide={menuMonster ? () => fail(monsterControls.hide(menuToken.id, !menuToken.hidden)) : undefined}
+                    onHide={menuMonster && !menuOnTray ? () => fail(monsterControls.hide(menuToken.id, !menuToken.hidden)) : undefined}
+                    onTray={
+                        menuMonster && !menuOnTray && !playing
+                            ? () =>
+                            {
+                                setMenu(null);
+                                fail(monsterControls.stage(menuToken.id, null, true));
+                            }
+                            : undefined
+                    }
                     onSetDetails={menuMonster ? (details) => monsterControls.setMonster(menuToken.id, details) : undefined}
                     onStatBlock={menuPreset ? () => setReading(reading === menuPreset.id ? null : menuPreset.id) : undefined}
                     statBlockOpen={Boolean(menuPreset) && reading === menuPreset?.id}

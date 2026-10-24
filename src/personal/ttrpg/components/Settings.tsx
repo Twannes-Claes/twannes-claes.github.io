@@ -19,9 +19,11 @@ const shortcuts: { title: string; keys: [string, string][] }[] = [
         title: 'Edit tools',
         keys: [
             ['V or Space', 'Move around'],
+            ['B', 'Select'],
             ['W', 'Walls and doors'],
             ['E', 'Erase'],
             ['P', 'Props'],
+            ['M', 'Monsters'],
             ['S', 'Spawn point'],
             ['G', 'Grid'],
             ['Ctrl+Z', 'Undo'],

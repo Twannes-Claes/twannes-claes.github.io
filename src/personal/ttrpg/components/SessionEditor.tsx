@@ -115,6 +115,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const moveToken = useMutation(api.play.move);
     const kickPlayer = useMutation(api.play.kick);
     const hideNpc = useMutation(api.play.hide);
+    const stageNpc = useMutation(api.play.stage);
     const removeNpc = useMutation(api.play.removeMonster);
     const setStats = useMutation(api.play.setStats);
     const setConditions = useMutation(api.play.setConditions);
@@ -172,9 +173,10 @@ function Session({ sessionId, debug }: SessionEditorProps)
             kick: (tokenId) => friendly(kickPlayer({ tokenId: tokenId as Id<'tokens'> })),
             monsters: monsters ?? noMonsters,
             placeMonster: (presetId, scenarioId, at) =>
-                friendly(placeMonster({ sessionId: id, scenarioId, presetId: presetId as Id<'presets'>, x: at.x, y: at.y })),
+                friendly(placeMonster({ sessionId: id, scenarioId, presetId: presetId as Id<'presets'>, at })),
             setMonster: (tokenId, monster) => friendly(setMonster({ tokenId: tokenId as Id<'tokens'>, ...monster })),
             hide: (tokenId, hidden) => friendly(hideNpc({ tokenId: tokenId as Id<'tokens'>, hidden })),
+            stage: (tokenId, at, hidden) => friendly(stageNpc({ tokenId: tokenId as Id<'tokens'>, at, hidden })),
             removeMonster: (tokenId) => friendly(removeNpc({ tokenId: tokenId as Id<'tokens'> })),
             setStats: (tokenId, stats) => friendly(setStats({ tokenId: tokenId as Id<'tokens'>, ...stats })),
             setConditions: (tokenId, conditions) => friendly(setConditions({ tokenId: tokenId as Id<'tokens'>, conditions })),

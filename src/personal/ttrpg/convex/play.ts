@@ -151,7 +151,7 @@ async function respawn(ctx: MutationCtx, session: Doc<'sessions'>, scenarioId: s
 
     const tokens = await tokensOf(ctx, session._id);
     const players = tokens.filter((token) => token.kind === 'player');
-    const monsters = tokens.filter((token) => token.kind === 'npc' && token.scenarioId === scenarioId);
+    const monsters = tokens.filter((token) => token.kind === 'npc' && token.scenarioId === scenarioId && token.tray !== true);
     const spots = spawnSpots(scenario, players, monsters);
 
     for (const [index, player] of players.entries())
@@ -284,7 +284,7 @@ export const tokens = query({
 /** A token as the host's screen gets it, everything but its storage and bookkeeping. */
 function tokenOf(doc: Doc<'tokens'>): Token
 {
-    const { kind, name, color, size, speed, avatar, x, y, path, movedAt, hidden, conditions } = doc;
+    const { kind, name, color, size, speed, avatar, x, y, path, movedAt, hidden, tray, conditions } = doc;
     const { hp, maxHp, tempHp, ac, perception, downs, presetId } = doc;
 
     return {
@@ -300,6 +300,7 @@ function tokenOf(doc: Doc<'tokens'>): Token
         path,
         movedAt,
         hidden,
+        tray,
         hp,
         maxHp,
         tempHp,
@@ -558,7 +559,7 @@ export const join = mutation({
         if (all.filter((token) => token.kind === 'player').length >= maxPlayers)
             throw new ConvexError('The table is full.');
 
-        const here = all.filter((token) => token.scenarioId === session.activeScenarioId);
+        const here = all.filter((token) => token.scenarioId === session.activeScenarioId && token.tray !== true);
         const [spot] = spawnSpots(scenario, [{ size }], here);
 
         const tokenId = await ctx.db.insert('tokens', {
@@ -834,12 +835,17 @@ async function requireMonster(ctx: MutationCtx, tokenId: Id<'tokens'>): Promise<
 }
 
 /**
- * The host drags a preset onto a map, in Edit, whether the session runs or not, see monsterFrom in
- * map/presets.ts and Monster staging in PLAN.md.
+ * The host drags a preset onto a map, or with no point onto its tray, in Edit, whether the session
+ * runs or not, see monsterFrom in map/presets.ts and Monster staging in PLAN.md.
  */
 export const placeMonster = mutation({
-    args: { sessionId: v.id('sessions'), scenarioId: v.string(), presetId: v.id('presets'), x: v.number(), y: v.number() },
-    handler: async (ctx, { sessionId, scenarioId, presetId, x, y }) =>
+    args: {
+        sessionId: v.id('sessions'),
+        scenarioId: v.string(),
+        presetId: v.id('presets'),
+        at: v.union(v.object({ x: v.number(), y: v.number() }), v.null()),
+    },
+    handler: async (ctx, { sessionId, scenarioId, presetId, at }) =>
     {
         const session = await requireSession(ctx, sessionId);
         const preset = await ctx.db.get('presets', presetId);
@@ -851,7 +857,7 @@ export const placeMonster = mutation({
         if (!scenario)
             throw new ConvexError('That map is not saved yet. Wait for Saved and try again.');
 
-        if (!onScenario(scenario, { x, y }))
+        if (at && !onScenario(scenario, at))
             throw new ConvexError('That is off the map.');
 
         const all = await tokensOf(ctx, sessionId);
@@ -861,7 +867,10 @@ export const placeMonster = mutation({
 
         const names = new Set(all.filter((token) => token.scenarioId === scenarioId).map((token) => token.name));
 
-        await ctx.db.insert('tokens', { sessionId, scenarioId, presetId, ...monsterFrom(preset, scenario.grid, { x, y }, names) });
+        // One on the tray stands on the spawn point until it is dragged onto the map.
+        const monster = monsterFrom(preset, scenario.grid, at ?? scenario.spawn, names);
+
+        await ctx.db.insert('tokens', { sessionId, scenarioId, presetId, ...monster, tray: at ? undefined : true });
 
         return null;
     },
@@ -894,6 +903,33 @@ export const hide = mutation({
     {
         await requireMonster(ctx, tokenId);
         await ctx.db.patch('tokens', tokenId, { hidden });
+
+        return null;
+    },
+});
+
+/**
+ * The host puts a monster on its map's tray, hidden, or with a point takes it off onto the map
+ * there, hidden or not as the host says. See Monster staging in PLAN.md.
+ */
+export const stage = mutation({
+    args: { tokenId: v.id('tokens'), at: v.union(v.object({ x: v.number(), y: v.number() }), v.null()), hidden: v.boolean() },
+    handler: async (ctx, { tokenId, at, hidden }) =>
+    {
+        const token = await requireMonster(ctx, tokenId);
+        const scenario = await scenarioOf(ctx, token.sessionId, token.scenarioId);
+
+        if (!scenario)
+            throw new ConvexError('That map is not saved yet. Wait for Saved and try again.');
+
+        if (at && !onScenario(scenario, at))
+            throw new ConvexError('That is off the map.');
+
+        const walk = { path: undefined, movedAt: undefined, leavingUntil: undefined };
+
+        await ctx.db.patch('tokens', tokenId, at ? { ...at, ...walk, tray: undefined, hidden } : { ...walk, tray: true, hidden: true, inSight: false });
+        await dropDraftOf(ctx, tokenId);
+        await refreshSight(ctx, token.sessionId, scenario);
 
         return null;
     },
@@ -1385,7 +1421,7 @@ export const hit = mutation({
         {
             const token = await ctx.db.get('tokens', tokenId);
 
-            if (!token || token.sessionId !== sessionId || token.scenarioId !== scenarioId)
+            if (!token || token.sessionId !== sessionId || token.scenarioId !== scenarioId || token.tray === true)
                 continue;
 
             const seen = token.kind === 'player' || (token.inSight === true && token.hidden !== true);

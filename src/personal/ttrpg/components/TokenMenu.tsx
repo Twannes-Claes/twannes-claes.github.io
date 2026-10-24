@@ -1,4 +1,4 @@
-import { faBookOpen, faBurst, faEye, faEyeSlash, faTrash, faUserXmark, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faBookOpen, faBurst, faEye, faEyeSlash, faInbox, faTrash, faUserXmark, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useEffectEvent, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -30,6 +30,8 @@ interface TokenMenuProps
     onHit?: () => void;
     /** Monsters only: hide from the players, or show again. */
     onHide?: () => void;
+    /** A monster on the map: off it onto the tray, hidden, see Tray.tsx. */
+    onTray?: () => void;
     /** Monsters only: name, ring and Goes down at 0. */
     onSetDetails?: (details: { name: string; color: string; downs: boolean }) => Promise<void>;
     /** A monster placed from a preset: opens or closes its stat block. */
@@ -54,6 +56,7 @@ export function TokenMenu({
     onSetSize,
     onHit,
     onHide,
+    onTray,
     onSetDetails,
     onStatBlock,
     statBlockOpen = false,
@@ -174,6 +177,12 @@ export function TokenMenu({
                     >
                         <FontAwesomeIcon icon={token.hidden ? faEyeSlash : faEye} />
                         {token.hidden ? 'Hidden' : 'Hide'}
+                    </button>
+                )}
+                {onTray && (
+                    <button type="button" className="ttrpg-segment" title="Off the map onto the tray, hidden" onClick={onTray}>
+                        <FontAwesomeIcon icon={faInbox} />
+                        To tray
                     </button>
                 )}
                 {onStatBlock && (

@@ -118,6 +118,11 @@ export interface Token
     /** A monster the game master keeps out of sight, even where players could see it. */
     hidden?: boolean;
     /**
+     * A monster waiting on its map's tray, off the grid, only for the game master, see Monster
+     * staging in PLAN.md. Its x and y mean nothing until it is dragged onto the map.
+     */
+    tray?: boolean;
+    /**
      * The numbers, for the game master and the token's own player only. Missing on a token
      * without them, like a monster added without HP, and on everyone else's screen, see
      * withoutNumbers in map/health.ts.
@@ -292,11 +297,13 @@ export interface Live
     kick: (tokenId: string) => Promise<void>;
     /** Every monster of the session on all its maps, for Edit and a GM view not yet started. */
     monsters: (Token & { scenarioId: string })[];
-    /** Puts a monster from a preset on a map, hidden, around a point. */
-    placeMonster: (presetId: string, scenarioId: string, at: Point) => Promise<void>;
+    /** Puts a monster from a preset on a map, hidden, around a point, or with null on its tray. */
+    placeMonster: (presetId: string, scenarioId: string, at: Point | null) => Promise<void>;
     /** Renames a monster, changes its ring, or whether it goes down at 0. */
     setMonster: (tokenId: string, monster: Pick<Token, 'name' | 'color'> & { downs: boolean }) => Promise<void>;
     hide: (tokenId: string, hidden: boolean) => Promise<void>;
+    /** Puts a monster on its map's tray, hidden, or with a point takes it off onto the map there. */
+    stage: (tokenId: string, at: Point | null, hidden: boolean) => Promise<void>;
     removeMonster: (tokenId: string) => Promise<void>;
     /** Sets any token's HP, AC and Perception. */
     setStats: (tokenId: string, stats: Stats) => Promise<void>;
@@ -361,7 +368,7 @@ export interface Live
  */
 export type MonsterControls = Pick<
     Live,
-    'system' | 'presets' | 'savePreset' | 'removePreset' | 'placeMonster' | 'setMonster' | 'hide' | 'removeMonster' | 'setStats' | 'setConditions' | 'setSize'
+    'system' | 'presets' | 'savePreset' | 'removePreset' | 'placeMonster' | 'setMonster' | 'hide' | 'stage' | 'removeMonster' | 'setStats' | 'setConditions' | 'setSize'
 >;
 
 /**

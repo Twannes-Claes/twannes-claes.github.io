@@ -1,11 +1,12 @@
 import { faFileImport, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useState, type ChangeEvent, type ReactNode } from 'react';
+import { useRef, useState, type ChangeEvent, type ReactNode, type WheelEvent } from 'react';
 
 import type { GameSystem, Preset, Token } from '../types';
 
 import { statBlockTemplates, statsOf } from '../content/statBlocks';
 
+import { carry, readyCarry } from './carry';
 import { presetDragType } from './MapCanvas';
 import { PresetDialog, PresetFace } from './PresetDialog';
 
@@ -40,6 +41,21 @@ interface PresetLibraryProps
 export function PresetLibrary({ presets, system, monsters, onSave, onRemove, onDone, onError, children }: PresetLibraryProps)
 {
     const [writing, setWriting] = useState<Preset | Omit<Preset, 'id'> | null>(null);
+    const list = useRef<HTMLDivElement>(null);
+
+    // The presets and the heading stay put, so a wheel over them scrolls the monsters under them,
+    // as the whole panel would. Over presets with more to show, those scroll first.
+    const wheel = (event: WheelEvent) =>
+    {
+        const target = event.target instanceof Element ? event.target : null;
+        const library = target?.closest('.ttrpg-library');
+        const more = library && (event.deltaY > 0 ? library.scrollTop + library.clientHeight < library.scrollHeight - 1 : library.scrollTop > 0);
+
+        if (!list.current || !target || list.current.contains(target) || more)
+            return;
+
+        list.current.scrollBy({ top: event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY });
+    };
 
     // Each .md file picked becomes a preset, named by its # heading or else by the file.
     const upload = (event: ChangeEvent<HTMLInputElement>) =>
@@ -66,10 +82,11 @@ export function PresetLibrary({ presets, system, monsters, onSave, onRemove, onD
     };
 
     return (
-        <section className="ttrpg-panel ttrpg-properties ttrpg-settings ttrpg-presets" aria-label="Monsters">
+        <section className="ttrpg-panel ttrpg-properties ttrpg-settings ttrpg-presets" aria-label="Monsters" onWheel={wheel}>
             <h2>Monsters</h2>
 
-            <div className="ttrpg-popover__scroll">
+            {/* The presets stay put, so a long list of monsters under them never pushes them away. */}
+            <div className="ttrpg-presets__top">
                 {presets.length === 0 ? (
                     <p className="ttrpg-empty">Make a preset to drag monsters onto the map.</p>
                 ) : (
@@ -81,11 +98,14 @@ export function PresetLibrary({ presets, system, monsters, onSave, onRemove, onD
                                     className="ttrpg-library__item ttrpg-preset-tile"
                                     title={`${preset.name}: drag onto the map, or click to edit`}
                                     draggable
+                                    onPointerEnter={readyCarry}
                                     onDragStart={(event) =>
                                     {
                                         event.dataTransfer.setData(presetDragType, preset.id);
                                         event.dataTransfer.effectAllowed = 'copy';
+                                        carry(event, { ...preset, size: statsOf(preset.markdown).size ?? 'medium' });
                                     }}
+                                    onDragEnd={() => carry(null, null)}
                                     onClick={() => setWriting(preset)}
                                 >
                                     <PresetFace preset={preset} />
@@ -111,16 +131,15 @@ export function PresetLibrary({ presets, system, monsters, onSave, onRemove, onD
                         <input type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" multiple className="ttrpg-hidden-input" onChange={upload} />
                     </label>
                 </div>
+            </div>
 
-                {monsters.length > 0 && (
-                    <>
-                        <h3 className="ttrpg-subhead">{`On this map · ${monsters.length}`}</h3>
-                        {children}
-                    </>
-                )}
+            {monsters.length > 0 && <h3 className="ttrpg-subhead ttrpg-presets__head">{`On this map · ${monsters.length}`}</h3>}
+
+            <div ref={list} className="ttrpg-popover__scroll">
+                {monsters.length > 0 && children}
 
                 <ul className="ttrpg-keys" aria-label="Keys">
-                    <li>Drag a preset onto the map. It starts hidden.</li>
+                    <li>Drag a preset onto the map, or onto the tray to keep it ready. It starts hidden.</li>
                 </ul>
             </div>
 

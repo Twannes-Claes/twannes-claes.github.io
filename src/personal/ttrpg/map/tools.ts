@@ -19,6 +19,7 @@ import { confirmAction } from '../services/confirm.ts';
 
 export type ToolId =
     | 'select'
+    | 'pick'
     | 'walls'
     | 'rings'
     | 'erase'
@@ -244,7 +245,7 @@ function dot(ctx: CanvasRenderingContext2D, at: Point, radius: number, colour: s
 }
 
 /** The dashed outline of a dragged box, with a faint fill when it marks an area. */
-function drawBox(ctx: CanvasRenderingContext2D, { start, end }: Drag, zoom: number, colour: string, fill = false)
+export function drawBox(ctx: CanvasRenderingContext2D, { start, end }: Drag, zoom: number, colour: string, fill = false)
 {
     if (fill)
     {
@@ -1371,6 +1372,7 @@ export function createTool(
             return revealCircleTool(reveal, id === 'hide-circle');
         // Monsters come from their panel, dragged onto the map, so the map itself only pans.
         case 'select':
+        case 'pick':
         case 'align':
         case 'monsters':
             return null;

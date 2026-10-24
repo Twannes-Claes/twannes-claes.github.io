@@ -464,11 +464,29 @@ html:has(.ttrpg) {
     padding: 1rem;
 }
 
-/* The Monsters panel in Edit, which grows with a monster opened: the title stays and the rest
-   scrolls, with the bar in the padding like a popover's, between the rounded corners. */
+/* The Monsters panel in Edit, which grows with monsters and one opened: the title, the presets
+   and the list's heading stay, and the list scrolls, with the bar in the padding like a popover's,
+   between the rounded corners. */
 .ttrpg-properties.ttrpg-presets {
     display: flex;
     flex-direction: column;
+}
+
+.ttrpg-presets__top {
+    display: grid;
+    flex: none;
+    gap: 0.875rem;
+    margin-bottom: 0.875rem;
+}
+
+/* A few rows of presets at most, the rest scrolling inside, so the list keeps room under them. */
+.ttrpg-presets__top .ttrpg-library {
+    max-height: 30svh;
+}
+
+.ttrpg-presets__head {
+    flex: none;
+    margin-bottom: 0.875rem;
 }
 
 /*
@@ -874,6 +892,54 @@ html:has(.ttrpg) {
     object-fit: cover;
     /* A drag carries the tile, not the picture on its own. */
     pointer-events: none;
+}
+
+/* The open map's tray of monsters made ready, bottom right in Edit, under the maps and as wide,
+   see Tray.tsx. Its tiles are the presets', four to a row. */
+.ttrpg-tray {
+    position: fixed;
+    right: 16px;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    z-index: 10;
+    display: grid;
+    gap: 0.5rem;
+    width: 17rem;
+    padding: 0.75rem;
+    transition:
+        box-shadow 150ms var(--ttrpg-ease),
+        border-color 150ms var(--ttrpg-ease);
+    animation: ttrpg-drop 200ms var(--ttrpg-ease);
+}
+
+.ttrpg-tray .ttrpg-subhead {
+    padding-top: 0;
+    border-top: 0;
+}
+
+/* A preset held over it. */
+.ttrpg-tray--over {
+    border-color: var(--ttrpg-accent);
+    box-shadow:
+        0 0 0 3px color-mix(in srgb, var(--ttrpg-accent) 45%, transparent),
+        0 12px 32px rgb(0 0 0 / 0.35);
+}
+
+.ttrpg-tray__list {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    max-height: 30svh;
+    overflow: hidden auto;
+    scrollbar-width: thin;
+}
+
+.ttrpg-tray__empty {
+    padding: 0.75rem;
+    border: 1px dashed var(--ttrpg-edge);
+    border-radius: 10px;
+    color: var(--ttrpg-muted);
+    font-size: 0.8125rem;
+    text-align: center;
 }
 
 /* How much of the plan's storage is used, under the props. The track is a slider's, the props
@@ -2638,11 +2704,11 @@ button.ttrpg-row__main {
     margin-top: calc((1lh - 12px) / 2);
 }
 
-/* What the GM does to a token most, each its icon over its name, like the sizes. Four slots
+/* What the GM does to a token most, each its icon over its name, like the sizes. Five slots
    whatever the token offers, so a player's few are the same size as a monster's. */
 .ttrpg-token-menu__actions {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 4px;
 }
 

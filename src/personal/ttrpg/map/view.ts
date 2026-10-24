@@ -27,7 +27,9 @@ import {
     drawHit,
     drawPill,
     drawPing,
+    drawFootprint,
     drawRoute,
+    drawSelected,
     drawTarget,
     drawUnknownStep,
     render,
@@ -38,8 +40,8 @@ import {
     type Scene,
     type Viewport,
 } from './render.ts';
-import { anchorAt, footprintCenter, footprintKeys } from './size.ts';
-import { createTool, drawMark, type MapTool, type ToolId, type ToolPointer } from './tools.ts';
+import { anchorAt, footprint, footprintCenter, footprintKeys } from './size.ts';
+import { createTool, drawBox, drawMark, type MapTool, type ToolId, type ToolPointer } from './tools.ts';
 import { insidePolygon, sightSegments, visibilityPolygon, type Segment } from './visibility.ts';
 import { startWalk, walkAt, type Walk } from './walk.ts';
 
@@ -117,6 +119,8 @@ export interface MapViewOptions
     onMark?: (mark: Mark | null) => void;
     /** A token pressed while picking targets, to add or take off, see setTargets. */
     onTarget?: (id: string) => void;
+    /** The tokens the Select tool picks now, by a click, Shift and a click, or a box, see setSelection. */
+    onSelect?: (ids: string[]) => void;
     /**
      * A right click on a token, with nothing half done, at that point of the page.
      * True when the page opened its menu, otherwise the click cancels as usual, see contextMenu.
@@ -167,6 +171,16 @@ export interface MapView
      * not. While picking, a press on a token goes to onTarget rather than moving it.
      */
     setTargets: (ids: string[] | null) => void;
+    /**
+     * The Select tool in Edit, with the tokens picked so far ringed, or null without it. A press on
+     * a token picks it and drags every picked one together, see onSelect; on empty ground it boxes.
+     */
+    setSelection: (ids: string[] | null) => void;
+    /**
+     * A monster dragged from the presets or the tray, drawn where it would land, lifted, hidden
+     * like it will be, over the cells it will take. Null once it leaves the map or lands.
+     */
+    setGhost: (ghost: { monster: Pick<Token, 'name' | 'color' | 'avatar' | 'size'>; at: Point } | null) => void;
     /** What killed monsters left on the map, see Decal. */
     setDecals: (decals: Decal[]) => void;
     /** Which blood shows, see BloodSettings. */
@@ -253,8 +267,17 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     let urgent = false;
     /** Where each finger or the mouse was last seen, by pointer id, for panning and pinching. */
     const pointers = new Map<number, Point>();
-    /** The token being dragged freely and the pointer dragging it. */
-    let dragging: { id: string; pointerId: number; from: Point } | null = null;
+    /**
+     * The token being dragged freely, the pointer dragging it and where it started, with every
+     * token going along and where each started: the tokens picked with the Select tool, or itself.
+     */
+    let dragging: { id: string; pointerId: number; from: Point; group: { id: string; from: Point }[] } | null = null;
+    /** The tokens picked with the Select tool in Edit, or null without it, see setSelection. */
+    let selection: string[] | null = null;
+    /** A monster dragged from the presets or the tray over the map, see setGhost. */
+    let ghost: { monster: Pick<Token, 'name' | 'color' | 'avatar' | 'size'>; at: Point } | null = null;
+    /** A box being dragged on empty ground with the Select tool, in world pixels. */
+    let boxing: { pointerId: number; start: Point; end: Point; add: boolean } | null = null;
     let route: Route | null = null;
     let pending: PendingMove | null = null;
     /** Set when a right button press already cancelled a move, so its menu event does not too. */
@@ -702,7 +725,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
         for (const token of visible)
         {
-            const moving = walks.has(token.id) || dragging?.id === token.id;
+            const moving = walks.has(token.id) || held(token.id);
             const state = moving ? stateOf(token) : undefined;
 
             if (state !== 'bloodied' && state !== 'critical' && state !== 'down')
@@ -815,11 +838,26 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
         layDrops(visible, time);
 
+        // The monster being dragged on, lined up with the grid the way it will land, see monsterFrom
+        // in map/presets.ts.
+        const { grid } = scenario;
+        const anchor = ghost && grid.type !== 'none' ? anchorAt(grid, ghost.at, ghost.monster.size) : null;
+        const landing = ghost && {
+            ...ghost.monster,
+            id: 'ghost',
+            kind: 'npc' as const,
+            speed: 0,
+            ...(anchor ? footprintCenter(grid, anchor, ghost.monster.size) : ghost.at),
+            hidden: true,
+            alpha: 0.8,
+            lift: 1,
+        };
+
         const scene: Scene = {
             scenario,
             background,
             picture: loaded,
-            tokens: fadeTokens(visible, time),
+            tokens: landing ? [...fadeTokens(visible, time), landing] : fadeTokens(visible, time),
             editing: !fogEnabled,
             own,
             ownRestedAt,
@@ -839,6 +877,9 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
                 if (path)
                     drawRoute(context, path.points, camera.zoom, path.colour);
+
+                if (landing)
+                    drawFootprint(context, grid, anchor ? footprint(grid, anchor, landing.size) : [], landing, tokenRadius(grid, landing.size), camera.zoom);
 
             },
         };
@@ -878,6 +919,19 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
             }
         }
+
+        if (selection)
+        {
+            for (const token of scene.tokens)
+            {
+                if (selection.includes(token.id))
+                    drawSelected(context, token, tokenRadius(scenario.grid, token.size), camera.zoom);
+
+            }
+        }
+
+        if (boxing)
+            drawBox(context, boxing, camera.zoom, highlight, true);
 
         // The name of the condition badge the mouse rests on or a finger pressed, over the rest.
         const badge = badgePoint && conditionBadgeAt(visible, scenario.grid, badgePoint);
@@ -1031,12 +1085,24 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         }
     };
 
-    const moveToken = (id: string, to: Point) =>
+    /** Puts tokens down where given, by id, all in one go. */
+    const moveTokens = (moves: Map<string, Point>) =>
     {
-        tokens = tokens.map((token) => (token.id === id ? { ...token, x: to.x, y: to.y } : token));
+        tokens = tokens.map((token) =>
+        {
+            const to = moves.get(token.id);
+
+            return to ? { ...token, x: to.x, y: to.y } : token;
+        });
         refreshFog();
         redraw();
     };
+
+    /** Whether a token is being dragged, on its own or with the ones picked. */
+    const held = (id: string) => dragging?.group.some((member) => member.id === id) === true;
+
+    /** The cursor at rest: the tool's, an arrow for the Select tool, or the stylesheet's grab hand. */
+    const restCursor = () => (tool ? tool.cursor : selection ? 'default' : '');
 
     /** What a route costs: counted per cell on a grid, by length without one. */
     const routeFeet = (current: Scenario, { cells, points }: Route) =>
@@ -1202,6 +1268,44 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             return;
         }
 
+        // The Select tool: a press on a token picks it, or with Shift adds it or lets it go, and
+        // drags every picked one along; on empty ground it starts a box, so it never pans.
+        if (idle && selection && scenario && event.button === 0)
+        {
+            const point = local(event);
+            const token = tokenAt(point, scenario);
+
+            if (!token)
+            {
+                const world = toWorld(camera, point);
+
+                boxing = { pointerId: event.pointerId, start: world, end: world, add: event.shiftKey };
+
+                return;
+            }
+
+            if (event.shiftKey)
+            {
+                options.onSelect?.(selection.includes(token.id) ? selection.filter((id) => id !== token.id) : [...selection, token.id]);
+
+                return;
+            }
+
+            const group = selection.includes(token.id) ? selection : [token.id];
+
+            if (group !== selection)
+                options.onSelect?.(group);
+
+            dragging = {
+                id: token.id,
+                pointerId: event.pointerId,
+                from: { x: token.x, y: token.y },
+                group: tokens.filter((other) => group.includes(other.id)).map((other) => ({ id: other.id, from: { x: other.x, y: other.y } })),
+            };
+
+            return;
+        }
+
         if (idle && tool && scenario && tool.down(toolPointer(event, scenario)))
         {
             toolPointerId = event.pointerId;
@@ -1248,7 +1352,11 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         }
 
         if (token)
-            dragging = { id: token.id, pointerId: event.pointerId, from: { x: token.x, y: token.y } };
+        {
+            const from = { x: token.x, y: token.y };
+
+            dragging = { id: token.id, pointerId: event.pointerId, from, group: [{ id: token.id, from }] };
+        }
         else
             pointers.set(event.pointerId, point);
 
@@ -1292,10 +1400,24 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             return;
         }
 
+        if (boxing?.pointerId === event.pointerId)
+        {
+            boxing = { ...boxing, end: toWorld(camera, local(event)) };
+            redraw();
+
+            return;
+        }
+
+        // The pressed token follows the pointer and the rest of the group keeps its place around it.
         if (dragging?.pointerId === event.pointerId)
         {
             if (scenario)
-                moveToken(dragging.id, onMap(scenario, toWorld(camera, local(event))));
+            {
+                const to = onMap(scenario, toWorld(camera, local(event)));
+                const { from } = dragging;
+
+                moveTokens(new Map(dragging.group.map((member) => [member.id, { x: member.from.x + to.x - from.x, y: member.from.y + to.y - from.y }])));
+            }
 
             return;
         }
@@ -1385,8 +1507,23 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         if (middlePan === event.pointerId)
         {
             middlePan = null;
-            // The tool's cursor again, or the stylesheet's grab hand without one.
-            canvas.style.cursor = tool ? tool.cursor : '';
+            canvas.style.cursor = restCursor();
+        }
+
+        // A box picks every token whose middle is inside it, with Shift added to those picked. A
+        // click on empty ground, a box around nothing, lets them all go.
+        if (boxing?.pointerId === event.pointerId)
+        {
+            const { start, end, add } = boxing;
+            const inside = tokens
+                .filter((token) => token.x >= Math.min(start.x, end.x) && token.x <= Math.max(start.x, end.x) && token.y >= Math.min(start.y, end.y) && token.y <= Math.max(start.y, end.y))
+                .map((token) => token.id);
+
+            boxing = null;
+            options.onSelect?.(add ? [...new Set([...(selection ?? []), ...inside])] : inside);
+            redraw();
+
+            return;
         }
 
         if (route?.pointerId === event.pointerId)
@@ -1418,37 +1555,37 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         if (dragging?.pointerId !== event.pointerId || !scenario)
             return;
 
-        const { id } = dragging;
-        const token = tokens.find((candidate) => candidate.id === id);
+        const { group } = dragging;
 
         dragging = null;
 
-        if (!token)
-            return;
-
-        // Lands lined up with the grid, its whole footprint in cells; wherever it was let go
+        // Each lands lined up with the grid, its whole footprint in cells; wherever it was let go
         // without a grid.
         const { grid } = scenario;
-        const to =
-            grid.type === 'none'
-                ? { x: token.x, y: token.y }
-                : footprintCenter(grid, anchorAt(grid, token, token.size), token.size);
+        const landed = new Map(
+            tokens
+                .filter((token) => group.some((member) => member.id === token.id))
+                .map((token) => [token.id, grid.type === 'none' ? { x: token.x, y: token.y } : footprintCenter(grid, anchorAt(grid, token, token.size), token.size)]),
+        );
 
-        moveToken(id, to);
-        options.onTokenMove?.(id, to);
+        moveTokens(landed);
+
+        for (const [id, to] of landed)
+            options.onTokenMove?.(id, to);
     };
 
     /** Drops a path being drawn, or puts a dragged token back. False when neither was going on. */
     const cancelMove = () =>
     {
-        if (!route && !dragging)
+        if (!route && !dragging && !boxing)
             return false;
 
         if (dragging)
-            moveToken(dragging.id, dragging.from);
+            moveTokens(new Map(dragging.group.map((member) => [member.id, member.from])));
 
         route = null;
         dragging = null;
+        boxing = null;
         redraw();
 
         return true;
@@ -1624,7 +1761,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
                 {
                     const previous = before.get(token.id);
 
-                    if (!previous || walks.has(token.id) || dragging?.id === token.id || stateOf(token) !== 'down')
+                    if (!previous || walks.has(token.id) || held(token.id) || stateOf(token) !== 'down')
                         continue;
 
                     const length = distance(previous, token);
@@ -1638,10 +1775,10 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
                 }
             }
 
-            // A token in mid drag keeps following the finger rather than jumping back.
-            const held = dragging ? tokens.find((token) => token.id === dragging?.id) : undefined;
+            // Tokens in mid drag keep following the finger rather than jumping back.
+            const holding = new Map(tokens.filter((token) => held(token.id)).map((token) => [token.id, token]));
 
-            tokens = held ? next.map((token) => (token.id === held.id ? held : token)) : next;
+            tokens = next.map((token) => holding.get(token.id) ?? token);
             focusOwn();
             // From where walking tokens are now: their end would light up first and jump back.
             refreshFog(tokensAt(performance.now()));
@@ -1662,8 +1799,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
             tool = createTool(id, changeScenario, placing, reveal, snap, shareMark, (ids) => options.onMonstersErase?.(ids));
             toolPointerId = null;
-            // The tool's cursor, or the stylesheet's grab hand when there is no tool.
-            canvas.style.cursor = tool ? tool.cursor : '';
+            canvas.style.cursor = restCursor();
             redraw();
         },
         setPending: (move) =>
@@ -1702,6 +1838,21 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         setTargets: (ids) =>
         {
             targets = ids;
+            redraw();
+        },
+        setGhost: (next) =>
+        {
+            ghost = next;
+            redraw();
+        },
+        setSelection: (ids) =>
+        {
+            selection = ids;
+
+            if (!ids)
+                boxing = null;
+
+            canvas.style.cursor = restCursor();
             redraw();
         },
         setBlood: (next) =>

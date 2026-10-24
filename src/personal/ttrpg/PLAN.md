@@ -808,6 +808,11 @@ Built into play mode neatly, it should look and feel good.
   minute without a change. A ruler drawn in the Player view's own window stays on it, as that
   window runs as the host and would get it back as the GM's. Cones, lines and cubes can join the
   pop-out the same way, see 16.
+- **Select tool in Edit, built** (B, `components/SelectPanel.tsx`): click a token, Shift+click to
+  add or take one off, drag a box on empty ground, Ctrl+A for all, Esc for none, each picked one
+  ringed (`setSelection` in `map/view.ts`). Dragging a picked token moves them all, onto the grid
+  or onto the tray; the panel hides, shows or trays the picked monsters at once. Removing stays the
+  eraser's, and damage and healing the GM view's Attack, which already picks several.
 - **The demo map's credit** shows on the public demo only, which its licence asks for; sessions
   are played in private and show the map alone.
 
@@ -853,6 +858,17 @@ Built into play mode neatly, it should look and feel good.
   it is needed. The right-click menu (13) hides one again.
 - Monster presets (7) are what the tray is filled from.
 - What a monster killed in one session is at the next Start shows in testing.
+- **Built, in Edit only for now.** A monster on the tray is a token with `tray` set
+  (`components/Tray.tsx`): tiles like the presets', bottom right with the Move and Monsters tools.
+  A preset dropped on it lands there (`placeMonster` without a point); a monster dragged off the
+  map and let go over it, or **To tray** in its right-click menu, goes onto it, hidden
+  (`play.stage`). Dragged from the tray onto the map it lines up with the grid, still hidden, and
+  the GM shows it from the GM view when it is needed. A click on a tile opens its menu. A preset
+  or tray tile dragged over the map shows the monster where it will land, lifted and hidden, over
+  the cells it will take, instead of the browser's copy of the tile (`components/carry.ts`,
+  `setGhost` in `map/view.ts`). `tokensOn` in
+  `convex/sight.ts` leaves tray monsters out, so sight, turns, hits and the players' screens never
+  see them. A monster killed is deleted, so it is gone at the next Start.
 
 ### 15. Session drawings
 

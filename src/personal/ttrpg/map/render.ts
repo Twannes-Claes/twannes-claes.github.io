@@ -1,6 +1,6 @@
 import { faEyeSlash, faShield, faSkull, type IconDefinition } from '@fortawesome/free-solid-svg-icons';
 
-import type { CreatureSize, Decal, Grid, HealthState, Point, Scenario, Token } from '../types';
+import type { Cell, CreatureSize, Decal, Grid, HealthState, Point, Scenario, Token } from '../types';
 import { conditionKind, type ConditionKind } from '../content/conditions.ts';
 
 import { toWorld, type Camera } from './camera.ts';
@@ -372,6 +372,57 @@ export function drawTarget(ctx: CanvasRenderingContext2D, at: Point, radius: num
         ctx.lineTo(at.x + dx * (ring + 6 / zoom), at.y + dy * (ring + 6 / zoom));
     }
 
+    ctx.stroke();
+    ctx.restore();
+}
+
+/**
+ * The cells a monster dragged onto the map will take, under where it would land, see setGhost in
+ * map/view.ts. Without a grid, the round space it takes.
+ */
+export function drawFootprint(ctx: CanvasRenderingContext2D, grid: Grid, cells: Cell[], at: Point, radius: number, zoom: number)
+{
+    ctx.save();
+    ctx.fillStyle = faded(highlight, 0.22);
+    ctx.strokeStyle = faded(highlight, 0.85);
+    ctx.lineWidth = 2 / zoom;
+    ctx.lineJoin = 'round';
+
+    if (cells.length === 0)
+    {
+        ctx.beginPath();
+        ctx.arc(at.x, at.y, radius * 1.15, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+    }
+
+    for (const cell of cells)
+    {
+        const corners = cellCorners(grid, cell);
+
+        ctx.beginPath();
+        corners.forEach((corner, index) => (index === 0 ? ctx.moveTo(corner.x, corner.y) : ctx.lineTo(corner.x, corner.y)));
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+    }
+
+    ctx.restore();
+}
+
+/** A token picked with the Select tool in Edit: a ring of the app's highlight, with a soft glow. */
+export function drawSelected(ctx: CanvasRenderingContext2D, at: Point, radius: number, zoom: number)
+{
+    const ring = radius + 5 / zoom;
+
+    ctx.save();
+    ctx.strokeStyle = faded(highlight, 0.35);
+    ctx.lineWidth = 8 / zoom;
+    ctx.beginPath();
+    ctx.arc(at.x, at.y, ring, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = highlight;
+    ctx.lineWidth = 2.5 / zoom;
     ctx.stroke();
     ctx.restore();
 }
