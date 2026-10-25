@@ -2711,6 +2711,31 @@ button.ttrpg-row__main {
     vertical-align: 1px;
 }
 
+/* A session players can join right now, on the dashboard, see SessionList.tsx: the red dot of
+   .ttrpg-live in the editor's top bar. */
+.ttrpg-tag--live {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--ttrpg-ink);
+}
+
+.ttrpg-tag--live::before {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #d9534a;
+    box-shadow: 0 0 0 0 rgb(217 83 74 / 0.6);
+    animation: ttrpg-live 2s ease-out infinite;
+    content: '';
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ttrpg-tag--live::before {
+        animation: none;
+    }
+}
+
 .ttrpg-row__detail {
     color: var(--ttrpg-muted);
     font-size: 0.8rem;

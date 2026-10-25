@@ -112,6 +112,7 @@ export const list = query({
                 name: session.name,
                 maps: session.order.length,
                 updatedAt: session.updatedAt,
+                live: session.live === true,
             }))
             .sort((a, b) => b.updatedAt - a.updatedAt);
     },

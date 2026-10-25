@@ -105,7 +105,10 @@ export function SessionList()
                                 />
                             ) : (
                                 <Link to={`/ttrpg/edit?s=${session.id}`} className="ttrpg-row__main">
-                                    <span className="ttrpg-row__name">{session.name}</span>
+                                    <span className="ttrpg-row__name">
+                                        {session.name}
+                                        {session.live && <span className="ttrpg-tag ttrpg-tag--live">Live</span>}
+                                    </span>
                                     <span className="ttrpg-row__detail">
                                         {`${session.maps} ${session.maps === 1 ? 'map' : 'maps'} · ${dateFormat.format(session.updatedAt)}`}
                                     </span>
