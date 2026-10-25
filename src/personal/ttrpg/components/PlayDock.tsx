@@ -16,14 +16,17 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
-import type { Scenario } from '../types';
+import type { Pen, Scenario } from '../types';
 
+import { highlight } from '../map/colours';
+
+import { DrawPicker } from './DrawPicker';
 import { AttackButton } from './HitSheet';
 import { RulerPicker } from './RulerPicker';
 import { useFullscreen } from './useScreen';
 
 /** What a press on the map does in play mode, besides drawing paths and dragging monsters. */
-export type PlayTool = 'open-doors' | 'measure' | 'area' | 'cone' | 'reveal' | 'reveal-circle' | 'hide' | 'hide-circle';
+export type PlayTool = 'open-doors' | 'measure' | 'area' | 'cone' | 'reveal' | 'reveal-circle' | 'hide' | 'hide-circle' | 'draw' | 'rub-out';
 
 /** Reveal's tool for a choice in its pop-out: uncover or hide, with a polygon or a circle. */
 function fogTool(hide: boolean, circle: boolean): PlayTool
@@ -38,6 +41,9 @@ interface PlayDockProps
 {
     tool: PlayTool;
     onTool: (tool: PlayTool) => void;
+    /** How the next line looks, and the GM's colour it starts in, see DrawPicker.tsx. */
+    pen: Pen;
+    onPen: (pen: Pen) => void;
     frozen: boolean;
     onFreeze: () => void;
     /** The maps of the session, to switch between. Players follow, see PLAN.md. */
@@ -67,7 +73,7 @@ interface PlayDockProps
 }
 
 /**
- * The game master's controls in the GM view, at the bottom: the map, the ruler, Reveal area,
+ * The game master's controls in the GM view, at the bottom: the map, the ruler, Draw, Reveal area,
  * Freeze, the fog and full screen. Ruler and Reveal toggle, and pressing the one that is on goes
  * back to opening doors with a click. While the ruler is on, a pop-out above it picks a line or a
  * circle, see RulerPicker.tsx. While Reveal is on, its pop-out picks uncover or hide, and a polygon
@@ -76,6 +82,8 @@ interface PlayDockProps
 export function PlayDock({
     tool,
     onTool,
+    pen,
+    onPen,
     frozen,
     onFreeze,
     scenarios,
@@ -122,6 +130,13 @@ export function PlayDock({
                 <RulerPicker
                     tool={tool}
                     onMeasure={(next) => onTool(next ?? 'open-doors')}
+                />
+                <DrawPicker
+                    tool={tool}
+                    onSketch={(next) => onTool(next ?? 'open-doors')}
+                    pen={pen}
+                    onPen={onPen}
+                    colour={highlight}
                 />
                 <AttackButton onClick={onAttack} />
                 <span className="ttrpg-pop">

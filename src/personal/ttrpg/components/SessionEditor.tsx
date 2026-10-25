@@ -4,7 +4,7 @@ import { ConvexError } from 'convex/values';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import type { Decal, Draft, Live, PictureBytes, Preset, PropPicture, Scenario, SharedMark, Token } from '../types';
+import type { Decal, Draft, Drawing, Live, PictureBytes, Preset, PropPicture, Scenario, SharedMark, Token } from '../types';
 
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
@@ -59,6 +59,7 @@ function presetPicture(picture: Blob | null): Promise<Id<'_storage'> | undefined
 const noTokens: Token[] = [];
 const noDrafts: Draft[] = [];
 const noMarks: SharedMark[] = [];
+const noDrawings: Drawing[] = [];
 const noDecals: Decal[] = [];
 const noPresets: Preset[] = [];
 const noMonsters: Live['monsters'] = [];
@@ -99,6 +100,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const decals = useQuery(api.play.decals, following ? { sessionId: id } : 'skip');
     const drafts = useQuery(api.play.drafts, following ? { sessionId: id } : 'skip');
     const marks = useQuery(api.play.marks, following ? { sessionId: id } : 'skip');
+    const drawings = useQuery(api.play.drawings, following ? { sessionId: id } : 'skip');
     const presets = useQuery(api.presets.list, following ? {} : 'skip');
     const monsters = useQuery(api.play.monsters, following ? { sessionId: id } : 'skip');
     const placeMonster = useMutation(api.play.placeMonster);
@@ -130,6 +132,8 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const sendPing = useMutation(api.play.sendPing);
     const draw = useMutation(api.play.draw);
     const mark = useMutation(api.play.mark);
+    const drawLine = useMutation(api.play.drawLine);
+    const eraseDrawings = useMutation(api.play.eraseDrawings);
 
     useEffect(() =>
     {
@@ -199,6 +203,9 @@ function Session({ sessionId, debug }: SessionEditorProps)
             draw: (tokenId, points, feet) => friendly(draw({ tokenId: tokenId as Id<'tokens'>, points, feet })),
             marks: marks ?? noMarks,
             mark: (next) => friendly(mark({ sessionId: id, mark: next })),
+            drawings: drawings ?? noDrawings,
+            drawLine: (key, points, pen) => friendly(drawLine({ sessionId: id, key, points, pen })),
+            eraseDrawings: (ids) => friendly(eraseDrawings({ sessionId: id, drawingIds: ids as Id<'drawings'>[] })),
             fogLook: status.fogLook,
             setFogLook: (look) => friendly(setFogLook({ sessionId: id, look })),
             blood: status.blood,

@@ -14,6 +14,8 @@ export const highlight = '#a77ee0';
 export const door = '#d8a657';
 /** What a tool is about to take away, like walls in the eraser's box. */
 export const danger = '#e0565b';
+/** A line the draw tool's eraser is about to take: a loud red, drawn see-through. */
+export const erasing = '#ff1a1a';
 /** Healing, the app's green for what worked. */
 export const heal = '#6fcf8e';
 /** AC, the cool grey-blue of a steel shield. */

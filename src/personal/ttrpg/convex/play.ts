@@ -1,8 +1,9 @@
 import { getAuthUserId } from '@convex-dev/auth/server';
 import { ConvexError, v } from 'convex/values';
 
-import type { Decal, Draft, PlayerFight, Point, Scenario, SharedHit, SharedMark, Token } from '../types';
+import type { Decal, Draft, Drawing, PlayerFight, Point, Scenario, SharedHit, SharedMark, Token } from '../types';
 import { cleanConditions } from '../content/conditions';
+import { maxDrawingPoints, maxDrawings, penWidths } from '../map/drawings';
 import { distance } from '../map/geometry';
 import { cleanStats, downedPool, hitOn, withoutNumbers } from '../map/health';
 import { cleanFight, cleanRoll, hasRolled, nextTurn, upNext, withRoll } from '../map/initiative';
@@ -854,6 +855,8 @@ export const start = mutation({
         for (const doc of await decalsOf(ctx, sessionId))
             await ctx.db.delete('decals', doc._id);
 
+        await clearDrawings(ctx, sessionId);
+
         return null;
     },
 });
@@ -1376,6 +1379,7 @@ export const end = mutation({
         if (scenario)
             await refreshSight(ctx, sessionId, scenario);
 
+        await clearDrawings(ctx, sessionId);
 
         return null;
     },
@@ -1870,6 +1874,120 @@ export const mark = mutation({
         const markId = await ctx.db.insert('marks', row);
 
         await ctx.scheduler.runAfter(markLife, internal.play.dropMark, { markId });
+
+        return null;
+    },
+});
+
+/** Every line drawn in a session, on any map, oldest first. */
+async function drawingsOf(ctx: QueryCtx, sessionId: Id<'sessions'>): Promise<Doc<'drawings'>[]>
+{
+    const docs = await ctx.db
+        .query('drawings')
+        .withIndex('by_sessionId_and_key', (q) => q.eq('sessionId', sessionId))
+        .take(maxDrawings * (maxPlayers + 1));
+
+    return docs.sort((a, b) => a._creationTime - b._creationTime);
+}
+
+/** Wipes every line drawn in a session, so none outlives the night it was drawn in. */
+async function clearDrawings(ctx: MutationCtx, sessionId: Id<'sessions'>)
+{
+    for (const doc of await drawingsOf(ctx, sessionId))
+        await ctx.db.delete('drawings', doc._id);
+}
+
+/**
+ * The lines drawn on the map being played, for the host and the players, the drawer's own too:
+ * once let go, only this shows it. Each says whether the asker may erase it.
+ */
+export const drawings = query({
+    args: { sessionId: v.id('sessions') },
+    handler: async (ctx, { sessionId }): Promise<Drawing[]> =>
+    {
+        const session = await memberOf(ctx, sessionId);
+        const userId = await getAuthUserId(ctx);
+
+        if (!session || !session.live)
+            return [];
+
+        const host = session.ownerId === userId;
+
+        return (await drawingsOf(ctx, sessionId))
+            .filter((doc) => doc.scenarioId === session.activeScenarioId)
+            .map((doc) => ({ id: doc._id, points: doc.points, color: doc.color, width: doc.width, erasable: host || doc.userId === userId }));
+    },
+});
+
+/**
+ * Someone at the table starts a line with a key their screen made up, or sends its points so far.
+ * The host and players who joined, on the map being played, while the session is live. Frozen or
+ * not, like a ruler. The pen counts only for a new line: one keeps how it started.
+ */
+export const drawLine = mutation({
+    args: {
+        sessionId: v.id('sessions'),
+        key: v.string(),
+        points: v.array(v.object({ x: v.number(), y: v.number() })),
+        pen: v.object({ color: v.optional(v.string()), width: v.number() }),
+    },
+    handler: async (ctx, { sessionId, key, points, pen }) =>
+    {
+        const userId = await requireUser(ctx);
+        const session = await sessionOf(ctx, sessionId);
+        const token = session.ownerId === userId ? null : await ownToken(ctx, sessionId, userId);
+        const atTable = session.ownerId === userId || token !== null;
+        const fine = key.length > 0 && key.length <= 64 && points.length > 0 && points.length <= maxDrawingPoints && points.every((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
+
+        // Refused out loud, so the drawer's screen drops the line it still shows, see drawTool.
+        if (!fine || !atTable || session.live !== true || !session.activeScenarioId)
+            throw new ConvexError('That line could not be drawn.');
+
+        const doc = await ctx.db
+            .query('drawings')
+            .withIndex('by_sessionId_and_key', (q) => q.eq('sessionId', sessionId).eq('key', key))
+            .unique();
+
+        if (doc)
+        {
+            if (doc.userId !== userId)
+                throw new ConvexError('That line could not be drawn.');
+
+            await ctx.db.patch('drawings', doc._id, { points });
+
+            return null;
+        }
+
+        // Past the limit the oldest go, so drawing never just stops working.
+        const own = (await drawingsOf(ctx, sessionId)).filter((other) => other.userId === userId);
+
+        for (const old of own.slice(0, Math.max(0, own.length - maxDrawings + 1)))
+            await ctx.db.delete('drawings', old._id);
+
+        const color = pen.color !== undefined && colourPattern.test(pen.color) ? pen.color : token?.color;
+        const width = Number.isFinite(pen.width) ? Math.min(Math.max(pen.width, penWidths.min), penWidths.max) : penWidths.start;
+
+        await ctx.db.insert('drawings', { sessionId, scenarioId: session.activeScenarioId, userId, key, color, width, points });
+
+        return null;
+    },
+});
+
+/** Erases lines: a player only their own, the host any. */
+export const eraseDrawings = mutation({
+    args: { sessionId: v.id('sessions'), drawingIds: v.array(v.id('drawings')) },
+    handler: async (ctx, { sessionId, drawingIds }) =>
+    {
+        const userId = await requireUser(ctx);
+        const session = await sessionOf(ctx, sessionId);
+
+        for (const drawingId of drawingIds.slice(0, maxDrawings * (maxPlayers + 1)))
+        {
+            const doc = await ctx.db.get('drawings', drawingId);
+
+            if (doc && doc.sessionId === sessionId && (doc.userId === userId || session.ownerId === userId))
+                await ctx.db.delete('drawings', drawingId);
+        }
 
         return null;
     },

@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 
-import type { Cell, GameSystem, Grid, Mark, Point, Scenario, Token, Wall } from '../types';
+import type { Cell, Drawing, GameSystem, Grid, Mark, Point, Scenario, Token, Wall } from '../types';
 import { cleanConditions } from '../content/conditions.ts';
 import { blocksOf, demoOgreStatBlock, spansOf, statBlockTemplates, statsOf } from '../content/statBlocks.ts';
 
 import { toScreen, toWorld, zoomAt } from './camera.ts';
 import { createExplored, markSeen, packedFlag, packSeen, wasSeen } from './fog.ts';
+import { drawingsAt, extendLine, maxDrawingPoints } from './drawings.ts';
 import { distance } from './geometry.ts';
 import {
     cellAt,
@@ -795,4 +796,27 @@ assert.deepEqual(statsOf(demoOgreStatBlock), { name: 'Ogre', size: 'large', ac: 
     const free = shared.at(-1);
 
     assert.ok(free && free.to.y > cell && Math.abs(distance(free.from, free.to) - cell * 3) < 1e-9);
+}
+
+// A line takes a point only once the pointer moved a few screen pixels, and stops at its limit.
+// The eraser finds only lines this screen may erase that pass near the pointer, between points too.
+{
+    const start = [{ x: 0, y: 0 }];
+
+    assert.equal(extendLine(start, { x: 2, y: 0 }, 1), start);
+    assert.equal(extendLine(start, { x: 2, y: 0 }, 4).length, 2);
+
+    const full = Array.from({ length: maxDrawingPoints }, (_, x) => ({ x: x * 10, y: 0 }));
+
+    assert.equal(extendLine(full, { x: 1e6, y: 0 }, 1), full);
+
+    const lines: Drawing[] = [
+        { id: 'mine', points: [{ x: 0, y: 0 }, { x: 100, y: 0 }], width: 4, erasable: true },
+        { id: 'theirs', points: [{ x: 0, y: 4 }, { x: 100, y: 4 }], width: 4, erasable: false },
+        { id: 'dot', points: [{ x: 300, y: 300 }], width: 4, erasable: true },
+    ];
+
+    assert.deepEqual(drawingsAt(lines, { x: 50, y: 3 }, 5), ['mine']);
+    assert.deepEqual(drawingsAt(lines, { x: 50, y: 20 }, 5), []);
+    assert.deepEqual(drawingsAt(lines, { x: 302, y: 301 }, 5), ['dot']);
 }

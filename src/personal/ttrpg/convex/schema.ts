@@ -292,6 +292,19 @@ export default defineSchema({
         /** The last change, so one left by a closed phone still goes, see dropMark. */
         at: v.number(),
     }).index('by_sessionId_and_userId', ['sessionId', 'userId']),
+    /** A line drawn freehand on a map in play, gone when the session ends, see Drawing in types.ts. */
+    drawings: defineTable({
+        sessionId: v.id('sessions'),
+        scenarioId: v.string(),
+        userId: v.id('users'),
+        /** Made up by the screen drawing it, so the line's next points find it before its id comes back. */
+        key: v.string(),
+        /** The colour picked, else the player's ring colour. Missing for the host's, drawn in the GM's colour. */
+        color: v.optional(v.string()),
+        /** How thick it is on screen, in pixels. */
+        width: v.number(),
+        points: v.array(v.object({ x: v.number(), y: v.number() })),
+    }).index('by_sessionId_and_key', ['sessionId', 'key']),
     // One document per scenario, so saving a change to one map never rewrites the others.
     scenarios: defineTable({ sessionId: v.id('sessions'), scenario: scenarioValidator }).index(
         'by_sessionId_and_scenario_id',

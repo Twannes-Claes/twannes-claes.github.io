@@ -1,8 +1,9 @@
 import { useEffect, useEffectEvent, useRef } from 'react';
 
-import type { BloodSettings, Decal, Draft, FogSettings, GameSystem, Mark, Ping, Point, PropPicture, Scenario, SharedFog, SharedHit, SharedMark, Token } from '../types';
+import type { BloodSettings, Decal, Draft, Drawing, FogSettings, GameSystem, Mark, Pen, Ping, Point, PropPicture, Scenario, SharedFog, SharedHit, SharedMark, Token } from '../types';
 
 import { demoCredit, demoScenario } from '../content/scenarios';
+import { penWidths } from '../map/drawings';
 import { defaultFogSettings } from '../map/fog';
 import { defaultBlood } from '../map/health';
 import type { ToolId } from '../map/tools';
@@ -13,6 +14,8 @@ import { carrying } from './carry';
 /** One empty list for screens without drafts, so its effect does not run on every render. */
 const noDrafts: Draft[] = [];
 const noMarks: SharedMark[] = [];
+const noDrawings: Drawing[] = [];
+const defaultPen: Pen = { width: penWidths.start };
 const noDecals: Decal[] = [];
 
 interface MapCanvasProps
@@ -74,6 +77,14 @@ interface MapCanvasProps
     marks?: SharedMark[];
     /** Hears this screen's ruler or area as it is dragged, to share, see onMark in map/view.ts. */
     onMark?: (mark: Mark | null) => void;
+    /** The lines drawn on the map, see Drawing. */
+    drawings?: Drawing[];
+    /** Hears this screen's line as it is drawn, see onDrawLine in map/view.ts. */
+    onDrawLine?: (key: string, points: Point[], pen: Pen) => Promise<void> | void;
+    /** How this screen's next line looks, see Pen. */
+    pen?: Pen;
+    /** Hears the lines the eraser went over. */
+    onEraseDrawings?: (ids: string[]) => void;
     /** How the fog looks, see FogSettings. */
     fogSettings?: FogSettings;
     /** Whose fog this is, see setFogSource in map/view.ts. A phone is always live. */
@@ -153,6 +164,10 @@ export function MapCanvas({
     onDraft,
     marks = noMarks,
     onMark,
+    drawings = noDrawings,
+    onDrawLine,
+    pen = defaultPen,
+    onEraseDrawings,
     fogSettings = defaultFogSettings,
     fogSource = 'live',
     credit = false,
@@ -187,6 +202,8 @@ export function MapCanvas({
     const pinged = useEffectEvent((at: Point) => onPing?.(at));
     const drafted = useEffectEvent((id: string, points: Point[] | null, feet: number) => onDraft?.(id, points, feet));
     const markedOut = useEffectEvent((mark: Mark | null) => onMark?.(mark));
+    const lineDrawn = useEffectEvent((key: string, points: Point[], used: Pen) => onDrawLine?.(key, points, used));
+    const drawingsErased = useEffectEvent((ids: string[]) => onEraseDrawings?.(ids));
     const targeted = useEffectEvent((id: string) => onTarget?.(id));
     const selected = useEffectEvent((ids: string[]) => onSelect?.(ids));
     const menuOpened = useEffectEvent((id: string, client: Point) =>
@@ -223,6 +240,8 @@ export function MapCanvas({
             onPing: (at) => pinged(at),
             onDraft: (id, points, feet) => drafted(id, points, feet),
             onMark: (mark) => markedOut(mark),
+            onDrawLine: (key, points, used) => lineDrawn(key, points, used),
+            onEraseDrawings: (ids) => drawingsErased(ids),
             onTarget: (id) => targeted(id),
             onSelect: (ids) => selected(ids),
             onTokenMenu: (id, client) => menuOpened(id, client),
@@ -364,6 +383,16 @@ export function MapCanvas({
     {
         view.current?.setMarks(marks);
     }, [marks]);
+
+    useEffect(() =>
+    {
+        view.current?.setDrawings(drawings);
+    }, [drawings]);
+
+    useEffect(() =>
+    {
+        view.current?.setPen(pen);
+    }, [pen]);
 
     useEffect(() =>
     {

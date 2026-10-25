@@ -1,4 +1,4 @@
-import type { BloodSettings, Cell, CreatureSize, Decal, Draft, FogSettings, GameSystem, Mark, Point, PropPicture, Scenario, SharedFog, SharedHit, SharedMark, Token } from '../types';
+import type { BloodSettings, Cell, CreatureSize, Decal, Draft, Drawing, FogSettings, GameSystem, Mark, Pen, Point, PropPicture, Scenario, SharedFog, SharedHit, SharedMark, Token } from '../types';
 
 import { buzz } from '../services/haptics.ts';
 
@@ -47,6 +47,7 @@ import {
 } from './render.ts';
 import { propAt } from './props.ts';
 import { anchorAt, footprint, footprintCenter, footprintKeys, landingAt, partners } from './size.ts';
+import { drawLine, penWidths } from './drawings.ts';
 import { createTool, drawBox, drawMark, fingerGap, type MapTool, type ToolId, type ToolPointer } from './tools.ts';
 import { insidePolygon, sightSegments, visibilityPolygon, type Segment } from './visibility.ts';
 import { startWalk, walkAt, type Walk } from './walk.ts';
@@ -123,6 +124,10 @@ export interface MapViewOptions
     onDraft?: (id: string, points: Point[] | null, feet: number) => void;
     /** This screen's ruler or area as it is dragged, to show on every other screen, see Mark. */
     onMark?: (mark: Mark | null) => void;
+    /** This screen's line as it is drawn, by a key it made up, see Drawing. */
+    onDrawLine?: (key: string, points: Point[], pen: Pen) => Promise<void> | void;
+    /** Lines the eraser went over, see Drawing. */
+    onEraseDrawings?: (ids: string[]) => void;
     /** A token pressed while picking targets, to add or take off, see setTargets. */
     onTarget?: (id: string) => void;
     /** The tokens the Select tool picks now, by a click, Shift and a click, or a box, see setSelection. */
@@ -204,6 +209,10 @@ export interface MapView
     setDrafts: (drafts: Draft[]) => void;
     /** Other screens' rulers and areas, in their player's colour, see Mark. */
     setMarks: (marks: SharedMark[]) => void;
+    /** Every line drawn on the map, this screen's too, see Drawing. */
+    setDrawings: (drawings: Drawing[]) => void;
+    /** How this screen's next line looks, see Pen. */
+    setPen: (pen: Pen) => void;
     /**
      * On a player's phone, their own token: with their summons the only ones they can draw a path
      * from. Every other press pans. Null is the game master's screen, where every token answers, the Player view on
@@ -348,6 +357,12 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     let markSentAt = 0;
     let markTimer = 0;
     let marked = false;
+    /** The lines drawn on the map, see setDrawings. */
+    let drawings: Drawing[] = [];
+    let pen: Pen = { width: penWidths.start };
+    /** When this screen last sent its line, and the send waiting for draftGap to pass. */
+    let lineSentAt = 0;
+    let lineTimer = 0;
     /** The token whose path this screen last shared, and how that path looked, see shareDraft. */
     let drafted: string | null = null;
     let draftKey = '';
@@ -615,6 +630,33 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         markSentAt = performance.now();
         marked = mark !== null;
         options.onMark(mark);
+    };
+
+    /** Hands this screen's line on as it grows, at most every draftGap like a ruler. Letting go goes at once. */
+    const shareLine = (key: string, points: Point[], final: boolean) =>
+    {
+        if (!options.onDrawLine)
+            return;
+
+        window.clearTimeout(lineTimer);
+
+        const wait = lineSentAt + draftGap - performance.now();
+
+        if (!final && wait > 0)
+        {
+            lineTimer = window.setTimeout(() => shareLine(key, points, false), wait);
+
+            return;
+        }
+
+        lineSentAt = performance.now();
+
+        const sent = Promise.resolve(options.onDrawLine(key, points, pen));
+
+        // A refused line is dropped by the tool, see drawTool, and the map shows it gone.
+        sent.catch(() => redraw());
+
+        return sent;
     };
 
     /**
@@ -963,6 +1005,9 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
         if (path)
             drawPathLabels(path);
+
+        for (const line of drawings)
+            drawLine(context, line.points, camera.zoom, line.color ?? highlight, line.width);
 
         for (const mark of marks)
             drawMark(context, mark, camera.zoom, scenario, mark.color ?? highlight, system);
@@ -1867,7 +1912,13 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             if (marked || markTimer)
                 shareMark(null);
 
-            tool = createTool(id, changeScenario, placing, reveal, snap, shareMark, (ids) => options.onMonstersErase?.(ids));
+            tool = createTool(id, changeScenario, placing, reveal, snap, shareMark, (ids) => options.onMonstersErase?.(ids), {
+                share: shareLine,
+                erase: (ids) => options.onEraseDrawings?.(ids),
+                drawings: () => drawings,
+                // Without a colour picked the server colours a player's line with their ring, the host's with none.
+                look: () => ({ colour: pen.color ?? tokens.find((token) => token.id === own)?.color ?? highlight, width: pen.width }),
+            });
             toolPointerId = null;
             canvas.style.cursor = restCursor();
             redraw();
@@ -1886,6 +1937,15 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         {
             marks = next;
             redraw();
+        },
+        setDrawings: (next) =>
+        {
+            drawings = next;
+            redraw();
+        },
+        setPen: (next) =>
+        {
+            pen = next;
         },
         ping: (at, color) =>
         {

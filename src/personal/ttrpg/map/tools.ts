@@ -1,6 +1,7 @@
-import type { GameSystem, Mark, Point, Prop, PropPicture, Scenario, Token, Wall } from '../types';
+import type { Drawing, GameSystem, Mark, Point, Prop, PropPicture, Scenario, Token, Wall } from '../types';
 
-import { danger, door as doorColour, faded, ground, highlight, ink } from './colours.ts';
+import { danger, door as doorColour, erasing, faded, ground, highlight, ink } from './colours.ts';
+import { drawingsAt, drawLine, extendLine, maxDrawingPoints, penWidths } from './drawings.ts';
 import { boxOf, closestOnSegment, distance, distanceToSegment, onMap, segmentsTouch, type Area } from './geometry.ts';
 import { cellAt, cellCenter, cellLine, nearestCorner, snapPoint } from './grid.ts';
 import { lineFeet, pathFeet } from './path.ts';
@@ -35,7 +36,9 @@ export type ToolId =
     | 'reveal'
     | 'reveal-circle'
     | 'hide'
-    | 'hide-circle';
+    | 'hide-circle'
+    | 'draw'
+    | 'rub-out';
 
 /**
  * Hands a changed scenario back. A drag passes final false while it moves, which only shows
@@ -51,6 +54,20 @@ export type Reveal = (polygon: Point[], hide: boolean) => void;
 
 /** Hears a ruler or an area as it is dragged, to show on every screen, and null once let go. */
 export type ShareMark = (mark: Mark | null) => void;
+
+/** What the draw tool and its eraser work with, see map/drawings.ts. */
+export interface Sketching
+{
+    /** Hears this screen's line by its key as it grows, and once more with final when let go, which may say it failed. */
+    share: (key: string, points: Point[], final: boolean) => Promise<void> | void;
+    erase: (ids: string[]) => void;
+    /** Every line on the map now, read at each move. */
+    drawings: () => Drawing[];
+    /** How this screen's own line looks while it is drawn: its pen, or its player's ring or the GM's colour. */
+    look: () => { colour: string; width: number };
+}
+
+const noSketching: Sketching = { share: () => {}, erase: () => {}, drawings: () => [], look: () => ({ colour: ink, width: penWidths.start }) };
 
 /** One pointer event, as a tool sees it. */
 export interface ToolPointer
@@ -801,6 +818,152 @@ function coneTool(share: ShareMark): MapTool
     return markTool(share, (pointer) => reaching(areaStart(pointer), pointer), (mark, pointer) => reaching(mark.from, pointer));
 }
 
+/** The draw tool: drag to draw a line every screen sees, see Drawing. */
+function drawTool({ share, look, drawings }: Sketching): MapTool
+{
+    let key = '';
+    let points: Point[] = [];
+    // Where the pointer is now. The line only takes a point every few pixels, so without it the
+    // end would trail behind the finger.
+    let tip: Point | null = null;
+    // Lines let go of that the server has not sent back whole yet, still drawn here so they never
+    // blink out in between.
+    let settling: { points: Point[]; colour: string; width: number }[] = [];
+
+    const back = (line: Point[]) =>
+        drawings().some(({ points: other }) => other.length === line.length && other[other.length - 1].x === line[line.length - 1].x && other[other.length - 1].y === line[line.length - 1].y);
+
+    return {
+        cursor: 'crosshair',
+        down: ({ world }) =>
+        {
+            // Not crypto.randomUUID: phones open the dev server over plain http, which lacks it.
+            key = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+            points = [world];
+            tip = world;
+            share(key, points, false);
+
+            return true;
+        },
+        move: ({ world, zoom }, pressed) =>
+        {
+            if (!pressed || points.length === 0)
+                return;
+
+            const next = extendLine(points, world, zoom);
+
+            tip = world;
+
+            if (next === points)
+                return;
+
+            points = next;
+            share(key, points, false);
+        },
+        up: () =>
+        {
+            // The line ends where it was let go, not at its last point.
+            const last = points[points.length - 1];
+
+            if (tip && last && points.length < maxDrawingPoints && (tip.x !== last.x || tip.y !== last.y))
+                points = [...points, tip];
+
+            if (points.length > 0)
+            {
+                const line = { points, ...look() };
+
+                settling.push(line);
+                // A line the server refused goes from this screen too, as it never reached the others.
+                void Promise.resolve(share(key, points, true)).catch(() => (settling = settling.filter((other) => other !== line)));
+            }
+
+            points = [];
+            tip = null;
+        },
+        draw: (ctx, zoom) =>
+        {
+            // Checked here, since every new set of lines from the server redraws the map.
+            settling = settling.filter((line) => !back(line.points));
+
+            for (const line of settling)
+                drawLine(ctx, line.points, zoom, line.colour, line.width);
+
+            if (points.length > 0)
+                drawLine(ctx, tip ? [...points, tip] : points, zoom, look().colour, look().width);
+        },
+    };
+}
+
+/**
+ * The draw tool's eraser: drag over lines and let go to erase them, only those this screen may.
+ * They show in red first, under a resting mouse too, so a finger sees what it takes before it does.
+ */
+function rubOutTool({ erase, drawings }: Sketching): MapTool
+{
+    // Asked for once each, while the server takes them away.
+    const gone = new Set<string>();
+    // Under a resting mouse, or gathered by the drag.
+    let marked = new Set<string>();
+    let pressing = false;
+
+    const under = ({ world, zoom }: ToolPointer) => drawingsAt(drawings(), world, reach / zoom).filter((id) => !gone.has(id));
+
+    const drop = () =>
+    {
+        const had = pressing && marked.size > 0;
+
+        pressing = false;
+        marked = new Set();
+
+        return had;
+    };
+
+    return {
+        cursor: 'crosshair',
+        down: (pointer) =>
+        {
+            pressing = true;
+            marked = new Set(under(pointer));
+
+            return true;
+        },
+        move: (pointer, pressed) =>
+        {
+            if (!pressed)
+                marked = new Set(under(pointer));
+            else if (pressing)
+            {
+                for (const id of under(pointer))
+                    marked.add(id);
+            }
+        },
+        up: () =>
+        {
+            const ids = pressing ? [...marked] : [];
+
+            drop();
+
+            if (ids.length === 0)
+                return;
+
+            for (const id of ids)
+                gone.add(id);
+
+            erase(ids);
+        },
+        cancel: drop,
+        draw: (ctx, zoom) =>
+        {
+            for (const line of drawings())
+            {
+                // Still red once let go, until the server takes it away, so it never flashes back.
+                if (marked.has(line.id) || gone.has(line.id))
+                    drawLine(ctx, line.points, zoom, faded(erasing, 0.6), line.width + 8);
+            }
+        },
+    };
+}
+
 /**
  * The point at from's nearest 0, 45 or 90 degrees towards to, for Shift held. A diagonal takes
  * the longer side, so a corner on the grid leads to another one.
@@ -1528,6 +1691,7 @@ export function createTool(
     snap = 1,
     share: ShareMark = () => {},
     eraseMonsters: EraseMonsters = () => {},
+    sketching: Sketching = noSketching,
 ): MapTool | null
 {
     switch (id)
@@ -1574,6 +1738,10 @@ export function createTool(
         case 'reveal-circle':
         case 'hide-circle':
             return revealCircleTool(reveal, id === 'hide-circle');
+        case 'draw':
+            return drawTool(sketching);
+        case 'rub-out':
+            return rubOutTool(sketching);
         // Monsters come from their panel, dragged onto the map, so the map itself only pans.
         case 'select':
         case 'pick':

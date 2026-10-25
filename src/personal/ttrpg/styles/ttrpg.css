@@ -1250,6 +1250,19 @@ html:has(.ttrpg) {
 .ttrpg-corner--left {
     right: auto;
     left: max(16px, env(safe-area-inset-left));
+    /* Clear of the settings in the other corner, wrapping on a narrow phone. */
+    flex-wrap: wrap;
+    max-width: calc(100vw - 32px - 4rem);
+}
+
+/* Every pop-out opens from the corner's edge, not its own button's, so a wide one like Draw's
+   stays on screen. */
+.ttrpg-corner--left .ttrpg-pop {
+    position: static;
+}
+
+.ttrpg-corner--left .ttrpg-pop__menu {
+    max-width: calc(100vw - 32px);
 }
 
 main:has(.ttrpg-corner--left) .ttrpg-credit {

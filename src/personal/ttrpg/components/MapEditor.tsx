@@ -2,13 +2,14 @@ import { faCheck, faDiceD20, faHatWizard, faPen, faSnowflake, faTriangleExclamat
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useEffectEvent, useRef, useState, type DragEvent, type MouseEvent } from 'react';
 
-import type { BloodSettings, Decal, FogSettings, GameSystem, GroupCheck, HitKind, Initiative, Live, MonsterControls, PictureBytes, Ping, Point, Preset, PropPicture, Scenario, SharedHit, Store, Token } from '../types';
+import type { BloodSettings, Decal, Drawing, FogSettings, GameSystem, GroupCheck, HitKind, Initiative, Live, MonsterControls, PictureBytes, Pen, Ping, Point, Preset, PropPicture, Scenario, SharedHit, Store, Token } from '../types';
 
 import { cleanConditions } from '../content/conditions';
 import { blankScenario, demoTokens } from '../content/scenarios';
 import { demoOgrePreset } from '../content/statBlocks';
 import { gameSystems } from '../content/systems';
-import { ringColours } from '../map/colours';
+import { highlight, ringColours } from '../map/colours';
+import { penWidths } from '../map/drawings';
 import { defaultFogSettings } from '../map/fog';
 import { cleanStats, defaultBlood, downedPool, hitOn, withoutNumbers } from '../map/health';
 import { nextTurn } from '../map/initiative';
@@ -22,6 +23,7 @@ import { confirmAction, kickPlayer } from '../services/confirm';
 import { baseName, toAvatar } from '../services/images';
 import { listenForDoors, type DoorChange } from '../services/tableChannel';
 
+import { DrawPicker } from './DrawPicker';
 import { Spinner, Toast, Toasts } from './Feedback';
 import { FogPanel } from './FogPanel';
 import { AttackButton, HitSheet } from './HitSheet';
@@ -181,6 +183,9 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const [localFight, setLocalFight] = useState<Initiative | null>(null);
     const [localCheck, setLocalCheck] = useState<GroupCheck | null>(null);
     const [demoUpNext, setDemoUpNext] = useState(false);
+    // The lines drawn off a live map, in this tab, each on the map it was drawn on.
+    const [pen, setPen] = useState<Pen>({ width: penWidths.start });
+    const [localDrawings, setLocalDrawings] = useState<(Drawing & { scenarioId: string })[]>([]);
     // The tokens picked for an attack or a heal, or null when not picking, see HitSheet.
     const [targets, setTargets] = useState<string[] | null>(null);
     // The token right-clicked in the GM view, with where, and the preset whose stat block it opened.
@@ -628,6 +633,13 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     };
 
     const decals = liveMap ? liveMap.decals : localDecals;
+    const drawings = liveMap ? liveMap.drawings : localDrawings.filter((drawing) => drawing.scenarioId === active.id);
+    // No message when a send fails: the map drops a refused line, see drawTool in map/tools.ts.
+    const drawLine = (key: string, points: Point[], used: Pen) =>
+        liveMap
+            ? liveMap.drawLine(key, points, used)
+            : setLocalDrawings((current) => [...current.filter((drawing) => drawing.id !== key), { id: key, points, ...used, erasable: true, scenarioId: active.id }]);
+    const eraseDrawings = (ids: string[]) => (liveMap ? fail(liveMap.eraseDrawings(ids)) : setLocalDrawings((current) => current.filter((drawing) => !ids.includes(drawing.id))));
     const blood = live ? (live.blood ?? defaultBlood) : demoBlood;
 
     const setBlood = (change: Partial<BloodSettings>) =>
@@ -994,6 +1006,10 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 marks={liveMap ? liveMap.marks : undefined}
                 // Only a preview for the table, so a failed send is not worth a message.
                 onMark={liveMap ? (next) => void liveMap.mark(next).catch(() => undefined) : undefined}
+                drawings={drawings}
+                onDrawLine={drawLine}
+                pen={pen}
+                onEraseDrawings={eraseDrawings}
                 fogSettings={fogSettings}
                 fogSource={liveMap ? 'live' : 'preview'}
                 // Only the demo has no session, see credit in MapCanvas.tsx.
@@ -1275,6 +1291,8 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                     <PlayDock
                         tool={playTool}
                         onTool={setPlayTool}
+                        pen={pen}
+                        onPen={setPen}
                         frozen={isFrozen}
                         onFreeze={freeze}
                         scenarios={scenarios}
@@ -1296,12 +1314,20 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 )
             )}
 
-            {/* The Player view has a phone's ruler and nothing more, so it stays the map. */}
+            {/* The Player view has a phone's ruler and pen and nothing more, so it stays the map. */}
             {mode === 'players' && !pending && !targets && (
                 <div className={`ttrpg-panel ttrpg-corner ttrpg-corner--left${idle ? ' ttrpg-hidden' : ''}`}>
                     <RulerPicker
                         tool={playTool}
                         onMeasure={(next) => setPlayTool(next ?? 'open-doors')}
+                        start
+                    />
+                    <DrawPicker
+                        tool={playTool}
+                        onSketch={(next) => setPlayTool(next ?? 'open-doors')}
+                        pen={pen}
+                        onPen={setPen}
+                        colour={highlight}
                         start
                     />
                     <AttackButton onClick={startTargets} />

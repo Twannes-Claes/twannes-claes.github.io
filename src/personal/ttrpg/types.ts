@@ -197,6 +197,29 @@ export interface SharedMark extends Mark
     color?: string;
 }
 
+/**
+ * A line drawn freehand on the map being played, seen on every screen at the table and gone when
+ * the session ends, see drawings in convex/play.ts and map/drawings.ts.
+ */
+export interface Drawing
+{
+    id: string;
+    points: Point[];
+    /** The colour picked, else the player's ring colour. Missing for the GM's, drawn in the GM's colour. */
+    color?: string;
+    /** How thick it is on screen, in pixels, see Pen. */
+    width: number;
+    /** Whether this screen may erase it: a player only their own, the GM any. */
+    erasable: boolean;
+}
+
+/** How this screen's next line looks. Without a colour, its player's ring colour or the GM's. */
+export interface Pen
+{
+    color?: string;
+    width: number;
+}
+
 /** How hurt a token looks to everyone who may not see its numbers, see map/health.ts. */
 export type HealthState = 'unhurt' | 'hurt' | 'bloodied' | 'critical' | 'down';
 
@@ -353,6 +376,11 @@ export interface Live
     marks: SharedMark[];
     /** Shares the game master's ruler or area as it is dragged, or drops it with null. */
     mark: (mark: Mark | null) => Promise<void>;
+    /** The lines drawn on the map being played, see Drawing. */
+    drawings: Drawing[];
+    /** Starts the game master's line with this key, or gives it its points so far. */
+    drawLine: (key: string, points: Point[], pen: Pen) => Promise<void>;
+    eraseDrawings: (ids: string[]) => Promise<void>;
     /** How the fog looks on every screen, null until the game master changes it. */
     fogLook: FogSettings | null;
     setFogLook: (look: FogSettings) => Promise<void>;

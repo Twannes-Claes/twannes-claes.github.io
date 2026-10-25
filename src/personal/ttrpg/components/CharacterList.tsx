@@ -20,15 +20,17 @@ interface RingPickerProps
 {
     value: string;
     onChange: (color: string) => void;
+    /** What it picks a colour for, for screen readers. */
+    label?: string;
 }
 
-/** A ring colour: one of ringColours, or any other from the last swatch. */
-export function RingPicker({ value, onChange }: RingPickerProps)
+/** A ring colour, or a pen's: one of ringColours, or any other from the last swatch. */
+export function RingPicker({ value, onChange, label = 'Ring colour' }: RingPickerProps)
 {
     const custom = !ringColours.includes(value);
 
     return (
-        <div className="ttrpg-rings" role="radiogroup" aria-label="Ring colour">
+        <div className="ttrpg-rings" role="radiogroup" aria-label={label}>
             {ringColours.map((color) => (
                 <button
                     key={color}

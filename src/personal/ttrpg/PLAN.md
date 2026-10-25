@@ -883,7 +883,7 @@ Built into play mode neatly, it should look and feel good.
   it is needed. The right-click menu (13) hides one again.
 - Monster presets (7) are what the tray is filled from.
 - What a monster killed in one session is at the next Start shows in testing.
-- **Built, in Edit only for now.** A monster on the tray is a token with `tray` set
+- **Built.** A monster on the tray is a token with `tray` set
   (`components/Tray.tsx`): tiles like the presets', bottom right with the Move and Monsters tools.
   A preset dropped on it lands there (`placeMonster` without a point); a monster dragged off the
   map and let go over it, or **To tray** in its right-click menu, goes onto it, hidden
@@ -902,6 +902,15 @@ Built into play mode neatly, it should look and feel good.
 - Every screen sees every drawing, live, like a ruler.
 - An **eraser** in the same pop-out: a player erases only their own drawings, the GM any of them.
 - Never saved with the map: **End session** clears them all.
+- **Built.** A `drawings` table with the `drawings` query and the `drawLine` and `eraseDrawings`
+  mutations in `convex/play.ts`; `start` and `end` clear them. The screen makes up a key for each
+  line and sends its points as it grows, like a ruler (`shareLine` in `map/view.ts`). Pen and
+  Eraser are `drawTool` and `rubOutTool` in `map/tools.ts`, with the limits and hit testing in
+  `map/drawings.ts`, picked from `components/DrawPicker.tsx` beside the ruler. While drawing, the
+  pop-out also picks a colour (the ring swatches, starting on the ring or GM colour) and a
+  thickness. The Eraser shows in red the lines it would take, under a resting mouse or gathered by
+  a drag, and erases them on letting go. A line keeps 600 points and a person 20 lines, past which
+  their oldest goes. The demo keeps them in the tab.
 
 ### 16. Cone ruler
 

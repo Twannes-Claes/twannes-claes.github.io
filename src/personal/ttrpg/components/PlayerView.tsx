@@ -14,10 +14,12 @@ import { useConvex, useMutation, useQuery } from 'convex/react';
 import { ConvexError } from 'convex/values';
 import { useActionState, useEffect, useState, type ReactNode } from 'react';
 
-import type { BloodSettings, FogSettings, GameSystem, HitKind, PlayerCheck, PlayerFight, Scenario } from '../types';
+import type { BloodSettings, FogSettings, GameSystem, HitKind, Pen, PlayerCheck, PlayerFight, Scenario } from '../types';
 
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
+import { highlight } from '../map/colours';
+import { penWidths } from '../map/drawings';
 import { defaultFogSettings } from '../map/fog';
 import { defaultBlood } from '../map/health';
 import type { FrameStats, PendingMove } from '../map/view';
@@ -30,6 +32,7 @@ import { sendDoor } from '../services/tableChannel';
 import { Backend } from './Backend';
 import { CharacterList, PieceForm } from './CharacterList';
 import { ConditionPicker } from './ConditionPicker';
+import { DrawPicker, type Sketch } from './DrawPicker';
 import { Loading, Spinner, Toast, Toasts } from './Feedback';
 import { MapCanvas } from './MapCanvas';
 import { AttackButton, HitSheet } from './HitSheet';
@@ -373,7 +376,11 @@ function Table({ sessionId, mine, frozen, fogLook, blood, system, fight, check }
     const drafts = useQuery(api.play.drafts, { sessionId, asPlayer: onTable });
     const marks = useQuery(api.play.marks, { sessionId, asPlayer: onTable });
     const mark = useMutation(api.play.mark);
-    const [tool, setTool] = useState<Measure | typeof resting>(resting);
+    const drawings = useQuery(api.play.drawings, { sessionId });
+    const drawLine = useMutation(api.play.drawLine);
+    const eraseDrawings = useMutation(api.play.eraseDrawings);
+    const [pen, setPen] = useState<Pen>({ width: penWidths.start });
+    const [tool, setTool] = useState<Measure | Sketch | typeof resting>(resting);
     // A door the table screen just opened or closed, shown until the editor's save of it comes
     // back as a new scenario, see services/tableChannel.ts.
     const [doorMoved, setDoorMoved] = useState<{ from: Scenario; to: Scenario } | null>(null);
@@ -590,6 +597,14 @@ function Table({ sessionId, mine, frozen, fogLook, blood, system, fight, check }
                         onMeasure={(next) => setTool(next ?? resting)}
                         start
                     />
+                    <DrawPicker
+                        tool={tool}
+                        onSketch={(next) => setTool(next ?? resting)}
+                        pen={pen}
+                        onPen={setPen}
+                        colour={tokens?.find((token) => token.id === mine)?.color ?? highlight}
+                        start
+                    />
                     {/* Frozen, or waiting for their turn, players cannot attack, see play.hit. */}
                     <AttackButton onClick={startTargets} disabled={held && !onTable} />
                     {myTurn && (
@@ -712,6 +727,11 @@ function Table({ sessionId, mine, frozen, fogLook, blood, system, fight, check }
                 // Only a preview for the table, like a path being drawn. The table screen keeps its
                 // own: it runs as the host, so its ruler would come back to it as the GM's too.
                 onMark={onTable ? undefined : (next) => void mark({ sessionId, mark: next }).catch(() => undefined)}
+                drawings={drawings}
+                // No message when a send fails: the map drops a refused line. The table screen draws too, as the GM.
+                onDrawLine={(key, points, used) => drawLine({ sessionId, key, points, pen: used }).then(() => undefined)}
+                pen={pen}
+                onEraseDrawings={(ids) => void eraseDrawings({ sessionId, drawingIds: ids as Id<'drawings'>[] }).catch((reason: unknown) => message.error(explain(reason, 'That did not go through. Try again.')))}
                 onDraft={(id, points, feet) =>
                     void draw({ tokenId: id as Id<'tokens'>, points, feet }).catch(() =>
                     {
