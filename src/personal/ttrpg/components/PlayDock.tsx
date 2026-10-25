@@ -23,7 +23,7 @@ import { RulerPicker } from './RulerPicker';
 import { useFullscreen } from './useScreen';
 
 /** What a press on the map does in play mode, besides drawing paths and dragging monsters. */
-export type PlayTool = 'open-doors' | 'measure' | 'area' | 'reveal' | 'reveal-circle' | 'hide' | 'hide-circle';
+export type PlayTool = 'open-doors' | 'measure' | 'area' | 'cone' | 'reveal' | 'reveal-circle' | 'hide' | 'hide-circle';
 
 /** Reveal's tool for a choice in its pop-out: uncover or hide, with a box or a circle. */
 function fogTool(hide: boolean, circle: boolean): PlayTool

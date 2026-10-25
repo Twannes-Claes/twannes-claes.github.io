@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import type { Cell, Grid, Point, Scenario, Token, Wall } from '../types';
+import type { Cell, GameSystem, Grid, Mark, Point, Scenario, Token, Wall } from '../types';
 import { cleanConditions } from '../content/conditions.ts';
 import { blocksOf, demoOgreStatBlock, spansOf, statBlockTemplates, statsOf } from '../content/statBlocks.ts';
 
@@ -264,7 +264,7 @@ assert.deepEqual([{ x: 125, y: 525 }, { x: 775, y: 525 }, { x: -10, y: 525 }].ma
 
 // Reveal area marks the samples whose centres the box reaches, and nothing outside it.
 const revealed = createExplored(walled);
-const press = (x: number, y: number): ToolPointer => ({ world: { x, y }, free: false, zoom: 1, scenario: walled, seen: () => true });
+const press = (x: number, y: number): ToolPointer => ({ world: { x, y }, free: false, zoom: 1, scenario: walled, seen: () => true, system: '5e' });
 const uncover = (polygon: Point[]) => void markSeen(revealed, polygon);
 const revealTool = createTool('reveal', () => {}, null, uncover);
 
@@ -372,6 +372,7 @@ const click = (x: number, y: number, free = false): ToolPointer => ({
     zoom: 1,
     scenario: edited,
     seen: () => true,
+    system: '5e',
 });
 const keep = (next: Scenario) =>
 {
@@ -765,4 +766,22 @@ assert.deepEqual(statsOf(demoOgreStatBlock), { name: 'Ogre', size: 'large', ac: 
     assert.equal(ridesOn(square, hero, wolf), true);
     assert.equal(ridesOn(square, { ...owl, x: 125 }, hero), false);
     assert.equal(ridesOn(square, { ...owl, summonOf: undefined }, hero), false);
+}
+
+// A cone starts on the nearer grid corner and reaches in whole cells. In Pathfinder 2e it points
+// straight or diagonally; in 5e any way.
+{
+    const shared: (Mark | null)[] = [];
+    const cell = edited.grid.size;
+    const cone = createTool('cone', () => {}, null, undefined, 1, (mark) => void shared.push(mark));
+    const at = (x: number, y: number, system: GameSystem): ToolPointer => ({ world: { x, y }, free: false, zoom: 1, scenario: edited, seen: () => true, system });
+
+    cone?.down(at(cell - 2, cell + 2, 'pf2e'));
+    cone?.move(at(cell * 3.9, cell * 1.6, 'pf2e'), true);
+    assert.deepEqual(shared.at(-1), { kind: 'cone', from: { x: cell, y: cell }, to: { x: cell * 4, y: cell } });
+
+    cone?.move(at(cell * 3.9, cell * 1.6, '5e'), true);
+    const free = shared.at(-1);
+
+    assert.ok(free && free.to.y > cell && Math.abs(distance(free.from, free.to) - cell * 3) < 1e-9);
 }

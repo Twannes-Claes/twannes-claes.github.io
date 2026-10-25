@@ -1,4 +1,4 @@
-import type { BloodSettings, Cell, CreatureSize, Decal, Draft, FogSettings, Mark, Point, PropPicture, Scenario, SharedFog, SharedHit, SharedMark, Token } from '../types';
+import type { BloodSettings, Cell, CreatureSize, Decal, Draft, FogSettings, GameSystem, Mark, Point, PropPicture, Scenario, SharedFog, SharedHit, SharedMark, Token } from '../types';
 
 import { centerOn, fitCamera, panBy, toWorld, zoomAt, type Camera } from './camera.ts';
 import {
@@ -44,7 +44,7 @@ import {
     type Viewport,
 } from './render.ts';
 import { anchorAt, footprint, footprintCenter, footprintKeys, landingAt, partners } from './size.ts';
-import { createTool, drawBox, drawMark, type MapTool, type ToolId, type ToolPointer } from './tools.ts';
+import { createTool, drawBox, drawMark, fingerGap, type MapTool, type ToolId, type ToolPointer } from './tools.ts';
 import { insidePolygon, sightSegments, visibilityPolygon, type Segment } from './visibility.ts';
 import { startWalk, walkAt, type Walk } from './walk.ts';
 
@@ -189,6 +189,8 @@ export interface MapView
     setDecals: (decals: Decal[]) => void;
     /** Which blood shows, see BloodSettings. */
     setBlood: (blood: BloodSettings) => void;
+    /** The session's game, which shapes a cone, see drawMark in map/tools.ts. */
+    setSystem: (system: GameSystem) => void;
     /** The token whose turn it is in a fight, ringed, or null. */
     setTurn: (id: string | null) => void;
     /** The world point under a point of the page, like where a preset was dropped. */
@@ -226,6 +228,8 @@ interface Route
     points: Point[];
     /** The finger, while it is in ground nobody has seen, which the path does not go into. */
     unknown?: Point;
+    /** The finger drawing it, whose feet show just above it, see fingerGap in map/tools.ts. */
+    finger?: Point;
 }
 
 /**
@@ -319,6 +323,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     let drops: (Drop & { start: number })[] = [];
     const lastDrop = new Map<string, Point>();
     let blood = defaultBlood;
+    let system: GameSystem = '5e';
     /** The token whose turn it is, see setTurn. */
     let turn: string | null = null;
     /**
@@ -663,7 +668,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
         if (shown.points.length > 1)
             // The pill stays dark unless the path is too long: a light ring colour would hide its words.
-            drawPill(context, `${shown.feet} ft`, end, camera.zoom, shown.over ? tooFar : ground, pillScale());
+            drawPill(context, `${shown.feet} ft`, route?.finger ? { x: route.finger.x, y: route.finger.y - fingerGap / camera.zoom } : end, camera.zoom, shown.over ? tooFar : ground, pillScale(), route?.finger !== undefined);
 
     };
 
@@ -953,7 +958,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             drawPathLabels(path);
 
         for (const mark of marks)
-            drawMark(context, mark, camera.zoom, scenario, mark.color ?? highlight);
+            drawMark(context, mark, camera.zoom, scenario, mark.color ?? highlight, system);
 
         tool?.draw(context, camera.zoom, scenario);
 
@@ -1222,6 +1227,8 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         scenario: current,
         seen: (point) => peek || seenGround(point),
         monsters: tokens.filter((token) => token.kind === 'npc'),
+        system,
+        touch: event.pointerType !== 'mouse',
     });
 
     /**
@@ -1268,6 +1275,15 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         // A finger has no hover: a press names the badge under it, until the next press or a pan.
         if (event.pointerType !== 'mouse')
             showBadgeAt(local(event));
+
+        // A second finger while one drags a tool, like the ruler, means a pinch: the tool lets go
+        // and both fingers zoom.
+        if (toolPointerId !== null && pointers.has(toolPointerId))
+        {
+            tool?.cancel?.();
+            toolPointerId = null;
+            redraw();
+        }
 
         const idle = pointers.size === 0 && !dragging && !route && toolPointerId === null;
         const target = idle && targets && scenario ? tokenAt(local(event), scenario) : undefined;
@@ -1322,6 +1338,11 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         if (idle && tool && scenario && tool.down(toolPointer(event, scenario)))
         {
             toolPointerId = event.pointerId;
+
+            // Kept where it is, for a pinch should a second finger come.
+            if (event.pointerType !== 'mouse')
+                pointers.set(event.pointerId, local(event));
+
             redraw();
 
             return;
@@ -1359,6 +1380,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
                 pointerId: event.pointerId,
                 cells: anchor ? [anchor] : [],
                 points: [{ x: token.x, y: token.y }],
+                finger: event.pointerType !== 'mouse' ? toWorld(camera, point) : undefined,
             };
             redraw();
 
@@ -1408,7 +1430,13 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
         if (route?.pointerId === event.pointerId && scenario)
         {
-            extendRoute(scenario, onMap(scenario, toWorld(camera, local(event))));
+            const world = onMap(scenario, toWorld(camera, local(event)));
+
+            extendRoute(scenario, world);
+
+            if (route && event.pointerType !== 'mouse')
+                route = { ...route, finger: world };
+
             redraw();
 
             return;
@@ -1444,6 +1472,9 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         {
             if (!pressed && event.pointerType === 'mouse')
                 showBadgeAt(local(event));
+
+            if (pressed && previous)
+                pointers.set(event.pointerId, local(event));
 
             if (tool && scenario)
             {
@@ -1879,6 +1910,11 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         setBlood: (next) =>
         {
             blood = next;
+            redraw();
+        },
+        setSystem: (next) =>
+        {
+            system = next;
             redraw();
         },
         setTurn: (id) =>

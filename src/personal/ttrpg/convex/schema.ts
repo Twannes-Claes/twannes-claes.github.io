@@ -282,7 +282,7 @@ export default defineSchema({
         scenarioId: v.string(),
         /** The player or the host, whose own screen draws it already. */
         userId: v.id('users'),
-        kind: v.union(v.literal('ruler'), v.literal('area')),
+        kind: v.union(v.literal('ruler'), v.literal('area'), v.literal('cone')),
         from: v.object({ x: v.number(), y: v.number() }),
         to: v.object({ x: v.number(), y: v.number() }),
         /** The player's ring colour. Missing for the host, drawn in the GM's colour. */

@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useRef } from 'react';
 
-import type { BloodSettings, Decal, Draft, FogSettings, Mark, Ping, Point, PropPicture, Scenario, SharedFog, SharedHit, SharedMark, Token } from '../types';
+import type { BloodSettings, Decal, Draft, FogSettings, GameSystem, Mark, Ping, Point, PropPicture, Scenario, SharedFog, SharedHit, SharedMark, Token } from '../types';
 
 import { demoCredit, demoScenario } from '../content/scenarios';
 import { defaultFogSettings } from '../map/fog';
@@ -94,6 +94,8 @@ interface MapCanvasProps
     decals?: Decal[];
     /** Which blood shows, see BloodSettings. */
     blood?: BloodSettings;
+    /** The session's game, which shapes a cone. */
+    system?: GameSystem;
     /** The token whose turn it is in a fight, ringed, see Initiative. */
     turn?: string | null;
     /** Hears a right click on a token in play mode, with where on the page, to open its menu. */
@@ -155,6 +157,7 @@ export function MapCanvas({
     onSelect,
     decals = noDecals,
     blood = defaultBlood,
+    system = '5e',
     turn = null,
     onPresetDrop,
     onTrayDrop,
@@ -320,6 +323,11 @@ export function MapCanvas({
     {
         view.current?.setBlood(blood);
     }, [blood]);
+
+    useEffect(() =>
+    {
+        view.current?.setSystem(system);
+    }, [system]);
 
     useEffect(() =>
     {

@@ -1,4 +1,4 @@
-import type { Mark, Point, Prop, PropPicture, Scenario, Token, Wall } from '../types';
+import type { GameSystem, Mark, Point, Prop, PropPicture, Scenario, Token, Wall } from '../types';
 
 import { danger, door as doorColour, faded, ground, highlight, ink } from './colours.ts';
 import { boxOf, closestOnSegment, distance, distanceToSegment, onMap, segmentsTouch, type Area } from './geometry.ts';
@@ -31,6 +31,7 @@ export type ToolId =
     | 'open-doors'
     | 'measure'
     | 'area'
+    | 'cone'
     | 'reveal'
     | 'reveal-circle'
     | 'hide'
@@ -64,6 +65,10 @@ export interface ToolPointer
     seen: (point: Point) => boolean;
     /** The monsters on this screen, which the erase tool takes too. */
     monsters?: Token[];
+    /** The session's game, which shapes a cone, see drawMark. */
+    system: GameSystem;
+    /** A finger rather than a mouse, which hides what is under it. */
+    touch?: boolean;
 }
 
 /** Hears the monsters the erase tool took, once the GM said yes, see eraseTool. */
@@ -599,27 +604,50 @@ export function measure(scenario: Scenario, a: Point, b: Point): { points: Point
     return { points: cells.map((cell) => cellCenter(grid, cell)), feet: pathFeet(grid, cells) };
 }
 
+/** How far above a finger its feet show while it drags a ruler or a path, in screen pixels. */
+export const fingerGap = 50;
+
 /**
  * A ruler or an area of effect, in its colour: the line through the cells with its feet, or the
- * circle with its radius in feet.
+ * circle or cone with its reach in feet. A cone has a rounded end and follows the system: as wide
+ * as it is long in 5e, a quarter circle in Pathfinder 2e. A circle's feet sit in its middle. Given the
+ * finger dragging it, the feet sit just above it and follow it between cells, clear
+ * of the thumb.
  */
-export function drawMark(ctx: CanvasRenderingContext2D, mark: Mark, zoom: number, scenario: Scenario, colour: string)
+export function drawMark(ctx: CanvasRenderingContext2D, mark: Mark, zoom: number, scenario: Scenario, colour: string, system: GameSystem, finger?: Point)
 {
+    const label = (text: string, at: Point) =>
+        (finger ? drawPill(ctx, text, { x: finger.x, y: finger.y - fingerGap / zoom }, zoom, faded(ground, 0.9), 1, true) : drawPill(ctx, text, at, zoom, faded(ground, 0.9)));
+
     if (mark.kind === 'ruler')
     {
         const { points, feet } = measure(scenario, mark.from, mark.to);
 
         drawRoute(ctx, points, zoom, colour);
-        drawPill(ctx, `${feet} ft`, mark.to, zoom, faded(ground, 0.9));
+        label(`${feet} ft`, mark.to);
 
         return;
     }
 
     const { grid } = scenario;
-    const radius = distance(mark.from, mark.to);
+    const { from, to } = mark;
+    const reach = distance(from, to);
 
     ctx.beginPath();
-    ctx.arc(mark.from.x, mark.from.y, radius, 0, Math.PI * 2);
+
+    if (mark.kind === 'area')
+        ctx.arc(from.x, from.y, reach, 0, Math.PI * 2);
+    else
+    {
+        const angle = Math.atan2(to.y - from.y, to.x - from.x);
+        // To each side: a quarter turn in all in Pathfinder, as wide as it is long in 5e.
+        const spread = system === 'pf2e' ? Math.PI / 4 : Math.atan(0.5);
+
+        ctx.moveTo(from.x, from.y);
+        ctx.arc(from.x, from.y, reach, angle - spread, angle + spread);
+        ctx.closePath();
+    }
+
     ctx.fillStyle = faded(colour, 0.18);
     ctx.fill();
     ctx.setLineDash([6 / zoom, 4 / zoom]);
@@ -627,7 +655,12 @@ export function drawMark(ctx: CanvasRenderingContext2D, mark: Mark, zoom: number
     ctx.lineWidth = 2 / zoom;
     ctx.stroke();
     ctx.setLineDash([]);
-    drawPill(ctx, `${Math.round((radius / grid.size) * grid.feetPerCell)} ft`, mark.from, zoom, faded(ground, 0.9));
+    const feet = `${Math.round((reach / grid.size) * grid.feetPerCell)} ft`;
+
+    if (mark.kind === 'area' && !finger)
+        drawPill(ctx, feet, from, zoom, faded(ground, 0.9), 1, true);
+    else
+        label(feet, to);
 }
 
 /**
@@ -637,6 +670,10 @@ export function drawMark(ctx: CanvasRenderingContext2D, mark: Mark, zoom: number
 function markTool(share: ShareMark, start: (pointer: ToolPointer) => Mark, update: (mark: Mark, pointer: ToolPointer) => Mark): MapTool
 {
     let mark: Mark | null = null;
+    // The last pointer's, for drawing, which gets no pointer.
+    let system: GameSystem = '5e';
+    // Where a finger dragging it is now, which the feet follow; none with a mouse.
+    let finger: Point | undefined;
 
     const drop = () =>
     {
@@ -655,6 +692,8 @@ function markTool(share: ShareMark, start: (pointer: ToolPointer) => Mark, updat
         down: (pointer) =>
         {
             mark = start(pointer);
+            system = pointer.system;
+            finger = pointer.touch ? pointer.world : undefined;
 
             return true;
         },
@@ -664,6 +703,9 @@ function markTool(share: ShareMark, start: (pointer: ToolPointer) => Mark, updat
                 return;
 
             const next = update(mark, pointer);
+
+            system = pointer.system;
+            finger = pointer.touch ? pointer.world : undefined;
 
             // Only a real change goes out: an area moves in whole cells, so most moves are none.
             if (next.to.x !== mark.to.x || next.to.y !== mark.to.y)
@@ -676,7 +718,7 @@ function markTool(share: ShareMark, start: (pointer: ToolPointer) => Mark, updat
         draw: (ctx, zoom, scenario) =>
         {
             if (mark)
-                drawMark(ctx, mark, zoom, scenario, ink);
+                drawMark(ctx, mark, zoom, scenario, ink, system, finger);
 
         },
     };
@@ -693,20 +735,31 @@ function measureTool(share: ShareMark): MapTool
 }
 
 /**
- * An area of effect, like a fireball: drag from where it lands out to how far it reaches. On a
- * grid it starts on whichever is nearer, a grid corner as spells are placed at the table or a
- * cell's middle for an aura around a token, and grows in whole cells; Alt places it freely.
+ * Where an area or a cone starts: on a grid, whichever is nearer, a grid corner as spells are
+ * placed at the table or a cell's middle for an aura around a token; Alt places it freely.
  */
+function areaStart({ world, free, scenario: { grid } }: ToolPointer): Point
+{
+    if (free || grid.type === 'none')
+        return world;
+
+    const corner = nearestCorner(grid, world);
+    const middle = cellCenter(grid, cellAt(grid, world));
+
+    return distance(corner, world) <= distance(middle, world) ? corner : middle;
+}
+
+/** How far an area or a cone reaches from where it starts: in whole cells on a grid. */
+function reachAt({ world, free, scenario: { grid } }: ToolPointer, from: Point): number
+{
+    const raw = distance(from, world);
+
+    return free || grid.type === 'none' ? raw : Math.max(1, Math.round(raw / grid.size)) * grid.size;
+}
+
+/** An area of effect, like a fireball: drag from where it lands out to how far it reaches. */
 function areaTool(share: ShareMark): MapTool
 {
-    const radiusAt = ({ world, free, scenario }: ToolPointer, center: Point) =>
-    {
-        const { grid } = scenario;
-        const raw = distance(center, world);
-
-        return free || grid.type === 'none' ? raw : Math.max(1, Math.round(raw / grid.size)) * grid.size;
-    };
-
     // The radius goes as a point straight right of the middle, see Mark.
     const reaching = (center: Point, radius: number): Mark => ({ kind: 'area', from: center, to: { x: center.x + radius, y: center.y } });
 
@@ -714,17 +767,34 @@ function areaTool(share: ShareMark): MapTool
         share,
         (pointer) =>
         {
-            const { world, free, scenario } = pointer;
-            const { grid } = scenario;
-            const corner = nearestCorner(grid, world);
-            const middle = cellCenter(grid, cellAt(grid, world));
-            const snapped = distance(corner, world) <= distance(middle, world) ? corner : middle;
-            const center = free || grid.type === 'none' ? world : snapped;
+            const center = areaStart(pointer);
 
-            return reaching(center, radiusAt(pointer, center));
+            return reaching(center, reachAt(pointer, center));
         },
-        (mark, pointer) => reaching(mark.from, radiusAt(pointer, mark.from)),
+        (mark, pointer) => reaching(mark.from, reachAt(pointer, mark.from)),
     );
+}
+
+/**
+ * A cone, like a dragon's breath: drag from where it starts the way it points, out to how far it
+ * reaches. In Pathfinder 2e it points straight or diagonally on a grid, the ways its cones are
+ * counted in cells.
+ */
+function coneTool(share: ShareMark): MapTool
+{
+    const eighth = Math.PI / 4;
+
+    const reaching = (from: Point, pointer: ToolPointer): Mark =>
+    {
+        const { world, free, scenario, system } = pointer;
+        const raw = Math.atan2(world.y - from.y, world.x - from.x);
+        const angle = system === 'pf2e' && !free && scenario.grid.type !== 'none' ? Math.round(raw / eighth) * eighth : raw;
+        const reach = reachAt(pointer, from);
+
+        return { kind: 'cone', from, to: { x: from.x + Math.cos(angle) * reach, y: from.y + Math.sin(angle) * reach } };
+    };
+
+    return markTool(share, (pointer) => reaching(areaStart(pointer), pointer), (mark, pointer) => reaching(mark.from, pointer));
 }
 
 /**
@@ -1364,6 +1434,8 @@ export function createTool(
             return measureTool(share);
         case 'area':
             return areaTool(share);
+        case 'cone':
+            return coneTool(share);
         case 'reveal':
         case 'hide':
             return revealTool(reveal, id === 'hide');

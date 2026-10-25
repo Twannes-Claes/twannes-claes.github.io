@@ -25,8 +25,11 @@ interface MonstersProps
     onError: (message: string) => void;
 }
 
-/** A monster's name, ring and whether it goes down at 0, to change under its row. */
-export function DetailsForm({ monster, onSave }: { monster: Token; onSave: (details: { name: string; color: string; downs: boolean }) => Promise<void> })
+/**
+ * A monster's name, ring and whether it goes down at 0, to change under its row. Without atZero,
+ * only the name and ring, for a test player, who always goes down.
+ */
+export function DetailsForm({ monster, onSave, atZero = true }: { monster: Token; onSave: (details: { name: string; color: string; downs: boolean }) => Promise<void>; atZero?: boolean })
 {
     const [downs, setDowns] = useState(monster.downs === true);
     const [failure, save, saving] = useActionState(
@@ -47,18 +50,20 @@ export function DetailsForm({ monster, onSave }: { monster: Token; onSave: (deta
                 Ring
                 <input name="color" type="color" defaultValue={monster.color} />
             </label>
-            <div className="ttrpg-settings__group" role="group" aria-label="At 0 HP">
-                At 0 HP
-                <div className="ttrpg-settings__choices">
-                    <button type="button" className="ttrpg-segment" aria-pressed={!downs} onClick={() => setDowns(false)}>
-                        Dies
-                    </button>
-                    <button type="button" className="ttrpg-segment" aria-pressed={downs} onClick={() => setDowns(true)}>
-                        <FontAwesomeIcon icon={faSkull} />
-                        Goes down
-                    </button>
+            {atZero && (
+                <div className="ttrpg-settings__group" role="group" aria-label="At 0 HP">
+                    At 0 HP
+                    <div className="ttrpg-settings__choices">
+                        <button type="button" className="ttrpg-segment" aria-pressed={!downs} onClick={() => setDowns(false)}>
+                            Dies
+                        </button>
+                        <button type="button" className="ttrpg-segment" aria-pressed={downs} onClick={() => setDowns(true)}>
+                            <FontAwesomeIcon icon={faSkull} />
+                            Goes down
+                        </button>
+                    </div>
                 </div>
-            </div>
+            )}
             {failure && (
                 <p className="ttrpg-error" role="alert">
                     {failure}

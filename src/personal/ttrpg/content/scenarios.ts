@@ -93,10 +93,10 @@ export function blankScenario(name: string): Scenario
 }
 
 
-// Aria bloodied and Bram with temp HP, so the demo shows how hurt looks and what the GM sees.
+// Arya bloodied and Brom with temp HP, so the demo shows how hurt looks and what the GM sees.
 const demoPlayers = [
-    { name: 'Aria', color: '#683c9b', speed: 30, hp: 9, maxHp: 24, tempHp: 0, ac: 14, perception: 13 },
-    { name: 'Bram', color: '#2f8f55', speed: 25, hp: 30, maxHp: 30, tempHp: 4, ac: 17, perception: 11 },
+    { name: 'Arya', color: '#683c9b', speed: 30, hp: 9, maxHp: 24, tempHp: 0, ac: 14, perception: 13 },
+    { name: 'Brom', color: '#2f8f55', speed: 25, hp: 30, maxHp: 30, tempHp: 4, ac: 17, perception: 11 },
 ];
 
 /**
@@ -121,23 +121,25 @@ export function demoOgre(grid: Grid): Omit<Token, 'id' | 'presetId' | 'summonOf'
     };
 }
 
+/** The test players a map opens with before anyone joins. The GM adds and removes more. */
+const testPlayers: Omit<Token, 'x' | 'y'>[] = demoPlayers.map((player, index) => ({ id: `player-${index}`, kind: 'player', size: 'medium', ...player }));
+
 /**
- * Two players, placed around a map's spawn point the way joining players will be, and the ogre
- * on any map with the demo's picture, which includes the example session and its copies.
+ * The test players, placed around a map's spawn point the way joining players will be, and the
+ * ogre on any map with the demo's picture, which includes the example session and its copies.
  */
-export function demoTokens(scenario: Scenario): Token[]
+export function demoTokens(scenario: Scenario, players = testPlayers): Token[]
 {
-    const spots = spawnCells(scenario.grid, scenario.walls, scenario, scenario.spawn, 2, new Set());
-    const players: Token[] = spots.map((spot, index) => ({
-        id: `player-${index}`,
-        kind: 'player',
-        size: 'medium',
-        ...demoPlayers[index],
-        ...cellCenter(scenario.grid, spot),
+    const spots = spawnCells(scenario.grid, scenario.walls, scenario, scenario.spawn, players.length, new Set());
+    const placed: Token[] = players.map((player, index) => ({
+        ...player,
+        path: undefined,
+        movedAt: undefined,
+        ...(spots[index] ? cellCenter(scenario.grid, spots[index]) : scenario.spawn),
     }));
 
     if (scenario.background !== demoScenario.background)
-        return players;
+        return placed;
 
-    return [...players, { id: 'ogre', ...demoOgre(scenario.grid), presetId: demoOgrePreset.id }];
+    return [...placed, { id: 'ogre', ...demoOgre(scenario.grid), presetId: demoOgrePreset.id }];
 }

@@ -177,11 +177,11 @@ export interface Condition
 /**
  * A ruler or an area of effect being dragged out, shown live on every screen at the table, see
  * marks in convex/play.ts. A ruler runs from one point to the other; an area is a circle around
- * from, out to to.
+ * from, out to to; a cone spreads from from towards to, shaped by the game system, see drawMark.
  */
 export interface Mark
 {
-    kind: 'ruler' | 'area';
+    kind: 'ruler' | 'area' | 'cone';
     from: Point;
     to: Point;
 }
@@ -274,7 +274,7 @@ export interface Store
 
 /**
  * A saved session being played, handed to the editor by components/SessionEditor.tsx, see
- * convex/play.ts. The demo has none and previews play mode with two test players.
+ * convex/play.ts. The demo has none and previews play mode with test players.
  */
 export interface Live
 {

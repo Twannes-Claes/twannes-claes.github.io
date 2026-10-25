@@ -852,7 +852,7 @@ Built into play mode neatly, it should look and feel good.
   Size and Details. Size moves the token onto the grid for its new footprint (`resizedAt` in
   `map/size.ts`, `play.setSize`). A right click with a tool mid drag or targets being picked
   still cancels those first (`onTokenMenu` in `map/view.ts`); Esc, a press beside it, a right
-  click on empty ground or zooming the map closes it. A test player has no Remove, only a live one leaves the table.
+  click on empty ground or zooming the map closes it. Remove takes a test player off this screen.
   In Edit it opens with the Move and Monsters tools, whose right click has nothing to cancel,
   without Attack, and the stat block keeps clear of the rail and the Monsters panel. The Players
   list has the same Size tab, and the join form asks for it, Medium first
@@ -892,6 +892,11 @@ Built into play mode neatly, it should look and feel good.
   it reaches.
 - Its shape follows the session's system (11): in 5e a cone as wide as it is long, in Pathfinder 2e
   the quarter circle of cells the rules use. Other draws the 5e one.
+- **Built.** A `cone` mark (`coneTool` and `drawMark` in `map/tools.ts`), shared live like the
+  others. It starts where the circle does, on the nearer grid corner or cell middle, and reaches in
+  whole cells; Alt places it freely. The map view gets the system from `MapCanvas`
+  (`setSystem` in `map/view.ts`). In Pathfinder 2e it points straight or diagonally on a grid.
+  Every cone has a rounded end. Only the outline shows, not the cells it covers.
 
 ### 17. Group checks
 

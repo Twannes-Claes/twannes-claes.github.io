@@ -8,6 +8,7 @@ import { cleanConditions } from '../content/conditions';
 import { blankScenario, demoTokens } from '../content/scenarios';
 import { demoOgrePreset } from '../content/statBlocks';
 import { gameSystems } from '../content/systems';
+import { ringColours } from '../map/colours';
 import { defaultFogSettings } from '../map/fog';
 import { cleanStats, defaultBlood, downedPool, hitOn, withoutNumbers } from '../map/health';
 import { nextTurn } from '../map/initiative';
@@ -82,6 +83,8 @@ function walkFromNow(path: Point[]): Pick<Token, 'path' | 'movedAt'>
 }
 
 const saveDelay = 1000;
+/** As many test players as a live table takes, see maxPlayers in convex/play.ts. */
+const maxPlayers = 12;
 const pictureFailed = 'That picture did not upload. Is it a PNG, WebP or JPEG?';
 
 /**
@@ -336,7 +339,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const active = scenarios.find((scenario) => scenario.id === activeId) ?? scenarios[0];
 
     // The map being played shows the players' tokens, live. Any other map, or a session not
-    // started, previews play mode with the two test players.
+    // started, previews play mode with the test players.
     const liveMap = live && live.live && live.activeScenarioId === active.id ? live : null;
     // A saved session's monsters stand on their map whether it is played or not, beside the test
     // players, see placeMonster in convex/play.ts. The demo's are in this tab with the players.
@@ -434,6 +437,40 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
         setSize: (id, size) => changeToken(id, (token) => ({ ...token, size, ...resizedAt(active.grid, token, size) })),
     };
     const playerControls = liveMap ?? testPlayers;
+    const testCount = tokens.filter((token) => token.kind === 'player').length;
+
+    // One more at the spawn point, numbered after the ones there, up to a full table.
+    const addTestPlayer = () =>
+    {
+        const names = new Set(tokens.map((token) => token.name));
+        let number = testCount + 1;
+
+        while (names.has(`Player ${number}`))
+            number++;
+
+        setTokens((current) => [
+            ...current,
+            {
+                id: crypto.randomUUID(),
+                kind: 'player',
+                name: `Player ${number}`,
+                color: ringColours[testCount % ringColours.length],
+                size: 'medium',
+                speed: 30,
+                hp: 20,
+                maxHp: 20,
+                tempHp: 0,
+                ac: 12,
+                perception: 10,
+                ...landingAt(active, active.spawn, 'medium', shown),
+            },
+        ]);
+    };
+
+    const removeTestPlayer = (id: string) => setTokens((current) => current.filter((token) => token.id !== id));
+
+    const setTestDetails = (id: string, { name, color }: { name: string; color: string }) =>
+        changeToken(id, (token) => ({ ...token, name: name.trim().slice(0, 30) || token.name, color }));
 
     // Where the last press let go on the page, to tell a monster dragged off the map onto the tray.
     // Heard before the map hears it, so the drag it ends is judged from where it ended.
@@ -667,14 +704,14 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const menuControls = menuMonster ? monsterControls : playerControls;
     const menuPreset = menuMonster ? monsterControls.presets.find((preset) => preset.id === menuToken.presetId) : undefined;
     const readPreset = monsterControls.presets.find((preset) => preset.id === reading);
-    // A monster leaves the map, a live player the table; the test players stay.
+    // A monster leaves the map, a live player the table, a test player this screen.
     const menuRemove = !menuToken
         ? undefined
         : menuMonster
             ? () => eraseMonster(menuToken)
             : liveMap
                 ? () => kickPlayer(liveMap, menuToken.id, menuToken.name, message.done, message.error)
-                : undefined;
+                : () => removeTestPlayer(menuToken.id);
 
     const togglePanel = (next: 'monsters' | 'fog' | 'initiative' | 'check') => setPanel((open) => (open === next ? null : next));
 
@@ -746,14 +783,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const open = (scenario: Scenario) =>
     {
         setActiveId(scenario.id);
-        setTokens((current) =>
-            demoTokens(scenario).map((token) =>
-            {
-                const was = current.find((other) => other.id === token.id);
-
-                return was && token.kind === 'player' ? { ...was, x: token.x, y: token.y, path: undefined, movedAt: undefined } : token;
-            }),
-        );
+        setTokens((current) => demoTokens(scenario, current.filter((token) => token.kind === 'player')));
         setLocalDecals([]);
         setLocalFight(null);
         setPending(null);
@@ -943,6 +973,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 hit={liveMap ? liveMap.lastHit : localHit}
                 decals={decals}
                 blood={blood}
+                system={system}
                 turn={fight?.turn ?? null}
                 targets={targets}
                 onTarget={pickTarget}
@@ -978,7 +1009,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                     title={
                         liveMap
                             ? 'Live: the fog dimmed, every monster, and your GM controls'
-                            : 'Run the map, with two test players'
+                            : 'Run the map, with test players'
                     }
                     onClick={() => switchMode('gm')}
                 >
@@ -1019,6 +1050,9 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                         onSetConditions={testPlayers.setConditions}
                         onSetSize={testPlayers.setSize}
                         grid={active.grid}
+                        onKick={removeTestPlayer}
+                        onAdd={testCount < maxPlayers ? addTestPlayer : undefined}
+                        onSetDetails={setTestDetails}
                         hidden={idle}
                     />
                 )}
@@ -1312,7 +1346,8 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                             }
                             : undefined
                     }
-                    onSetDetails={menuMonster ? (details) => monsterControls.setMonster(menuToken.id, details) : undefined}
+                    onSetDetails={menuMonster ? (details) => monsterControls.setMonster(menuToken.id, details) : liveMap ? undefined : (details) => setTestDetails(menuToken.id, details)}
+                    detailsAtZero={menuMonster}
                     onStatBlock={menuPreset ? () => setReading(reading === menuPreset.id ? null : menuPreset.id) : undefined}
                     statBlockOpen={Boolean(menuPreset) && reading === menuPreset?.id}
                     onRemove={menuRemove}

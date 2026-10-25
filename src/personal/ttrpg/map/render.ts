@@ -476,7 +476,10 @@ export function drawSelected(ctx: CanvasRenderingContext2D, at: Point, radius: n
     ctx.restore();
 }
 
-/** A small rounded label, such as the feet a path costs, the same size at any zoom. */
+/**
+ * A small rounded label, such as the feet a path costs, the same size at any zoom: above and to
+ * the right of the point, or centred on it.
+ */
 export function drawPill(
     ctx: CanvasRenderingContext2D,
     text: string,
@@ -484,10 +487,18 @@ export function drawPill(
     zoom: number,
     colour: string,
     scale = 1,
+    centred = false,
 )
 {
     // One screen pixel, times scale, so the pill keeps its size on screen at any zoom.
     const unit = scale / zoom;
+
+    if (centred)
+    {
+        drawPillAt(ctx, text, { x: at.x, y: at.y - 13 * unit }, unit, colour, { centred: true });
+
+        return;
+    }
 
     // Above and to the right of the point, so a finger on a phone does not cover it.
     drawPillAt(ctx, text, { x: at.x + 14 * unit, y: at.y - 14 * unit - 26 * unit }, unit, colour);

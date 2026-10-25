@@ -1820,7 +1820,7 @@ export const mark = mutation({
         sessionId: v.id('sessions'),
         mark: v.union(
             v.object({
-                kind: v.union(v.literal('ruler'), v.literal('area')),
+                kind: v.union(v.literal('ruler'), v.literal('area'), v.literal('cone')),
                 from: v.object({ x: v.number(), y: v.number() }),
                 to: v.object({ x: v.number(), y: v.number() }),
             }),

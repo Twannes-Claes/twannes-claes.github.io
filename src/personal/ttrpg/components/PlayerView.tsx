@@ -671,6 +671,7 @@ function Table({ sessionId, mine, frozen, fogLook, blood, system, fight, check }
                 hit={lastHit}
                 decals={decals}
                 blood={blood ?? defaultBlood}
+                system={system}
                 targets={targets}
                 onTarget={pickTarget}
                 onStats={screen.frameRate ? setStats : undefined}

@@ -32,8 +32,10 @@ interface TokenMenuProps
     onHide?: () => void;
     /** A monster on the map: off it onto the tray, hidden, see Tray.tsx. */
     onTray?: () => void;
-    /** Monsters only: name, ring and Goes down at 0. */
+    /** A monster's name, ring and Goes down at 0, or a test player's name and ring. */
     onSetDetails?: (details: { name: string; color: string; downs: boolean }) => Promise<void>;
+    /** Whether Details offers Goes down at 0: a monster's does, a test player's not. */
+    detailsAtZero?: boolean;
     /** A monster placed from a preset: opens or closes its stat block. */
     onStatBlock?: () => void;
     statBlockOpen?: boolean;
@@ -58,6 +60,7 @@ export function TokenMenu({
     onHide,
     onTray,
     onSetDetails,
+    detailsAtZero = true,
     onStatBlock,
     statBlockOpen = false,
     onRemove,
@@ -222,7 +225,7 @@ export function TokenMenu({
                             <SizePicker size={token.size} grid={grid} onChange={onSetSize} />
                         ),
                     },
-                    ...(onSetDetails ? [{ id: 'details', label: 'Details', content: <DetailsForm monster={token} onSave={onSetDetails} /> }] : []),
+                    ...(onSetDetails ? [{ id: 'details', label: 'Details', content: <DetailsForm monster={token} atZero={detailsAtZero} onSave={onSetDetails} /> }] : []),
                 ]}
             />
         </section>,

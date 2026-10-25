@@ -5,6 +5,7 @@ import {
     faPlay,
     faQrcode,
     faStop,
+    faUserPlus,
     faUserXmark,
     faUsers,
     faXmark,
@@ -19,6 +20,7 @@ import { confirmAction, kickPlayer } from '../services/confirm';
 
 import { ConditionPicker } from './ConditionPicker';
 import { Spinner } from './Feedback';
+import { DetailsForm } from './Monsters';
 import { Popover } from './Popover';
 import { RowEditor } from './RowEditor';
 import { SizePicker } from './SizePicker';
@@ -62,8 +64,12 @@ interface PlayersProps
     onSetSize: (tokenId: string, size: CreatureSize) => Promise<void>;
     /** The open map's grid, to show how much of it each size takes. */
     grid: Grid;
-    /** Removes one from the table, only in a live session. */
+    /** Removes one from the table, or a test player from this screen. */
     onKick?: (tokenId: string, name: string) => void;
+    /** Adds a test player, only before the session is live. */
+    onAdd?: () => void;
+    /** Changes a test player's name and ring, only before the session is live. */
+    onSetDetails?: (tokenId: string, details: { name: string; color: string }) => Promise<void>;
     /** Shows the QR code to join, only in a live session. */
     onQr?: () => void;
     /** See hidden on LiveControls. */
@@ -72,9 +78,9 @@ interface PlayersProps
 
 /**
  * The Players button and its pop-out: who is at the table, with their numbers to change. Live
- * it lists who joined; before that the GM view's two test players, see demoTokens.
+ * it lists who joined; before that the GM view's test players, see demoTokens.
  */
-export function Players({ tokens, onSetStats, system, onSetConditions, onSetSize, grid, onKick, onQr, hidden = false }: PlayersProps)
+export function Players({ tokens, onSetStats, system, onSetConditions, onSetSize, grid, onKick, onAdd, onSetDetails, onQr, hidden = false }: PlayersProps)
 {
     const [open, setOpen] = useState(false);
     // The one player opened under their row, and the one folding away.
@@ -100,7 +106,7 @@ export function Players({ tokens, onSetStats, system, onSetConditions, onSetSize
             {open && !hidden && (
                 <Popover title="Players" className="ttrpg-start" dismissOnOutside onClose={() => setOpen(false)}>
                     {players.length === 0 ? (
-                        <p className="ttrpg-empty">Nobody has joined yet.</p>
+                        <p className="ttrpg-empty">{onQr ? 'Nobody has joined yet.' : 'No test players.'}</p>
                     ) : (
                         <ul className="ttrpg-rows">
                             {rowsShown.map((player) => (
@@ -126,7 +132,7 @@ export function Players({ tokens, onSetStats, system, onSetConditions, onSetSize
                                             type="button"
                                             className="ttrpg-icon-button ttrpg-icon-button--small"
                                             aria-label={`Remove ${player.name}`}
-                                            title="Remove from the table"
+                                            title={onQr ? 'Remove from the table' : 'Remove'}
                                             onClick={() => onKick(player.id, player.name)}
                                         >
                                             <FontAwesomeIcon icon={faUserXmark} />
@@ -155,12 +161,21 @@ export function Players({ tokens, onSetStats, system, onSetConditions, onSetSize
                                                     label: 'Size',
                                                     content: <SizePicker size={player.size} grid={grid} onChange={(size) => onSetSize(player.id, size)} />,
                                                 },
+                                                ...(onSetDetails
+                                                    ? [{ id: 'details', label: 'Details', content: <DetailsForm monster={player} atZero={false} onSave={(details) => onSetDetails(player.id, details)} /> }]
+                                                    : []),
                                             ]}
                                         />
                                     )}
                                 </li>
                             ))}
                         </ul>
+                    )}
+                    {onAdd && (
+                        <button type="button" className="ttrpg-segment ttrpg-segment--block" onClick={onAdd}>
+                            <FontAwesomeIcon icon={faUserPlus} />
+                            Add a test player
+                        </button>
                     )}
                     {/* Always here live, the only way to the QR code, so late players can join. */}
                     {onQr && (

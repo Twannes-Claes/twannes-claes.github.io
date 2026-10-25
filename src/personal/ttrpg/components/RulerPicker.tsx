@@ -1,8 +1,8 @@
-import { faCircle, faRulerHorizontal } from '@fortawesome/free-solid-svg-icons';
+import { faCircle, faRulerHorizontal, faWifi } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
-/** What the ruler measures: a line, or a circle for an area of effect, see map/tools.ts. */
-export type Measure = 'measure' | 'area';
+/** What the ruler measures: a line, or a circle or a cone for an area of effect, see map/tools.ts. */
+export type Measure = 'measure' | 'area' | 'cone';
 
 interface RulerPickerProps
 {
@@ -15,12 +15,12 @@ interface RulerPickerProps
 
 /**
  * The ruler, for the game master and the players alike. Pressing it turns it on with a line, and
- * while it is on a pop-out above it picks a line or a circle, like Reveal's, see PlayDock.tsx.
- * Pressing it again puts it away.
+ * while it is on a pop-out above it picks a line, a circle or a cone, like Reveal's, see
+ * PlayDock.tsx. Pressing it again puts it away.
  */
 export function RulerPicker({ tool, onMeasure, start = false }: RulerPickerProps)
 {
-    const measure = tool === 'measure' || tool === 'area' ? tool : null;
+    const measure = tool === 'measure' || tool === 'area' || tool === 'cone' ? tool : null;
 
     return (
         <span className="ttrpg-pop">
@@ -57,6 +57,16 @@ export function RulerPicker({ tool, onMeasure, start = false }: RulerPickerProps
                         >
                             <FontAwesomeIcon icon={faCircle} />
                             Circle
+                        </button>
+                        <button
+                            type="button"
+                            className="ttrpg-segment"
+                            aria-pressed={measure === 'cone'}
+                            title="Drag from where a cone starts the way it points, out to how far it reaches"
+                            onClick={() => onMeasure('cone')}
+                        >
+                            <FontAwesomeIcon icon={faWifi} />
+                            Cone
                         </button>
                     </span>
                 </span>
