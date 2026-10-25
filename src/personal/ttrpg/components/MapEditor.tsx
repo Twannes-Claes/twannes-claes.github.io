@@ -809,6 +809,17 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
     };
 
+    // Takes the place of the map at index: after it when dragged down, before it when dragged up.
+    const move = (id: string, index: number) =>
+        history.commit((current) =>
+        {
+            const rest = current.filter((scenario) => scenario.id !== id);
+
+            rest.splice(index, 0, ...current.filter((scenario) => scenario.id === id));
+
+            return rest;
+        });
+
     const rename = (id: string, name: string) => updateScenario(id, (scenario) => ({ ...scenario, name }));
 
     const duplicate = (id: string) =>
@@ -1228,6 +1239,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                         scenarios={scenarios}
                         activeId={active.id}
                         onSelect={select}
+                        onMove={move}
                         onRename={rename}
                         onDuplicate={duplicate}
                         onDelete={remove}

@@ -809,9 +809,14 @@ Built into play mode neatly, it should look and feel good.
 
 ### 10. Smaller things
 
-- **Reorder scenarios:** drag them in the list, kept in `sessions.order`.
-- **Haptics:** a short tick per cell while a player draws a path, and fitting haptics for every
-  player interaction on a phone, new ones included: the initiative pop-up, Your turn, being hit.
+- **Reorder scenarios, built** (`components/ScenarioList.tsx`): the map dropdown is now a list,
+  click to open, drag a map onto another to take its place, or Alt+Up and Alt+Down. A move goes
+  through undo like any edit, and the autosave keeps it in `sessions.order`.
+- **Haptics, built** (`services/haptics.ts`, a no-op without `navigator.vibrate`, as on iOS
+  Safari): a tick per cell gained or taken back while a path is drawn (`extendRoute` in
+  `map/view.ts`), and in `components/PlayerView.tsx` a double buzz for the initiative or group
+  check pop-up, a triple one for Your turn, a long one when the own token or one of its summons is
+  hit, and a soft pulse when one is healed.
 - **Ruler for everyone, built.** One Ruler button with a Line or Circle pop-out
   (`components/RulerPicker.tsx`): in the GM view's dock, and bottom left on phones and in both
   Player views. While a ruler is dragged it goes to every screen, like a live path: one row per

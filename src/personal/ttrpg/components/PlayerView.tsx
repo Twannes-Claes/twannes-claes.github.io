@@ -22,6 +22,7 @@ import { defaultFogSettings } from '../map/fog';
 import { defaultBlood } from '../map/health';
 import type { FrameStats, PendingMove } from '../map/view';
 import { confirmAction } from '../services/confirm';
+import { buzz } from '../services/haptics';
 import { explain, uploadAvatar } from '../services/backend';
 import { toAvatar } from '../services/images';
 import { sendDoor } from '../services/tableChannel';
@@ -407,6 +408,37 @@ function Table({ sessionId, mine, frozen, fogLook, blood, system, fight, check }
     const idle = useIdle(screen.hideAfter, onTable && screen.hideAfter > 0);
 
     useWakeLock(onTable);
+
+    // Haptics on a phone, for what asks for the player while they may be looking away: a roll to
+    // send, their turn, and their own token or summons being hit or healed, found by where they stood.
+    const asked = onTable ? null : fight && !fight.begun && !fight.rolled && mine ? 'initiative' : check && !check.rolled ? check.text : null;
+    const yourTurn = !onTable && fight?.begun === true && fight.turn === mine;
+    const own = mine ? (tokens ?? []).filter((candidate) => candidate.id === mine || candidate.summonOf === mine) : [];
+    const touched = !onTable && lastHit?.targets.some((target) => own.some((token) => token.x === target.x && token.y === target.y));
+    const hitAt = touched && lastHit ? lastHit.at : null;
+    const hitKind = lastHit?.kind;
+
+    useEffect(() =>
+    {
+        if (asked)
+            buzz([30, 60, 30]);
+
+    }, [asked]);
+
+    useEffect(() =>
+    {
+        if (yourTurn)
+            buzz([40, 80, 40, 80, 40]);
+
+    }, [yourTurn]);
+
+    useEffect(() =>
+    {
+        // Only a fresh one: the last also comes back on opening the page. Healing is a soft pulse.
+        if (hitAt !== null && Date.now() - hitAt < 5000)
+            buzz(hitKind === 'heal' ? [20, 100, 20] : 200);
+
+    }, [hitAt, hitKind]);
 
     if (scenario === undefined || tokens === undefined)
         return <Note><Loading>Opening the map</Loading></Note>;

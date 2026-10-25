@@ -21,6 +21,8 @@ interface ScenarioListProps
     scenarios: Scenario[];
     activeId: string;
     onSelect: (id: string) => void;
+    /** Puts the map at index in the list, the order the session keeps. */
+    onMove: (id: string, index: number) => void;
     onRename: (id: string, name: string) => void;
     onDuplicate: (id: string) => void;
     onDelete: (id: string) => void;
@@ -71,8 +73,8 @@ function fold(folded: boolean)
 const noChange = () => () => undefined;
 
 /**
- * The scenarios of the session in the top right corner, one battle map each: a dropdown to open
- * one, rename, duplicate and delete for the open one under it, then its background. Rename swaps
+ * The scenarios of the session in the top right corner, one battle map each: a list to open one,
+ * dragged or moved with Alt+Up and Alt+Down to reorder, rename, duplicate and delete for the open one under it, then its background. Rename swaps
  * the dropdown for the name, saved on Enter or a click away, and Esc keeps the old one. The last
  * map cannot be deleted. Below, new maps: blank, imported from Dungeondraft or Dungeon Alchemist,
  * or from a picture. The title folds it to the open map's name, remembered in this browser.
@@ -81,6 +83,7 @@ export function ScenarioList({
     scenarios,
     activeId,
     onSelect,
+    onMove,
     onRename,
     onDuplicate,
     onDelete,
@@ -94,6 +97,9 @@ export function ScenarioList({
 {
     const active = scenarios.find((scenario) => scenario.id === activeId) ?? scenarios[0];
     const [renaming, setRenaming] = useState(false);
+    // The map being dragged and the row it hovers, which shows where it lands.
+    const [dragged, setDragged] = useState<string | null>(null);
+    const [over, setOver] = useState<string | null>(null);
     const folded = useSyncExternalStore(noChange, readFolded, () => false);
 
     const picked = (handle: (file: File) => void) => (event: ChangeEvent<HTMLInputElement>) =>
@@ -149,13 +155,63 @@ export function ScenarioList({
                             }}
                         />
                     ) : (
-                        <select aria-label="Open map" value={active.id} onChange={(event) => onSelect(event.target.value)}>
-                            {scenarios.map((scenario) => (
-                                <option key={scenario.id} value={scenario.id}>
-                                    {scenario.name}
-                                </option>
+                        <ol className="ttrpg-scenarios__maps" aria-label="Maps">
+                            {scenarios.map((scenario, index) => (
+                                <li key={scenario.id}>
+                                    <button
+                                        type="button"
+                                        aria-current={scenario.id === active.id}
+                                        data-over={over === scenario.id && dragged !== scenario.id ? true : undefined}
+                                        title="Open, or drag to reorder"
+                                        draggable
+                                        onClick={() => onSelect(scenario.id)}
+                                        onKeyDown={(event) =>
+                                        {
+                                            const step = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0;
+
+                                            if (!event.altKey || !step || !scenarios[index + step])
+                                                return;
+
+                                            event.preventDefault();
+                                            onMove(scenario.id, index + step);
+                                        }}
+                                        onDragStart={(event) =>
+                                        {
+                                            event.dataTransfer.effectAllowed = 'move';
+                                            setDragged(scenario.id);
+                                        }}
+                                        onDragEnd={() =>
+                                        {
+                                            setDragged(null);
+                                            setOver(null);
+                                        }}
+                                        onDragOver={(event) =>
+                                        {
+                                            if (!dragged)
+                                                return;
+
+                                            event.preventDefault();
+                                            setOver(scenario.id);
+                                        }}
+                                        onDrop={(event) =>
+                                        {
+                                            if (!dragged)
+                                                return;
+
+                                            // Not a file for the editor to open, see dropped in MapEditor.tsx.
+                                            event.preventDefault();
+                                            event.stopPropagation();
+
+                                            if (dragged !== scenario.id)
+                                                onMove(dragged, index);
+
+                                        }}
+                                    >
+                                        {scenario.name}
+                                    </button>
+                                </li>
                             ))}
-                        </select>
+                        </ol>
                     )}
                     <div className="ttrpg-settings__choices" role="group" aria-label="This map">
                         <button

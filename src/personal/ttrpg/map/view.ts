@@ -1,5 +1,7 @@
 import type { BloodSettings, Cell, CreatureSize, Decal, Draft, FogSettings, GameSystem, Mark, Point, PropPicture, Scenario, SharedFog, SharedHit, SharedMark, Token } from '../types';
 
+import { buzz } from '../services/haptics.ts';
+
 import { centerOn, fitCamera, panBy, toWorld, zoomAt, type Camera } from './camera.ts';
 import {
     clearShape,
@@ -1179,6 +1181,10 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
                 (cell, index) => index >= before && !open(footprintCenter(grid, cell, token.size)),
             );
             const cells = unseen === -1 ? grown : grown.slice(0, unseen);
+
+            // A tick per cell gained or taken back, felt on a phone while the finger hides the path.
+            if (cells.length !== before)
+                buzz(8);
 
             route = { ...route, cells, points: cells.map((cell) => footprintCenter(grid, cell, token.size)) };
 
