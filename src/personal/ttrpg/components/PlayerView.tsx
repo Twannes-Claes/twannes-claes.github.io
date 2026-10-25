@@ -170,6 +170,7 @@ function JoinForm({ sessionId, name }: JoinFormProps)
     // The character being taken back, and why that did not work.
     const [taking, setTaking] = useState<Id<'tokens'> | null>(null);
     const [takeFailure, setTakeFailure] = useState('');
+    const [returning, setReturning] = useState(false);
     const [colour] = useState(() => ringColours[Math.floor(Math.random() * ringColours.length)]);
     const [pictureName, setPictureName] = useState('');
     const [size, setSize] = useState<CreatureSize>('medium');
@@ -278,35 +279,8 @@ function JoinForm({ sessionId, name }: JoinFormProps)
         <main className="ttrpg-dashboard ttrpg-player">
             <header className="ttrpg-dashboard__header">
                 <h1>Your character</h1>
-                <p>
-                    {characters.length > 0
-                        ? 'Back at the table? Pick your character. New here? Make one below.'
-                        : 'A name, a colour for the ring around your token, a picture, and a few numbers off your sheet.'}
-                </p>
+                <p>A name, a colour for the ring around your token, a picture, and a few numbers off your sheet.</p>
             </header>
-            {characters.length > 0 && (
-                <section className="ttrpg-panel ttrpg-card" aria-label="Back at the table">
-                    <h2>Back at the table</h2>
-                    <div className="ttrpg-characters">
-                        {characters.map((character) => (
-                            <button
-                                key={character.id}
-                                type="button"
-                                className="ttrpg-segment ttrpg-character"
-                                disabled={taking !== null}
-                                onClick={() => takeBack(character.id)}
-                            >
-                                <span className="ttrpg-sheet__avatar" style={{ borderColor: character.color }} aria-hidden="true">
-                                    {character.avatar ? <img src={character.avatar} alt="" /> : character.name.charAt(0)}
-                                </span>
-                                <span className="ttrpg-character__name">{character.name}</span>
-                                {taking === character.id && <Spinner />}
-                            </button>
-                        ))}
-                    </div>
-                    {takeFailure && <p className="ttrpg-error" role="alert">{takeFailure}</p>}
-                </section>
-            )}
             <form action={create} className="ttrpg-panel ttrpg-card">
                 <label className="ttrpg-field">
                     Name
@@ -354,6 +328,35 @@ function JoinForm({ sessionId, name }: JoinFormProps)
                     {creating ? 'Joining' : 'Join'}
                 </button>
             </form>
+            {/* Behind a link, so someone new is not asked to pick from the others' characters. */}
+            {characters.length > 0 && !returning && (
+                <button type="button" className="ttrpg-link ttrpg-rejoin" onClick={() => setReturning(true)}>
+                    Already playing? Pick your character
+                </button>
+            )}
+            {characters.length > 0 && returning && (
+                <section className="ttrpg-panel ttrpg-card" aria-label="Back at the table">
+                    <h2>Back at the table</h2>
+                    <div className="ttrpg-characters">
+                        {characters.map((character) => (
+                            <button
+                                key={character.id}
+                                type="button"
+                                className="ttrpg-segment ttrpg-character"
+                                disabled={taking !== null}
+                                onClick={() => takeBack(character.id)}
+                            >
+                                <span className="ttrpg-sheet__avatar" style={{ borderColor: character.color }} aria-hidden="true">
+                                    {character.avatar ? <img src={character.avatar} alt="" /> : character.name.charAt(0)}
+                                </span>
+                                <span className="ttrpg-character__name">{character.name}</span>
+                                {taking === character.id && <Spinner />}
+                            </button>
+                        ))}
+                    </div>
+                    {takeFailure && <p className="ttrpg-error" role="alert">{takeFailure}</p>}
+                </section>
+            )}
         </main>
     );
 }

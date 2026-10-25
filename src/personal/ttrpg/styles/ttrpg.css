@@ -1332,12 +1332,23 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
     background: var(--ttrpg-well);
     font-size: 1.1rem;
     font-weight: 600;
+    /* The initial, capital like on the map's token. */
+    text-transform: uppercase;
 }
 
 .ttrpg-sheet__avatar img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+}
+
+/* The way to those players, under the join form. */
+.ttrpg-rejoin {
+    justify-self: center;
+    padding: 0.5rem;
+    color: var(--ttrpg-muted);
+    font-size: 0.875rem;
+    cursor: pointer;
 }
 
 /* The players already at the table on the join form, to take one back, see JoinForm. */
