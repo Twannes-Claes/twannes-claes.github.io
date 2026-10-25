@@ -22,3 +22,6 @@ dist/
 .agents/
 .claude/skills/convex*/
 skills-lock.json
+
+# codegraph index
+.codegraph/
