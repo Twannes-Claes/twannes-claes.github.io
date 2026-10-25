@@ -40,7 +40,7 @@ import {
     type Scene,
     type Viewport,
 } from './render.ts';
-import { anchorAt, footprint, footprintCenter, footprintKeys } from './size.ts';
+import { anchorAt, cellsAcross, footprint, footprintCenter, footprintKeys, landingAt } from './size.ts';
 import { createTool, drawBox, drawMark, type MapTool, type ToolId, type ToolPointer } from './tools.ts';
 import { insidePolygon, sightSegments, visibilityPolygon, type Segment } from './visibility.ts';
 import { startWalk, walkAt, type Walk } from './walk.ts';
@@ -178,9 +178,10 @@ export interface MapView
     setSelection: (ids: string[] | null) => void;
     /**
      * A monster dragged from the presets or the tray, drawn where it would land, lifted, hidden
-     * like it will be, over the cells it will take. Null once it leaves the map or lands.
+     * like it will be, over the cells it will take, on someone only with stack. Null once it leaves
+     * the map or lands.
      */
-    setGhost: (ghost: { monster: Pick<Token, 'name' | 'color' | 'avatar' | 'size'>; at: Point } | null) => void;
+    setGhost: (ghost: { monster: Pick<Token, 'name' | 'color' | 'avatar' | 'size'>; at: Point; stack: boolean } | null) => void;
     /** What killed monsters left on the map, see Decal. */
     setDecals: (decals: Decal[]) => void;
     /** Which blood shows, see BloodSettings. */
@@ -275,7 +276,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     /** The tokens picked with the Select tool in Edit, or null without it, see setSelection. */
     let selection: string[] | null = null;
     /** A monster dragged from the presets or the tray over the map, see setGhost. */
-    let ghost: { monster: Pick<Token, 'name' | 'color' | 'avatar' | 'size'>; at: Point } | null = null;
+    let ghost: { monster: Pick<Token, 'name' | 'color' | 'avatar' | 'size'>; at: Point; stack: boolean } | null = null;
     /** A box being dragged on empty ground with the Select tool, in world pixels. */
     let boxing: { pointerId: number; start: Point; end: Point; add: boolean } | null = null;
     let route: Route | null = null;
@@ -840,18 +841,18 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
         // The monster being dragged on, lined up with the grid the way it will land, see monsterFrom
         // in map/presets.ts.
-        const { grid } = scenario;
-        const anchor = ghost && grid.type !== 'none' ? anchorAt(grid, ghost.at, ghost.monster.size) : null;
         const landing = ghost && {
             ...ghost.monster,
             id: 'ghost',
             kind: 'npc' as const,
             speed: 0,
-            ...(anchor ? footprintCenter(grid, anchor, ghost.monster.size) : ghost.at),
+            ...landingAt(scenario, ghost.at, ghost.monster.size, ghost.stack ? [] : tokens),
             hidden: true,
             alpha: 0.8,
             lift: 1,
         };
+        const { grid } = scenario;
+        const anchor = landing && grid.type !== 'none' ? anchorAt(grid, landing, landing.size) : null;
 
         const scene: Scene = {
             scenario,
@@ -1177,13 +1178,13 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     };
 
     /**
-     * Whether a route would end on top of someone the players can see. A monster they cannot see
-     * does not count, or saying no would give away where it hides.
+     * Whether a route would end on top of someone. Outside the GM view a monster the players cannot
+     * see does not count, or saying no would give away where it hides.
      */
     const endTaken = (current: Scenario, token: Token, end: Point) =>
     {
         const { grid } = current;
-        const others = tokens.filter((other) => other.id !== token.id && (!fogEnabled || seenByPlayers(other)));
+        const others = tokens.filter((other) => other.id !== token.id && (peek || !fogEnabled || seenByPlayers(other)));
 
         if (grid.type === 'none')
         {
@@ -1559,14 +1560,20 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
         dragging = null;
 
-        // Each lands lined up with the grid, its whole footprint in cells; wherever it was let go
-        // without a grid.
-        const { grid } = scenario;
-        const landed = new Map(
-            tokens
-                .filter((token) => group.some((member) => member.id === token.id))
-                .map((token) => [token.id, grid.type === 'none' ? { x: token.x, y: token.y } : footprintCenter(grid, anchorAt(grid, token, token.size), token.size)]),
-        );
+        // Each lands lined up with the grid, its whole footprint on the map, clear of everyone else
+        // and of the group landed before it; wherever it was let go without a grid. Only the game
+        // master drags freely, so hidden monsters count too. With Alt held it may land on someone.
+        const moved = tokens.filter((token) => group.some((member) => member.id === token.id));
+        const stay = event.altKey ? [] : tokens.filter((token) => !moved.includes(token));
+        const landed = new Map<string, Point>();
+
+        for (const token of moved)
+        {
+            const to = landingAt(scenario, token, token.size, stay);
+
+            landed.set(token.id, to);
+            stay.push({ ...token, ...to });
+        }
 
         moveTokens(landed);
 
@@ -1778,7 +1785,8 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             // Tokens in mid drag keep following the finger rather than jumping back.
             const holding = new Map(tokens.filter((token) => held(token.id)).map((token) => [token.id, token]));
 
-            tokens = next.map((token) => holding.get(token.id) ?? token);
+            // Bigger first, so a small token standing in a big one's space is drawn and picked on top.
+            tokens = next.map((token) => holding.get(token.id) ?? token).sort((a, b) => cellsAcross(b.size) - cellsAcross(a.size));
             focusOwn();
             // From where walking tokens are now: their end would light up first and jump back.
             refreshFog(tokensAt(performance.now()));

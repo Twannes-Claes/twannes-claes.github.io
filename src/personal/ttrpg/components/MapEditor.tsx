@@ -12,7 +12,7 @@ import { defaultFogSettings } from '../map/fog';
 import { cleanStats, defaultBlood, downedPool, hitOn, withoutNumbers } from '../map/health';
 import { nextTurn } from '../map/initiative';
 import { monsterFrom } from '../map/presets';
-import { resizedAt } from '../map/size';
+import { landingAt, resizedAt } from '../map/size';
 import { toggleDoor, type ToolId } from '../map/tools';
 import { scenarioFromUvtt } from '../map/uvtt';
 import type { FrameStats, PendingMove } from '../map/view';
@@ -388,7 +388,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
             return Promise.resolve();
         },
-        placeMonster: (presetId, scenarioId, at) =>
+        placeMonster: (presetId, scenarioId, at, stack) =>
         {
             const preset = demoPresets.find((other) => other.id === presetId);
 
@@ -400,7 +400,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                     {
                         id: crypto.randomUUID(),
                         presetId,
-                        ...monsterFrom(preset, active.grid, at ?? active.spawn, new Set(current.map((token) => token.name))),
+                        ...monsterFrom(preset, active, at ?? active.spawn, new Set(current.map((token) => token.name)), stack ? [] : current.filter((token) => token.tray !== true)),
                         tray: at ? undefined : true,
                     },
                 ]);
@@ -503,7 +503,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
         });
 
     // Off the tray onto the map, lined up with the grid, hidden like any monster placed.
-    const fromTray = (id: string, at: Point) =>
+    const fromTray = (id: string, at: Point, stack: boolean) =>
     {
         const monster = tray.find((other) => other.id === id);
 
@@ -511,7 +511,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
             return;
 
         setMenu(null);
-        fail(monsterControls.stage(id, resizedAt(active.grid, at, monster.size), true));
+        fail(monsterControls.stage(id, landingAt(active, at, monster.size, stack ? [] : shown), true));
     };
 
     // What the Select tool's panel does to the picked monsters at once, see SelectPanel.
@@ -919,7 +919,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 onPathCancel={() => setPending(null)}
                 onScenarioChange={changeScenario}
                 onStats={showStats ? setStats : undefined}
-                onPresetDrop={playing ? undefined : (presetId, at) => fail(monsterControls.placeMonster(presetId, active.id, at))}
+                onPresetDrop={playing ? undefined : (presetId, at, stack) => fail(monsterControls.placeMonster(presetId, active.id, at, stack))}
                 onTrayDrop={playing ? undefined : fromTray}
                 onToolCancel={putToolAway}
                 shared={liveMap ? liveMap.fog : null}

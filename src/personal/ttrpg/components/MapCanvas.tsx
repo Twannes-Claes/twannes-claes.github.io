@@ -98,10 +98,13 @@ interface MapCanvasProps
     turn?: string | null;
     /** Hears a right click on a token in play mode, with where on the page, to open its menu. */
     onTokenMenu?: (id: string, client: Point) => void;
-    /** Hears a preset dragged from the library and let go over the map, see PresetLibrary.tsx. */
-    onPresetDrop?: (presetId: string, at: Point) => void;
-    /** Hears a monster dragged off the tray and let go over the map, see Tray.tsx. */
-    onTrayDrop?: (tokenId: string, at: Point) => void;
+    /**
+     * Hears a preset dragged from the library and let go over the map, see PresetLibrary.tsx, and
+     * whether Alt was held to let it land on someone.
+     */
+    onPresetDrop?: (presetId: string, at: Point, stack: boolean) => void;
+    /** Hears a monster dragged off the tray and let go over the map, see Tray.tsx, Alt as above. */
+    onTrayDrop?: (tokenId: string, at: Point, stack: boolean) => void;
 }
 
 /** What a preset tile carries while it is dragged, its id. */
@@ -369,7 +372,7 @@ export function MapCanvas({
 
                     // The monster as it would land, under the pointer, see setGhost in map/view.ts.
                     if (monster && view.current)
-                        view.current.setGhost({ monster, at: view.current.worldAt({ x: event.clientX, y: event.clientY }) });
+                        view.current.setGhost({ monster, at: view.current.worldAt({ x: event.clientX, y: event.clientY }), stack: event.altKey });
 
                 }}
                 onDragLeave={() => view.current?.setGhost(null)}
@@ -387,12 +390,12 @@ export function MapCanvas({
                     if (onPresetDrop && presetId)
                     {
                         event.preventDefault();
-                        onPresetDrop(presetId, at);
+                        onPresetDrop(presetId, at, event.altKey);
                     }
                     else if (onTrayDrop && tokenId)
                     {
                         event.preventDefault();
-                        onTrayDrop(tokenId, at);
+                        onTrayDrop(tokenId, at, event.altKey);
                     }
                 }}
             />

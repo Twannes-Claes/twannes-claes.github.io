@@ -23,7 +23,7 @@ import { applyHit, cleanStats, healthState, hitOn, withoutNumbers } from './heal
 import { begun, cleanRoll, newFight, nextTurn, swapped, upNext, withoutRoll, withRoll } from './initiative.ts';
 import { extendPath, pathBlocked, pathFeet } from './path.ts';
 import { placedSize, propAt, snapCenter, snapSize } from './props.ts';
-import { anchorAt, footprint, footprintCenter } from './size.ts';
+import { anchorAt, footprint, footprintCenter, footprintKeys, landingAt } from './size.ts';
 import { spawnCells } from './spawn.ts';
 import { createTool, measure, toggleDoor, wallInBox, type ToolPointer } from './tools.ts';
 import { scenarioFromUvtt } from './uvtt.ts';
@@ -554,6 +554,43 @@ for (const grid of grids)
             cellKey(anchor),
             label,
         );
+    }
+}
+
+// Let go on or past an edge, every size lands with the middle of each cell it covers on the map.
+for (const grid of grids)
+{
+    const map = { grid, width: 1000, height: 800 };
+
+    for (const size of sizes)
+    {
+        for (const point of [{ x: 1000, y: 800 }, { x: -300, y: 400 }, { x: 500, y: 2000 }, { x: 0, y: 0 }])
+        {
+            const anchor = anchorAt(grid, landingAt(map, point, size), size);
+            const label = `${grid.type} ${grid.hexOrientation} ${size} ${point.x},${point.y}`;
+
+            for (const cell of footprint(grid, anchor, size))
+            {
+                const { x, y } = cellCenter(grid, cell);
+
+                assert.ok(x >= 0 && y >= 0 && x <= map.width && y <= map.height, label);
+            }
+        }
+    }
+}
+
+// Let go on someone, every size lands beside them.
+for (const grid of grids)
+{
+    const map = { grid, width: 1000, height: 800 };
+    const other = { ...landingAt(map, { x: 500, y: 400 }, 'medium'), size: 'medium' as const };
+
+    for (const size of sizes)
+    {
+        const anchor = anchorAt(grid, landingAt(map, other, size, [other]), size);
+        const theirs = footprintKeys(grid, anchorAt(grid, other, 'medium'), 'medium');
+
+        assert.ok(footprint(grid, anchor, size).every((cell) => !theirs.has(cellKey(cell))), `${grid.type} ${grid.hexOrientation} ${size}`);
     }
 }
 

@@ -297,8 +297,11 @@ export interface Live
     kick: (tokenId: string) => Promise<void>;
     /** Every monster of the session on all its maps, for Edit and a GM view not yet started. */
     monsters: (Token & { scenarioId: string })[];
-    /** Puts a monster from a preset on a map, hidden, around a point, or with null on its tray. */
-    placeMonster: (presetId: string, scenarioId: string, at: Point | null) => Promise<void>;
+    /**
+     * Puts a monster from a preset on a map, hidden, near a point and clear of everyone, or on
+     * someone with stack; with null on its tray.
+     */
+    placeMonster: (presetId: string, scenarioId: string, at: Point | null, stack?: boolean) => Promise<void>;
     /** Renames a monster, changes its ring, or whether it goes down at 0. */
     setMonster: (tokenId: string, monster: Pick<Token, 'name' | 'color'> & { downs: boolean }) => Promise<void>;
     hide: (tokenId: string, hidden: boolean) => Promise<void>;

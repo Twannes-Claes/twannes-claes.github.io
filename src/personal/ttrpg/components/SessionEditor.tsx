@@ -172,8 +172,8 @@ function Session({ sessionId, debug }: SessionEditorProps)
                 friendly(moveToken({ tokenId: tokenId as Id<'tokens'>, x: to.x, y: to.y, path })),
             kick: (tokenId) => friendly(kickPlayer({ tokenId: tokenId as Id<'tokens'> })),
             monsters: monsters ?? noMonsters,
-            placeMonster: (presetId, scenarioId, at) =>
-                friendly(placeMonster({ sessionId: id, scenarioId, presetId: presetId as Id<'presets'>, at })),
+            placeMonster: (presetId, scenarioId, at, stack) =>
+                friendly(placeMonster({ sessionId: id, scenarioId, presetId: presetId as Id<'presets'>, at, stack })),
             setMonster: (tokenId, monster) => friendly(setMonster({ tokenId: tokenId as Id<'tokens'>, ...monster })),
             hide: (tokenId, hidden) => friendly(hideNpc({ tokenId: tokenId as Id<'tokens'>, hidden })),
             stage: (tokenId, at, hidden) => friendly(stageNpc({ tokenId: tokenId as Id<'tokens'>, at, hidden })),

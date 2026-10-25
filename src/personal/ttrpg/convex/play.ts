@@ -844,8 +844,9 @@ export const placeMonster = mutation({
         scenarioId: v.string(),
         presetId: v.id('presets'),
         at: v.union(v.object({ x: v.number(), y: v.number() }), v.null()),
+        stack: v.optional(v.boolean()),
     },
-    handler: async (ctx, { sessionId, scenarioId, presetId, at }) =>
+    handler: async (ctx, { sessionId, scenarioId, presetId, at, stack }) =>
     {
         const session = await requireSession(ctx, sessionId);
         const preset = await ctx.db.get('presets', presetId);
@@ -865,10 +866,11 @@ export const placeMonster = mutation({
         if (all.filter((token) => token.kind === 'npc').length >= maxMonsters)
             throw new ConvexError(`A session holds at most ${maxMonsters} monsters.`);
 
-        const names = new Set(all.filter((token) => token.scenarioId === scenarioId).map((token) => token.name));
+        const here = all.filter((token) => token.scenarioId === scenarioId);
+        const names = new Set(here.map((token) => token.name));
 
         // One on the tray stands on the spawn point until it is dragged onto the map.
-        const monster = monsterFrom(preset, scenario.grid, at ?? scenario.spawn, names);
+        const monster = monsterFrom(preset, scenario, at ?? scenario.spawn, names, stack ? [] : here.filter((token) => token.tray !== true));
 
         await ctx.db.insert('tokens', { sessionId, scenarioId, presetId, ...monster, tray: at ? undefined : true });
 

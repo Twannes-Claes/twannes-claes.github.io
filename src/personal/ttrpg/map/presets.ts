@@ -1,22 +1,22 @@
-import type { Grid, Point, Preset, Token } from '../types';
+import type { Point, Preset, Scenario, Token } from '../types';
 import { statsOf } from '../content/statBlocks.ts';
 
 import { cleanStats } from './health.ts';
-import { anchorAt, footprintCenter } from './size.ts';
+import { landingAt } from './size.ts';
 
 /**
  * The monster a preset puts on a map where it was dropped, shared by the server and the demo, see
  * placeMonster in convex/play.ts: its stat block's numbers at full health, lined up with the grid,
- * hidden until the GM shows it. A second of the same name on the map gets a number, from the
- * names already there.
+ * hidden until the GM shows it, clear of the others on the map. A second of the same name on the
+ * map gets a number, from the names already there.
  */
-export function monsterFrom(preset: Pick<Preset, 'name' | 'markdown' | 'color' | 'downs' | 'avatar'>, grid: Grid, at: Point, names: Set<string>): Omit<Token, 'id' | 'presetId'>
+export function monsterFrom(preset: Pick<Preset, 'name' | 'markdown' | 'color' | 'downs' | 'avatar'>, map: Pick<Scenario, 'grid' | 'width' | 'height'>, at: Point, names: Set<string>, others: Pick<Token, 'x' | 'y' | 'size'>[]): Omit<Token, 'id' | 'presetId'>
 {
     const stats = statsOf(preset.markdown);
     const size = stats.size ?? 'medium';
     const base = (stats.name || preset.name).slice(0, 26);
     const numbers = stats.maxHp === undefined ? {} : cleanStats({ hp: stats.maxHp, maxHp: stats.maxHp, tempHp: 0, ac: stats.ac ?? 10, perception: stats.perception ?? 10 });
-    const spot = grid.type === 'none' ? at : footprintCenter(grid, anchorAt(grid, at, size), size);
+    const spot = landingAt(map, at, size, others);
     let name = base;
 
     for (let count = 2; names.has(name); count++)

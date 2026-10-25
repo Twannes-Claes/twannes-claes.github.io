@@ -1,6 +1,7 @@
-import type { Cell, CreatureSize, Grid, Point, Wall } from '../types';
+import type { Cell, CreatureSize, Grid, Point, Token, Wall } from '../types';
 
-import { cellAt, cellCenter, cellKey, stepBlocked } from './grid.ts';
+import { distance, onMap } from './geometry.ts';
+import { cellAt, cellCenter, cellKey, neighbours, stepBlocked } from './grid.ts';
 
 /*
  * How much of the grid a creature takes, see PLAN.md: Tiny to Medium one cell, Large 2 by 2,
@@ -123,4 +124,57 @@ export function footprintKeys(grid: Grid, anchor: Cell, size: CreatureSize): Set
 export function resizedAt(grid: Grid, point: Point, size: CreatureSize): Point
 {
     return grid.type === 'none' ? { x: point.x, y: point.y } : footprintCenter(grid, anchorAt(grid, point, size), size);
+}
+
+/**
+ * Where a creature let go at a point lands: lined up with the grid like resizedAt, as near the
+ * point as it can stand with the middle of every cell it covers on the map, clear of the others.
+ * A ragged edge cell counts while its middle is on the map.
+ */
+export function landingAt(
+    map: { grid: Grid; width: number; height: number },
+    point: Point,
+    size: CreatureSize,
+    others: Pick<Token, 'x' | 'y' | 'size'>[] = [],
+): Point
+{
+    const { grid, width, height } = map;
+    const at = onMap(map, point);
+
+    if (grid.type === 'none')
+        return at;
+
+    const taken = new Set(others.flatMap((other) => [...footprintKeys(grid, anchorAt(grid, other, other.size), other.size)]));
+    const onIt = (anchor: Cell) =>
+        footprint(grid, anchor, size).every((cell) =>
+        {
+            const { x, y } = cellCenter(grid, cell);
+
+            return x >= 0 && y >= 0 && x <= width && y <= height;
+        });
+    const clear = (anchor: Cell) => onIt(anchor) && footprint(grid, anchor, size).every((cell) => !taken.has(cellKey(cell)));
+    const start = anchorAt(grid, at, size);
+
+    // The nearest anchor that fits, ring by ring outwards.
+    // ponytail: gives up ten rings past the footprint; a crowd that big lands on top instead.
+    const nearest = (fits: (anchor: Cell) => boolean) =>
+    {
+        const seen = new Set([cellKey(start)]);
+        let ring = [start];
+
+        for (let step = 0; step <= across[size] + 10 && ring.length > 0; step++)
+        {
+            const spots = ring.filter(fits).map((anchor) => footprintCenter(grid, anchor, size));
+
+            if (spots.length > 0)
+                return spots.reduce((best, spot) => (distance(spot, at) < distance(best, at) ? spot : best));
+
+            ring = ring.flatMap((anchor) => neighbours(grid, anchor)).filter((cell) => !seen.has(cellKey(cell)) && seen.add(cellKey(cell)));
+        }
+
+        return null;
+    };
+
+    // On top of someone in a crowd, and past the edge only on a map smaller than the creature.
+    return nearest(clear) ?? nearest(onIt) ?? footprintCenter(grid, start, size);
 }
