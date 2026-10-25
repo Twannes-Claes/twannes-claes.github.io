@@ -6,6 +6,7 @@ import type { PropPicture } from '../types';
 
 import { fileSize } from '../services/images';
 
+import { propDragType } from './MapCanvas';
 import { StorageMeter } from './StorageMeter';
 import { useKeydown } from './useKeys';
 
@@ -23,8 +24,8 @@ interface PropLibraryProps
 }
 
 /**
- * The game master's own prop pictures, shown with the Props tool. Pick one and every click on
- * the map places it; pick it again, or press Esc, to go back to moving and scaling placed props.
+ * The game master's own prop pictures, shown with the Props tool. Drag one onto the map, or pick
+ * one and every click on the map places it; pick it again, or press Esc, to go back to moving and scaling placed props.
  * The bin on a hovered tile deletes the picture, which frees its storage.
  * There is no built-in set, everyone brings the art they own, see PLAN.md.
  */
@@ -58,7 +59,13 @@ export function PropLibrary({ pictures, placing, onPick, onUpload, onRemove, oth
                                 type="button"
                                 className="ttrpg-library__item"
                                 aria-pressed={placing?.id === picture.id}
-                                title={`${picture.name}, ${fileSize(picture.bytes)}`}
+                                title={`${picture.name}, ${fileSize(picture.bytes)}. Drag onto the map, or pick it to place with clicks`}
+                                draggable
+                                onDragStart={(event) =>
+                                {
+                                    event.dataTransfer.setData(propDragType, picture.id);
+                                    event.dataTransfer.effectAllowed = 'copy';
+                                }}
                                 onClick={() => onPick(placing?.id === picture.id ? null : picture)}
                             >
                                 <img src={picture.src} alt={picture.name} />

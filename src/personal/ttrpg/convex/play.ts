@@ -246,14 +246,18 @@ export const status = query({
     },
 });
 
-/** The map being played, for players. Their host has it open in the editor already. */
+/**
+ * The map being played, for players. Their host has it open in the editor already. Without the
+ * props the GM hides, so the dev tools on a phone show nothing the table does not.
+ */
 export const scenario = query({
     args: { sessionId: v.id('sessions') },
     handler: async (ctx, { sessionId }) =>
     {
         const session = await memberOf(ctx, sessionId);
+        const scenario = session && session.activeScenarioId ? await scenarioOf(ctx, sessionId, session.activeScenarioId) : null;
 
-        return session && session.activeScenarioId ? await scenarioOf(ctx, sessionId, session.activeScenarioId) : null;
+        return scenario && { ...scenario, props: scenario.props.filter((prop) => prop.hidden !== true) };
     },
 });
 

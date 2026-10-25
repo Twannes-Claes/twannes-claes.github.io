@@ -437,8 +437,8 @@ they go to Convex file storage, so a 20 MB PNG becomes a few MB.
   4K screen, and the good painted packs (Forgotten Adventures, 2-Minute Tabletop) may be used
   but not shared in a public repo. So every GM uploads the human-made art they own into their
   own library, kept in Convex file storage for all their sessions, never in the repo.
-- Pick a picture in the library, click the map to place it. Its size comes from the picture,
-  one cell per 200 pixels of its longest side, the size painted props are usually made at.
+- Drag a picture from the library onto the map, or pick it and click the map to place it. It
+  lands one cell along its longest side, however big the picture; scaling it up is one drag.
 - Select to move, scale from the corner handle, turn from the top handle, delete with Del.
 - Snaps to the grid (cells, half-cell sizes, 15 degree turns); Alt places freely.
 
@@ -848,6 +848,15 @@ Built into play mode neatly, it should look and feel good.
   only, so a click on a barrel never moves it by accident.
 - A move is saved to the map like an edit in Edit: it stays there next session, and undo works.
   Every screen sees it once it is saved.
+- **Built, with hidden props.** A right click on a prop, with the Props tool in Edit or in the GM
+  view, opens its menu (`PropMenu` in `components/TokenMenu.tsx`): laid out like a token's, with
+  **Movable** and **Hide**, set on the prop (`movable`, `hidden` in `types.ts`), and **Remove**,
+  which undo brings back. The GM view's doors tool also drags movable props, a token or door
+  under the pointer first, snapped unless Alt is held (`movablePropTool` in `map/tools.ts`), and
+  the move goes through undo and the autosave like a door. A hidden prop,
+  like loot the GM prepared, shows faded on the GM's screens (`map/render.ts`); `play.scenario`
+  leaves it out for the players, and the editor's Player view leaves it out when drawing
+  (`map/view.ts`).
 
 ### 13. The GM's right-click menu
 
@@ -1041,7 +1050,7 @@ parts: the engine and the fog).
   redo; the `.dd2vtt` import; doors that the game master opens with a click in Play mode. The
   tools live in `map/tools.ts`, so the self-check clicks them too.
 - **Props, built:** no built-in set; game masters upload the human-made art they own (P in the
-  rail). Pick a picture and click to place it, sized one cell per 200 pixels; then move, scale
+  rail). Drag a picture onto the map, or pick it and click to place it, one cell big; then move, scale
   from the corner, turn from the top handle, Delete to remove. Snaps to cells, half cells and 15
   degrees unless Alt is held. A whole drag is one step to undo. The maths is in `map/props.ts`.
 - **Backend, built on Convex:** sign in with Discord, Ask to host and the owner's

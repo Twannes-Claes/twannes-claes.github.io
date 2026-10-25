@@ -1,9 +1,9 @@
-import { faBookOpen, faBurst, faEye, faEyeSlash, faInbox, faTrash, faUserXmark, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faBookOpen, faBurst, faEye, faEyeSlash, faInbox, faTrash, faUpDownLeftRight, faUserXmark, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useEffectEvent, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
-import type { Condition, CreatureSize, GameSystem, Grid, Point, Stats, Token } from '../types';
+import type { Condition, CreatureSize, GameSystem, Grid, Point, Prop, Stats, Token } from '../types';
 
 import { ConditionPicker } from './ConditionPicker';
 import { DetailsForm } from './Monsters';
@@ -45,30 +45,12 @@ interface TokenMenuProps
 }
 
 /**
- * The GM view's right-click menu on a token: the token's row as the Players and Monsters lists
- * show it opened, at the pointer. What the GM does to one token most, without finding it in a list.
+ * Keeps a right-click menu at the pointer on screen, and closes it with Esc, a press beside it or
+ * zooming the map. The card to hand its ref.
  */
-export function TokenMenu({
-    token,
-    at,
-    grid,
-    system,
-    onSetStats,
-    onSetConditions,
-    onSetSize,
-    onHit,
-    onHide,
-    onTray,
-    onSetDetails,
-    detailsAtZero = true,
-    onStatBlock,
-    statBlockOpen = false,
-    onRemove,
-    onClose,
-}: TokenMenuProps)
+function useMenuAt(at: Point, onClose: () => void)
 {
     const card = useRef<HTMLElement>(null);
-    const monster = token.kind === 'npc';
 
     // Down and to the right of the pointer, flipped to the other side where the screen ends. Laid
     // out again when it changes size, before it paints, so it never shows cut off. The controls
@@ -141,6 +123,35 @@ export function TokenMenu({
             document.removeEventListener('wheel', wheel);
         };
     }, []);
+
+    return card;
+}
+
+/**
+ * The GM view's right-click menu on a token: the token's row as the Players and Monsters lists
+ * show it opened, at the pointer. What the GM does to one token most, without finding it in a list.
+ */
+export function TokenMenu({
+    token,
+    at,
+    grid,
+    system,
+    onSetStats,
+    onSetConditions,
+    onSetSize,
+    onHit,
+    onHide,
+    onTray,
+    onSetDetails,
+    detailsAtZero = true,
+    onStatBlock,
+    statBlockOpen = false,
+    onRemove,
+    onClose,
+}: TokenMenuProps)
+{
+    const card = useMenuAt(at, onClose);
+    const monster = token.kind === 'npc';
 
     return createPortal(
         <section
@@ -228,6 +239,75 @@ export function TokenMenu({
                     ...(onSetDetails ? [{ id: 'details', label: 'Details', content: <DetailsForm monster={token} atZero={detailsAtZero} onSave={onSetDetails} /> }] : []),
                 ]}
             />
+        </section>,
+        document.querySelector('.ttrpg') ?? document.body,
+    );
+}
+
+interface PropMenuProps
+{
+    prop: Prop;
+    /** The picture's name in the prop library, if it is still there. */
+    name: string;
+    at: Point;
+    onChange: (prop: Prop) => void;
+    /** Takes it off the map, which undo brings back. */
+    onRemove: () => void;
+    onClose: () => void;
+}
+
+/**
+ * The right-click menu on a prop, in Edit and the GM view, laid out like a token's: whether the GM
+ * view drags it, hiding it, and removing it.
+ */
+export function PropMenu({ prop, name, at, onChange, onRemove, onClose }: PropMenuProps)
+{
+    const card = useMenuAt(at, onClose);
+
+    return createPortal(
+        <section
+            ref={card}
+            className="ttrpg-panel ttrpg-popover ttrpg-token-menu"
+            aria-label={name}
+            onContextMenu={(event) => event.preventDefault()}
+        >
+            <div className="ttrpg-token-menu__head">
+                <div className="ttrpg-row__main">
+                    <span className="ttrpg-row__text">
+                        <span className="ttrpg-row__name">{name}</span>
+                    </span>
+                </div>
+                <button type="button" className="ttrpg-icon-button ttrpg-icon-button--small" aria-label="Close" title="Close (Esc)" onClick={onClose}>
+                    <FontAwesomeIcon icon={faXmark} />
+                </button>
+            </div>
+
+            <div className="ttrpg-token-menu__actions">
+                <button
+                    type="button"
+                    className="ttrpg-segment"
+                    aria-pressed={prop.movable === true}
+                    title={prop.movable ? 'Keep it in place in the GM view' : 'Let the GM view drag it'}
+                    onClick={() => onChange({ ...prop, movable: prop.movable ? undefined : true })}
+                >
+                    <FontAwesomeIcon icon={faUpDownLeftRight} />
+                    Movable
+                </button>
+                <button
+                    type="button"
+                    className="ttrpg-segment"
+                    aria-pressed={prop.hidden === true}
+                    title={prop.hidden ? 'Show to the players' : 'Hide from the players'}
+                    onClick={() => onChange({ ...prop, hidden: prop.hidden ? undefined : true })}
+                >
+                    <FontAwesomeIcon icon={prop.hidden ? faEyeSlash : faEye} />
+                    {prop.hidden ? 'Hidden' : 'Hide'}
+                </button>
+                <button type="button" className="ttrpg-segment" title="Remove from the map" onClick={onRemove}>
+                    <FontAwesomeIcon icon={faTrash} />
+                    Remove
+                </button>
+            </div>
         </section>,
         document.querySelector('.ttrpg') ?? document.body,
     );

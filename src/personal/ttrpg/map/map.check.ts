@@ -482,10 +482,10 @@ assert.deepEqual(edited.spawn, { x: 420, y: 260 });
 assert.equal(createTool('align', keep), null);
 assert.equal(createTool('select', keep), null);
 
-// Props land one cell per 200 pixels of their longest side.
-const picture = { id: 'barrel', name: 'Barrel', src: 'barrel.png', width: 400, height: 200, bytes: 0 };
+// Props land one cell along their longest side, however big the picture.
+const picture = { id: 'barrel', name: 'Barrel', src: 'barrel.png', width: 4000, height: 2000, bytes: 0 };
 
-assert.deepEqual(placedSize(picture, base), { width: 200, height: 100 });
+assert.deepEqual(placedSize(picture, base), { width: 100, height: 50 });
 
 // A prop turned a quarter is hit along its new long side, not its old one.
 const turned = { id: 'p', src: '', x: 500, y: 500, width: 200, height: 100, rotation: Math.PI / 2 };

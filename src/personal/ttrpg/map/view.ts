@@ -45,6 +45,7 @@ import {
     type Scene,
     type Viewport,
 } from './render.ts';
+import { propAt } from './props.ts';
 import { anchorAt, footprint, footprintCenter, footprintKeys, landingAt, partners } from './size.ts';
 import { createTool, drawBox, drawMark, fingerGap, type MapTool, type ToolId, type ToolPointer } from './tools.ts';
 import { insidePolygon, sightSegments, visibilityPolygon, type Segment } from './visibility.ts';
@@ -131,6 +132,8 @@ export interface MapViewOptions
      * True when the page opened its menu, otherwise the click cancels as usual, see contextMenu.
      */
     onTokenMenu?: (id: string, client: Point) => boolean;
+    /** The same for a prop with no token on it, see onTokenMenu. */
+    onPropMenu?: (id: string, client: Point) => boolean;
     /**
      * A while after more of the map was seen, what has been seen in all, to share, see SharedFog.
      * At once with forget when the game master hid some, so every screen forgets it too.
@@ -867,7 +870,9 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         const anchor = landing && grid.type !== 'none' ? anchorAt(grid, landing, landing.size) : null;
 
         const scene: Scene = {
-            scenario,
+            // The Player view leaves out the props the GM hides. Only at drawing, as the scenario
+            // here is the one a door opened in the Player view saves.
+            scenario: fogEnabled && !peek ? { ...scenario, props: scenario.props.filter((prop) => !prop.hidden) } : scenario,
             background,
             picture: loaded,
             tokens: landing ? [...fadeTokens(visible, time), landing] : fadeTokens(visible, time),
@@ -1236,6 +1241,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         monsters: tokens.filter((token) => token.kind === 'npc'),
         system,
         touch: event.pointerType !== 'mouse',
+        onToken: tokenAt(local(event), current) !== undefined,
     });
 
     /**
@@ -1683,6 +1689,11 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         const token = !held && !targets && scenario ? tokenAt(local(event), scenario) : undefined;
 
         if (token && options.onTokenMenu?.(token.id, { x: event.clientX, y: event.clientY }))
+            return;
+
+        const prop = !token && !held && !targets && scenario ? propAt(scenario.props, toWorld(camera, local(event))) : undefined;
+
+        if (prop && options.onPropMenu?.(prop.id, { x: event.clientX, y: event.clientY }))
             return;
 
         if (!tool)

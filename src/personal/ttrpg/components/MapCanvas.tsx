@@ -100,6 +100,8 @@ interface MapCanvasProps
     turn?: string | null;
     /** Hears a right click on a token in play mode, with where on the page, to open its menu. */
     onTokenMenu?: (id: string, client: Point) => void;
+    /** The same for a prop. */
+    onPropMenu?: (id: string, client: Point) => void;
     /**
      * Hears a preset dragged from the library and let go over the map, see PresetLibrary.tsx, and
      * whether Alt was held to let it land on someone.
@@ -107,12 +109,16 @@ interface MapCanvasProps
     onPresetDrop?: (presetId: string, at: Point, stack: boolean) => void;
     /** Hears a monster dragged off the tray and let go over the map, see Tray.tsx, Alt as above. */
     onTrayDrop?: (tokenId: string, at: Point, stack: boolean) => void;
+    /** Hears a prop picture dragged from the library and let go over the map, and whether Alt was held to place it freely. */
+    onPropDrop?: (pictureId: string, at: Point, free: boolean) => void;
 }
 
 /** What a preset tile carries while it is dragged, its id. */
 export const presetDragType = 'application/x-ttrpg-preset';
 /** What a monster on the tray carries while it is dragged, its id. */
 export const trayDragType = 'application/x-ttrpg-tray';
+/** What a prop picture carries while it is dragged from the library, its id. */
+export const propDragType = 'application/x-ttrpg-prop';
 
 /**
  * The map, filling the screen. Drawing, gestures and tools live in map/; this only mounts the
@@ -161,7 +167,9 @@ export function MapCanvas({
     turn = null,
     onPresetDrop,
     onTrayDrop,
+    onPropDrop,
     onTokenMenu,
+    onPropMenu,
 }: MapCanvasProps)
 {
     const canvas = useRef<HTMLCanvasElement>(null);
@@ -186,6 +194,12 @@ export function MapCanvas({
         onTokenMenu?.(id, client);
 
         return Boolean(onTokenMenu);
+    });
+    const propMenuOpened = useEffectEvent((id: string, client: Point) =>
+    {
+        onPropMenu?.(id, client);
+
+        return Boolean(onPropMenu);
     });
     // The last ping and hit seen, to tell a new one from the one already there.
     const lastPing = useRef<Ping | null | undefined>(undefined);
@@ -212,6 +226,7 @@ export function MapCanvas({
             onTarget: (id) => targeted(id),
             onSelect: (ids) => selected(ids),
             onTokenMenu: (id, client) => menuOpened(id, client),
+            onPropMenu: (id, client) => propMenuOpened(id, client),
         });
 
         view.current = created;
@@ -373,7 +388,9 @@ export function MapCanvas({
                     const { types } = event.dataTransfer;
                     const monster = carrying();
 
-                    if (!(onPresetDrop && types.includes(presetDragType)) && !(onTrayDrop && types.includes(trayDragType)))
+                    const takes = (onPresetDrop && types.includes(presetDragType)) || (onTrayDrop && types.includes(trayDragType)) || (onPropDrop && types.includes(propDragType));
+
+                    if (!takes)
                         return;
 
                     event.preventDefault();
@@ -390,6 +407,7 @@ export function MapCanvas({
 
                     const presetId = event.dataTransfer.getData(presetDragType);
                     const tokenId = event.dataTransfer.getData(trayDragType);
+                    const pictureId = event.dataTransfer.getData(propDragType);
                     const at = view.current?.worldAt({ x: event.clientX, y: event.clientY });
 
                     if (!at)
@@ -404,6 +422,11 @@ export function MapCanvas({
                     {
                         event.preventDefault();
                         onTrayDrop(tokenId, at, event.altKey);
+                    }
+                    else if (onPropDrop && pictureId)
+                    {
+                        event.preventDefault();
+                        onPropDrop(pictureId, at, event.altKey);
                     }
                 }}
             />

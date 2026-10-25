@@ -2,23 +2,26 @@ import type { Grid, Point, Prop, PropPicture } from '../types';
 
 import { cellAt, cellCenter } from './grid.ts';
 
-/**
- * The pixels per 5 ft cell that battle map props are commonly painted at. A new prop gets one
- * cell per this many pixels of its longest side, so a tree painted three cells wide lands three
- * cells wide. Scaling it afterwards is one drag.
- */
-const paintedCell = 200;
 /** How far the turn handle sits above a prop, in screen pixels. */
 const turnHandleGap = 28;
 
-/** The size a picture gets on the map when it is placed. */
+/**
+ * The size a picture gets on the map when it is placed: one cell along its longest side, however
+ * big the picture is, so a huge one never covers the map. Scaling it up afterwards is one drag.
+ */
 export function placedSize(picture: PropPicture, grid: Grid): { width: number; height: number }
 {
-    const longest = Math.max(picture.width, picture.height);
-    const cells = Math.min(8, Math.max(1, Math.round(longest / paintedCell)));
-    const scale = (cells * grid.size) / longest;
+    const scale = grid.size / Math.max(picture.width, picture.height);
 
     return { width: picture.width * scale, height: picture.height * scale };
+}
+
+/** A new prop of a picture, centred on a point, snapped to the grid unless free. */
+export function newProp(picture: PropPicture, grid: Grid, at: Point, free: boolean): Prop
+{
+    const prop: Prop = { id: crypto.randomUUID(), src: picture.src, ...at, ...placedSize(picture, grid), rotation: 0 };
+
+    return free ? prop : { ...prop, ...snapCenter(grid, prop, at) };
 }
 
 /** A world point in the prop's own frame: measured from its centre, turned back by its rotation. */

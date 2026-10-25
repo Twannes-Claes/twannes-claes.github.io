@@ -75,6 +75,8 @@ export const scenarioValidator = v.object({
             width: v.number(),
             height: v.number(),
             rotation: v.number(),
+            movable: v.optional(v.boolean()),
+            hidden: v.optional(v.boolean()),
         }),
     ),
     // ponytail: at most 8192 walls, Convex's array limit. A huge imported map past it would need

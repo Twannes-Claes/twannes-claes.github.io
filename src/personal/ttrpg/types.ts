@@ -77,6 +77,10 @@ export interface Prop
     height: number;
     /** Clockwise, in radians. */
     rotation: number;
+    /** The GM view drags it, like a cart, see movablePropTool in map/tools.ts. */
+    movable?: boolean;
+    /** Kept off the players' screens until the GM shows it, like loot waiting to be found. */
+    hidden?: boolean;
 }
 
 /** A picture in the prop library, ready to be placed. */

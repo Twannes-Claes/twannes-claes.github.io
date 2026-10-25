@@ -1165,6 +1165,8 @@ export function render(
             continue;
 
         ctx.save();
+        // Only the GM's screens get hidden props at all, faded like hidden monsters.
+        ctx.globalAlpha = prop.hidden ? 0.45 : 1;
         ctx.translate(prop.x, prop.y);
         ctx.rotate(prop.rotation);
         ctx.drawImage(image, -prop.width / 2, -prop.height / 2, prop.width, prop.height);

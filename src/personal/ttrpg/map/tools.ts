@@ -4,7 +4,7 @@ import { danger, door as doorColour, faded, ground, highlight, ink } from './col
 import { boxOf, closestOnSegment, distance, distanceToSegment, onMap, segmentsTouch, type Area } from './geometry.ts';
 import { cellAt, cellCenter, cellLine, nearestCorner, snapPoint } from './grid.ts';
 import { lineFeet, pathFeet } from './path.ts';
-import { fromLocal, placedSize, propAt, propCorners, propHandles, snapCenter, snapSize } from './props.ts';
+import { fromLocal, newProp, placedSize, propAt, propCorners, propHandles, snapCenter, snapSize } from './props.ts';
 import { drawPill, drawRoute, tokenRadius } from './render.ts';
 import { sightSegments, visibilityPolygon } from './visibility.ts';
 
@@ -71,6 +71,8 @@ export interface ToolPointer
     system: GameSystem;
     /** A finger rather than a mouse, which hides what is under it. */
     touch?: boolean;
+    /** A token is under the pointer, which a press drags before a prop under it. */
+    onToken?: boolean;
 }
 
 /** Hears the monsters the erase tool took, once the GM said yes, see eraseTool. */
@@ -1267,16 +1269,9 @@ function propTool(change: Change, placing: PropPicture | null): MapTool
 
             if (placing)
             {
-                const prop: Prop = {
-                    id: crypto.randomUUID(),
-                    src: placing.src,
-                    ...world,
-                    ...placedSize(placing, scenario.grid),
-                    rotation: 0,
-                };
-                const center = pointer.free ? world : snapCenter(scenario.grid, prop, world);
+                const prop = newProp(placing, scenario.grid, world, pointer.free);
 
-                change({ ...scenario, props: [...scenario.props, { ...prop, ...center }] });
+                change({ ...scenario, props: [...scenario.props, prop] });
                 selected = prop.id;
 
                 return true;
@@ -1445,6 +1440,80 @@ function propTool(change: Change, placing: PropPicture | null): MapTool
 }
 
 /**
+ * The GM view's doors, plus dragging the props marked Movable in Edit, like a cart. Every other
+ * prop stays put, so a click on a barrel never moves it by accident. A door or a token under the
+ * pointer goes first. Snaps like the props tool unless Alt is held, and lands as one step to undo.
+ */
+function movablePropTool(doors: MapTool, change: Change): MapTool
+{
+    let drag: { id: string; offset: Point; before: Scenario } | null = null;
+    let moved = false;
+    let hover = false;
+
+    const movableAt = ({ scenario, world, onToken }: ToolPointer) =>
+        onToken ? undefined : propAt(scenario.props.filter((prop) => prop.movable), world);
+
+    return {
+        get cursor()
+        {
+            return drag ? 'grabbing' : doors.cursor || (hover ? 'grab' : '');
+        },
+        down: (pointer) =>
+        {
+            if (doors.down(pointer))
+                return true;
+
+            const hit = movableAt(pointer);
+
+            if (!hit)
+                return false;
+
+            drag = { id: hit.id, offset: { x: pointer.world.x - hit.x, y: pointer.world.y - hit.y }, before: pointer.scenario };
+
+            return true;
+        },
+        move: (pointer, pressed) =>
+        {
+            doors.move(pointer, pressed);
+            hover = movableAt(pointer) !== undefined;
+
+            const { scenario, world, free } = pointer;
+            const prop = drag && scenario.props.find((candidate) => candidate.id === drag?.id);
+
+            if (!pressed || !drag || !prop)
+                return;
+
+            const center = { x: world.x - drag.offset.x, y: world.y - drag.offset.y };
+            const next = { ...prop, ...(free ? center : snapCenter(scenario.grid, prop, center)) };
+
+            moved = true;
+            change({ ...scenario, props: scenario.props.map((other) => (other.id === prop.id ? next : other)) }, false);
+        },
+        up: (pointer) =>
+        {
+            if (drag && moved)
+                change(pointer.scenario, true);
+
+            drag = null;
+            moved = false;
+        },
+        cancel: () =>
+        {
+            if (!drag)
+                return false;
+
+            // Only ever shown, never handed on as final, so this is all it takes.
+            change(drag.before, false);
+            drag = null;
+            moved = false;
+
+            return true;
+        },
+        draw: doors.draw,
+    };
+}
+
+/**
  * The tool for an id, or null for plain panning and token dragging. placing is the library
  * picture the props tool places with each click, null to select and edit placed props. reveal
  * hears what Reveal uncovers or hides, which changes what was seen, not the scenario. snap is
@@ -1478,11 +1547,15 @@ export function createTool(
                 change,
             );
         case 'open-doors':
-            // Play mode: only doors react, so a press anywhere else still pans or drags a token.
-            return wallClickTool(
-                (wall) => wall.door !== undefined,
-                (scenario, wall) => replaceWall(scenario, toggleDoor(wall)),
-                (wall) => (wall.door?.open ? 'Close door' : 'Open door'),
+            // Play mode: only doors and movable props react, so a press anywhere else still pans or
+            // drags a token.
+            return movablePropTool(
+                wallClickTool(
+                    (wall) => wall.door !== undefined,
+                    (scenario, wall) => replaceWall(scenario, toggleDoor(wall)),
+                    (wall) => (wall.door?.open ? 'Close door' : 'Open door'),
+                    change,
+                ),
                 change,
             );
         case 'spawn':

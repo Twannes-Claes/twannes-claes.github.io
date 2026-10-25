@@ -13,6 +13,7 @@ import { defaultFogSettings } from '../map/fog';
 import { cleanStats, defaultBlood, downedPool, hitOn, withoutNumbers } from '../map/health';
 import { nextTurn } from '../map/initiative';
 import { monsterFrom } from '../map/presets';
+import { newProp } from '../map/props';
 import { landingAt, resizedAt } from '../map/size';
 import { toggleDoor, type ToolId } from '../map/tools';
 import { scenarioFromUvtt } from '../map/uvtt';
@@ -40,7 +41,7 @@ import { ScenarioList } from './ScenarioList';
 import { Settings } from './Settings';
 import { StatBlock } from './StatBlock';
 import { SelectPanel } from './SelectPanel';
-import { TokenMenu } from './TokenMenu';
+import { PropMenu, TokenMenu } from './TokenMenu';
 import { Tray } from './Tray';
 import { ToolRail } from './ToolRail';
 import { useHistory } from './useHistory';
@@ -184,6 +185,8 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const [targets, setTargets] = useState<string[] | null>(null);
     // The token right-clicked in the GM view, with where, and the preset whose stat block it opened.
     const [menu, setMenu] = useState<{ id: string; at: Point } | null>(null);
+    // The prop right-clicked in Edit's Props tool or the GM view, with where, see PropMenu.
+    const [propMenu, setPropMenu] = useState<{ id: string; at: Point } | null>(null);
     const [reading, setReading] = useState<string | null>(null);
     // The tokens picked with the Select tool in Edit, see SelectPanel.
     const [selected, setSelected] = useState<string[]>([]);
@@ -695,6 +698,9 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     // The right-clicked token, gone with the token itself, a map switch or a fight that killed it.
     // In Edit only with the tools a right click has nothing to cancel in, like a wall chain.
     const menuOpens = mode === 'gm' || (mode === 'edit' && (tool === 'select' || tool === 'pick' || tool === 'monsters'));
+    // Not while placing, where a right click stops placing.
+    const propMenuOpens = mode === 'gm' || (mode === 'edit' && tool === 'props' && !placing);
+    const menuProp = propMenu && propMenuOpens ? active.props.find((prop) => prop.id === propMenu.id) : undefined;
     const menuToken = menu && menuOpens ? [...shown, ...tray].find((token) => token.id === menu.id) : undefined;
     const menuOnTray = menuToken?.tray === true;
     // In Edit, clear of the rail, or beside the Monsters panel when it is open.
@@ -942,6 +948,16 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
     };
 
+    // A picture dragged from the props library lands where it is let go, one cell big like a click.
+    const dropProp = (pictureId: string, at: Point, free: boolean) =>
+    {
+        const picture = library.find((candidate) => candidate.id === pictureId);
+
+        if (picture)
+            changeScenario({ ...active, props: [...active.props, newProp(picture, active.grid, at, free)] });
+
+    };
+
     // Without this the browser opens a dropped file itself instead of handing it to the page.
     const draggedOver = (event: DragEvent) => event.preventDefault();
 
@@ -967,6 +983,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 onStats={showStats ? setStats : undefined}
                 onPresetDrop={playing ? undefined : (presetId, at, stack) => fail(monsterControls.placeMonster(presetId, active.id, at, stack))}
                 onTrayDrop={playing ? undefined : fromTray}
+                onPropDrop={playing ? undefined : dropProp}
                 onToolCancel={putToolAway}
                 shared={liveMap ? liveMap.fog : null}
                 onExplored={liveMap ? (fog, forget) => fail(liveMap.saveFog(fog, forget)) : undefined}
@@ -991,6 +1008,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 selection={mode === 'edit' && tool === 'pick' ? selected : null}
                 onSelect={setSelected}
                 onTokenMenu={menuOpens ? (id, at) => setMenu({ id, at }) : undefined}
+                onPropMenu={propMenuOpens ? (id, at) => setPropMenu({ id, at }) : undefined}
             />
 
             <div
@@ -1364,6 +1382,21 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                     statBlockOpen={Boolean(menuPreset) && reading === menuPreset?.id}
                     onRemove={menuRemove}
                     onClose={() => setMenu(null)}
+                />
+            )}
+
+            {menuProp && propMenu && (
+                <PropMenu
+                    prop={menuProp}
+                    name={library.find((picture) => picture.src === menuProp.src)?.name ?? 'Prop'}
+                    at={propMenu.at}
+                    onChange={(next) => changeScenario({ ...active, props: active.props.map((prop) => (prop.id === next.id ? next : prop)) })}
+                    onRemove={() =>
+                    {
+                        setPropMenu(null);
+                        changeScenario({ ...active, props: active.props.filter((prop) => prop.id !== menuProp.id) });
+                    }}
+                    onClose={() => setPropMenu(null)}
                 />
             )}
 
