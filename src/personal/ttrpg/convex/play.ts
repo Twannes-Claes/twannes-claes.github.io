@@ -16,6 +16,7 @@ import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireSession, requireUser } from './access';
+import { saveCharacter } from './characters';
 import { bloodSettingsValidator, conditionValidator, fogSettingsValidator, initiativeValidator, sizeValidator } from './schema';
 import { refreshSight, tokensOf, tokensOn } from './sight';
 import { dropFile } from './usage';
@@ -453,8 +454,8 @@ async function tryPassword(ctx: MutationCtx, session: Doc<'sessions'>, password:
 
 /**
  * Whether a password opens a live session, so the join page can ask it before the character. Null
- * for a wrong one; otherwise the players at the table, so someone whose phone forgot them can take
- * their character back, see rejoin.
+ * for a wrong one; otherwise the anonymous players at the table, so someone whose phone forgot them
+ * can take their character back, see rejoin.
  */
 export const check = mutation({
     args: { sessionId: v.id('sessions'), password: v.string() },
@@ -465,11 +466,30 @@ export const check = mutation({
         if (!(await tryPassword(ctx, await sessionOf(ctx, sessionId), password)))
             return null;
 
-        return (await tokensOf(ctx, sessionId))
-            .filter((token) => token.kind === 'player')
-            .map(({ _id, name, color, avatar }) => ({ id: _id, name, color, avatar }));
+        const players = (await tokensOf(ctx, sessionId)).filter((token) => token.kind === 'player');
+        const open = [];
+
+        for (const player of players)
+        {
+            if (await takeable(ctx, player))
+                open.push({ id: player._id, name: player.name, color: player.color, avatar: player.avatar });
+
+        }
+
+        return open;
     },
 });
+
+/**
+ * Whether someone else may take a player's token back with rejoin: only an anonymous player's. One
+ * signed in with Discord gets theirs back by signing in again, so nobody can take it over.
+ */
+async function takeable(ctx: QueryCtx, token: Doc<'tokens'>): Promise<boolean>
+{
+    const user = token.userId ? await ctx.db.get('users', token.userId) : null;
+
+    return user?.isAnonymous === true;
+}
 
 /**
  * A player whose phone forgot them, after a closed browser or cleared data, signs in as someone
@@ -495,6 +515,9 @@ export const rejoin = mutation({
         if (!token || token.sessionId !== sessionId || token.kind !== 'player')
             throw new ConvexError('That character has left the table.');
 
+        if (!(await takeable(ctx, token)))
+            throw new ConvexError('That player signed in with Discord. They sign in again to get it back.');
+
         if (await ownToken(ctx, sessionId, userId))
             throw new ConvexError('You are at the table already.');
 
@@ -519,8 +542,10 @@ export const join = mutation({
         ac: v.number(),
         perception: v.number(),
         size: sizeValidator,
+        /** A saved character the player picked, which this join changes, see characters.ts. */
+        characterId: v.optional(v.id('characters')),
     },
-    handler: async (ctx, { sessionId, password, name, color, maxHp, ac, perception, size }) =>
+    handler: async (ctx, { sessionId, password, name, color, maxHp, ac, perception, size, characterId }) =>
     {
         const userId = await requireUser(ctx);
         // Joining at full health, with no temp HP yet.
@@ -543,6 +568,9 @@ export const join = mutation({
         if (!colourPattern.test(color))
             throw new ConvexError('Pick a ring colour.');
 
+        // Signed in with Discord, the character is kept for next time, picture and all.
+        const saved = await saveCharacter(ctx, userId, characterId, { name: character, color, size, maxHp: stats.maxHp, ac: stats.ac, perception: stats.perception });
+        const kept = saved ? { characterId: saved._id, ...(saved.avatar ? { avatar: saved.avatar } : {}) } : {};
         const existing = await ownToken(ctx, sessionId, userId);
 
         if (existing)
@@ -550,7 +578,7 @@ export const join = mutation({
             const stood = await scenarioOf(ctx, sessionId, existing.scenarioId);
             const at = stood ? resizedAt(stood.grid, existing, size) : existing;
 
-            await ctx.db.patch('tokens', existing._id, { name: character, color, size, x: at.x, y: at.y, ...stats });
+            await ctx.db.patch('tokens', existing._id, { name: character, color, size, x: at.x, y: at.y, ...stats, ...kept });
 
             return existing._id;
         }
@@ -579,6 +607,7 @@ export const join = mutation({
             scenarioId: session.activeScenarioId,
             ...spot,
             ...stats,
+            ...kept,
         });
 
         await refreshSight(ctx, sessionId, scenario);
@@ -613,6 +642,20 @@ export const keepAvatar = internalMutation({
 
         if (token.avatarId && token.avatarId !== storageId)
             await dropFile(ctx, token.avatarId);
+
+        const character = token.characterId ? await ctx.db.get('characters', token.characterId) : null;
+
+        // A saved character keeps the file for next time; the token only shows it.
+        if (character)
+        {
+            if (character.avatarId && character.avatarId !== storageId)
+                await dropFile(ctx, character.avatarId);
+
+            await ctx.db.patch('characters', character._id, { avatar, avatarId: storageId });
+            await ctx.db.patch('tokens', token._id, { avatar, avatarId: undefined });
+
+            return 'kept';
+        }
 
         await ctx.db.patch('tokens', token._id, { avatar, avatarId: storageId });
 

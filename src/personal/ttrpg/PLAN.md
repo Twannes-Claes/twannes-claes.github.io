@@ -907,6 +907,17 @@ Built into play mode neatly, it should look and feel good.
   volume, with the YouTube player embedded in the panel.
 - It plays from the GM's laptop, in the editor's tab, so it keeps playing in Edit too.
 
+### 19. Player accounts
+
+- Optional: a player can sign in with Discord on the join page. The session password is still
+  asked; signing in only keeps their characters and makes them the same player on any phone.
+- **Built.** The join page offers it on the password step, so Discord sending the browser back
+  loses nothing typed. Joining signed in saves the character (`convex/characters.ts`), and next
+  time a tap on it fills the form; what they join as is saved again. The character owns its
+  picture, so ending a session never deletes it. `/ttrpg` lists them to delete
+  (`components/CharacterList.tsx`). A signed-in player's character is never on the rejoin list
+  and cannot be taken over (`takeable` in `convex/play.ts`); they sign in again instead.
+
 ### Build order
 
 1 first, since it splits what the GM sees from what the players see, which everything after it

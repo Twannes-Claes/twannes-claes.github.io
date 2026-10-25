@@ -85,8 +85,12 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const [store] = useState(() => sessionStore(id));
     const [opened, setOpened] = useState<Opened | null>(null);
     const [error, setError] = useState('');
-    // Signing out in another tab stops these, rather than leaving them to fail.
-    const following = opened && isAuthenticated;
+    // Every tab shares one sign-in, so joining as a player in another tab signs this one in as that
+    // player. Signing out, or in as someone else, stops these rather than leaving them to fail.
+    const me = useQuery(api.hosts.me, isAuthenticated ? {} : 'skip');
+    const hosting = me?.role === 'host' || me?.role === 'owner';
+    const notHost = !isLoading && (!isAuthenticated || me !== undefined) && !hosting;
+    const following = opened && hosting;
     const status = useQuery(api.play.status, following ? { sessionId } : 'skip');
     const tokens = useQuery(api.play.tokens, following ? { sessionId: id } : 'skip');
     const fog = useQuery(api.play.fog, following ? { sessionId: id } : 'skip');
@@ -129,7 +133,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
 
     useEffect(() =>
     {
-        if (!isAuthenticated)
+        if (!hosting)
             return;
 
         let cancelled = false;
@@ -153,7 +157,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
         {
             cancelled = true;
         };
-    }, [convex, isAuthenticated, id]);
+    }, [convex, hosting, id]);
 
     const live: Live | undefined = status
         ? {
@@ -226,7 +230,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
         }
         : undefined;
 
-    if (opened)
+    if (opened && !notHost)
     {
         return (
             <MapEditor
@@ -241,9 +245,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
         );
     }
 
-    const signedOut = !isLoading && !isAuthenticated;
-
-    if (!signedOut && !error)
+    if (!notHost && !error)
     {
         return (
             <main className="ttrpg-placeholder">
@@ -254,8 +256,8 @@ function Session({ sessionId, debug }: SessionEditorProps)
 
     return (
         <main className="ttrpg-placeholder">
-            <h1>{signedOut ? 'Signed out' : 'Could not open it'}</h1>
-            <p>{signedOut ? 'Sign in to open this session.' : error}</p>
+            <h1>{notHost ? 'Signed out' : 'Could not open it'}</h1>
+            <p>{notHost ? 'This browser is not signed in as the host. Sign in with Discord to open this session.' : error}</p>
             <p>
                 <Link to="/ttrpg" className="ttrpg-link">
                     Back to your sessions

@@ -9,14 +9,15 @@ import { api } from '../convex/_generated/api';
 import { fileSize } from '../services/images';
 
 import { Backend } from './Backend';
+import { CharacterList } from './CharacterList';
 import { Loading, Spinner } from './Feedback';
 import { HostList } from './HostList';
 import { SessionList } from './SessionList';
 import { StorageMeter } from './StorageMeter';
 
 /**
- * The dashboard behind sign in: the host's sessions, asking to host, and for the owner the hosts,
- * see PLAN.md. Loaded on demand by pages/Dashboard.tsx, with Convex.
+ * The dashboard behind sign in: the host's sessions, the player's saved characters, asking to
+ * host, and for the owner the hosts, see PLAN.md. Loaded on demand by pages/Dashboard.tsx, with Convex.
  */
 export function Account()
 {
@@ -53,6 +54,7 @@ function Home()
             </section>
 
             {hosting && <SessionList />}
+            <CharacterList />
             {me.role === 'owner' && <HostList />}
             {me.role === 'guest' && <AskToHost />}
             {me.role === 'asked' && (
@@ -131,19 +133,20 @@ function SignIn()
     const { signIn } = useAuthActions();
     const [leaving, setLeaving] = useState(false);
 
-    // Discord sends the browser back here, where Backend finishes the sign in.
+    // Discord sends the browser back here, at the address it opened, where Backend finishes the
+    // sign in, see redirect in convex/auth.ts.
     const signInWithDiscord = () =>
     {
         setLeaving(true);
-        signIn('discord', { redirectTo: '/ttrpg' }).catch(() => setLeaving(false));
+        signIn('discord', { redirectTo: `${window.location.origin}/ttrpg` }).catch(() => setLeaving(false));
     };
 
     return (
         <section className="ttrpg-panel ttrpg-card" aria-label="Sign in">
-            <h2>Sign in to host</h2>
+            <h2>Sign in</h2>
             <p className="ttrpg-dashboard__note">
-                Game masters sign in to build and run sessions. Players do not need an account,
-                they join with the QR code at the table.
+                Game masters sign in to build and run sessions. Players join with the QR code at the
+                table, and can sign in to keep their characters.
             </p>
             <div className="ttrpg-card__actions">
                 <button type="button" className="ttrpg-button" disabled={leaving} onClick={signInWithDiscord}>

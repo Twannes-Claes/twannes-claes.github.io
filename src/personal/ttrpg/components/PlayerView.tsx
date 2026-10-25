@@ -7,6 +7,7 @@ import {
     faRightFromBracket,
     faSnowflake,
 } from '@fortawesome/free-solid-svg-icons';
+import { faDiscord } from '@fortawesome/free-brands-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useAuthActions, useAuthToken, useConvexAuth } from '@convex-dev/auth/react';
 import { useConvex, useMutation, useQuery } from 'convex/react';
@@ -52,8 +53,10 @@ interface PlayerViewProps
 
 /**
  * The phone side of a session: join with the password and a character, then move on the map.
- * Players never make an account: the page signs them in anonymously, which keeps them the same
- * player on this phone, so coming back skips joining. Loaded on demand by pages/Join.tsx.
+ * Players need no account: the page signs them in anonymously, which keeps them the same player
+ * on this phone, so coming back skips joining. Signed in with Discord instead, they are the same
+ * player on any phone and keep their characters, see convex/characters.ts. Loaded on demand by
+ * pages/Join.tsx.
  */
 export function PlayerView(props: PlayerViewProps)
 {
@@ -174,6 +177,28 @@ function JoinForm({ sessionId, name }: JoinFormProps)
     const [colour] = useState(() => ringColours[Math.floor(Math.random() * ringColours.length)]);
     const [pictureName, setPictureName] = useState('');
     const [size, setSize] = useState<CreatureSize>('medium');
+    // Signed in with Discord, the saved characters, and the one the form starts from. Null when
+    // anonymous, which keeps none.
+    const saved = useQuery(api.characters.mine);
+    const [pickedId, setPickedId] = useState<Id<'characters'> | null>(null);
+    const picked = saved?.find((character) => character.id === pickedId) ?? null;
+    const { signIn } = useAuthActions();
+    const [leaving, setLeaving] = useState(false);
+
+    const pick = (character: NonNullable<typeof saved>[number] | null) =>
+    {
+        setPickedId(character?.id ?? null);
+        setSize(character?.size ?? 'medium');
+        setPictureName('');
+    };
+
+    // Discord sends the browser back to this join page, at the address the phone opened it on,
+    // where Backend finishes the sign in, see redirect in convex/auth.ts.
+    const signInWithDiscord = () =>
+    {
+        setLeaving(true);
+        signIn('discord', { redirectTo: window.location.href }).catch(() => setLeaving(false));
+    };
 
     const [wrong, check, checking] = useActionState(
         (_: string, form: FormData) =>
@@ -216,6 +241,7 @@ function JoinForm({ sessionId, name }: JoinFormProps)
             ac: Number(form.get('ac')),
             perception: Number(form.get('perception')),
             size,
+            characterId: picked?.id,
         };
 
         return avatar.then(
@@ -271,6 +297,18 @@ function JoinForm({ sessionId, name }: JoinFormProps)
                         {checking ? 'Checking' : 'Next'}
                     </button>
                 </form>
+                {/* Before the password, so Discord sending the browser back loses nothing typed. */}
+                {saved === null && (
+                    <section className="ttrpg-panel ttrpg-card" aria-label="Keep your character">
+                        <p className="ttrpg-dashboard__note">Sign in with Discord to keep your character for the next game.</p>
+                        <div className="ttrpg-card__actions">
+                            <button type="button" className="ttrpg-button" disabled={leaving} onClick={signInWithDiscord}>
+                                {leaving ? <Spinner /> : <FontAwesomeIcon icon={faDiscord} />}
+                                {leaving ? 'Opening Discord' : 'Sign in with Discord'}
+                            </button>
+                        </div>
+                    </section>
+                )}
             </main>
         );
     }
@@ -279,22 +317,40 @@ function JoinForm({ sessionId, name }: JoinFormProps)
         <main className="ttrpg-dashboard ttrpg-player">
             <header className="ttrpg-dashboard__header">
                 <h1>Your character</h1>
-                <p>A name, a colour for the ring around your token, a picture, and a few numbers off your sheet.</p>
+                <p>
+                    {saved
+                        ? 'Pick a saved character or make a new one. What you join as is kept for next time.'
+                        : 'A name, a colour for the ring around your token, a picture, and a few numbers off your sheet.'}
+                </p>
             </header>
-            <form action={create} className="ttrpg-panel ttrpg-card">
+            {saved && saved.length > 0 && (
+                <div className="ttrpg-picks" role="group" aria-label="Your characters">
+                    {saved.map((character) => (
+                        <button key={character.id} type="button" className="ttrpg-pick" aria-pressed={character.id === pickedId} onClick={() => pick(character)}>
+                            <span className="ttrpg-swatch" style={{ background: character.color }} />
+                            {character.name}
+                        </button>
+                    ))}
+                    <button type="button" className="ttrpg-pick" aria-pressed={pickedId === null} onClick={() => pick(null)}>
+                        New character
+                    </button>
+                </div>
+            )}
+            {/* Keyed on the pick, so its fields start from that character. */}
+            <form key={pickedId ?? 'new'} action={create} className="ttrpg-panel ttrpg-card">
                 <label className="ttrpg-field">
                     Name
-                    <input name="name" maxLength={30} autoComplete="off" required autoFocus />
+                    <input name="name" maxLength={30} autoComplete="off" required autoFocus defaultValue={picked?.name} />
                 </label>
                 <label className="ttrpg-field">
                     Ring colour
-                    <input name="color" type="color" defaultValue={colour} />
+                    <input name="color" type="color" defaultValue={picked?.color ?? colour} />
                 </label>
                 <div className="ttrpg-field">
                     Picture, from the camera or your photos
                     <label className="ttrpg-segment">
                         <FontAwesomeIcon icon={faImage} />
-                        <span>{pictureName || 'Choose a picture'}</span>
+                        <span>{pictureName || (picked?.avatar ? 'Change the picture' : 'Choose a picture')}</span>
                         <input
                             name="picture"
                             type="file"
@@ -312,15 +368,15 @@ function JoinForm({ sessionId, name }: JoinFormProps)
                 <div className="ttrpg-fields">
                     <label className="ttrpg-field">
                         Max HP
-                        <input name="maxHp" type="number" inputMode="numeric" min={1} max={9999} required />
+                        <input name="maxHp" type="number" inputMode="numeric" min={1} max={9999} required defaultValue={picked?.maxHp} />
                     </label>
                     <label className="ttrpg-field">
                         AC
-                        <input name="ac" type="number" inputMode="numeric" min={0} max={50} required />
+                        <input name="ac" type="number" inputMode="numeric" min={0} max={50} required defaultValue={picked?.ac} />
                     </label>
                     <label className="ttrpg-field" title="Passive Perception">
                         Perception
-                        <input name="perception" type="number" inputMode="numeric" min={0} max={50} required />
+                        <input name="perception" type="number" inputMode="numeric" min={0} max={50} required defaultValue={picked?.perception} />
                     </label>
                 </div>
                 {failure && <p className="ttrpg-error" role="alert">{failure}</p>}

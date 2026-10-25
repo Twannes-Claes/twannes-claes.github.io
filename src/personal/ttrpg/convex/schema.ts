@@ -185,11 +185,14 @@ export default defineSchema({
         downs: v.optional(v.boolean()),
         /** The preset a monster was placed from, for its stat block in the GM view. */
         presetId: v.optional(v.id('presets')),
+        /** The saved character a player joined as, which owns the picture, see characters.ts. */
+        characterId: v.optional(v.id('characters')),
     })
         .index('by_sessionId_and_userId', ['sessionId', 'userId'])
         .index('by_sessionId_and_scenarioId', ['sessionId', 'scenarioId'])
         .index('by_avatarId', ['avatarId'])
-        .index('by_presetId', ['presetId']),
+        .index('by_presetId', ['presetId'])
+        .index('by_characterId', ['characterId']),
     /**
      * What the party has seen of each scenario of a session, see SharedFog in types.ts. Its own
      * table, so the frequent fog saves never rewrite the scenario.
@@ -336,5 +339,23 @@ export default defineSchema({
         avatarId: v.optional(v.id('_storage')),
     })
         .index('by_ownerId', ['ownerId'])
+        .index('by_avatarId', ['avatarId']),
+    /**
+     * A player's characters, kept for every table they join when signed in with Discord, see
+     * characters.ts. An anonymous player keeps none.
+     */
+    characters: defineTable({
+        userId: v.id('users'),
+        name: v.string(),
+        color: v.string(),
+        size: sizeValidator,
+        maxHp: v.number(),
+        ac: v.number(),
+        perception: v.number(),
+        /** A 256 px picture in Convex storage, which every token joined as it shows. */
+        avatar: v.optional(v.string()),
+        avatarId: v.optional(v.id('_storage')),
+    })
+        .index('by_userId', ['userId'])
         .index('by_avatarId', ['avatarId']),
 });
