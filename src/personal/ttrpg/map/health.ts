@@ -39,15 +39,15 @@ export function applyHit(stats: { hp: number; maxHp: number; tempHp?: number }, 
 /**
  * What a hit does to a token: its HP after, null for one without numbers, which takes nothing,
  * whether it dies of it, a monster brought to 0, and whether it goes down, a player brought to 0
- * from above it, or a monster that goes down at 0. One at 0 is down and stays; hit again there,
- * it goes down no further.
+ * from above it, or a monster that goes down at 0. A summon dies like a monster. One at 0 is down
+ * and stays; hit again there, it goes down no further.
  */
-export function hitOn(token: Pick<Token, 'kind' | 'hp' | 'maxHp' | 'tempHp' | 'downs'>, kind: HitKind, amount: number)
+export function hitOn(token: Pick<Token, 'kind' | 'hp' | 'maxHp' | 'tempHp' | 'downs' | 'summonOf'>, kind: HitKind, amount: number)
 {
     const { hp, maxHp, tempHp } = token;
     const after = hp !== undefined && maxHp !== undefined ? applyHit({ hp, maxHp, tempHp }, kind, amount) : null;
     const zero = after !== null && after.hp === 0;
-    const goesDown = token.kind === 'player' || token.downs === true;
+    const goesDown = (token.kind === 'player' && !token.summonOf) || token.downs === true;
 
     return { after, died: zero && !goesDown, downed: zero && goesDown && hp !== 0 };
 }

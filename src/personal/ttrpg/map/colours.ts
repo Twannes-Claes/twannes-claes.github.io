@@ -18,6 +18,8 @@ export const danger = '#e0565b';
 export const heal = '#6fcf8e';
 /** AC, the cool grey-blue of a steel shield. */
 export const steel = '#a9bdd6';
+/** The ring colours a player is offered first, which read well on any map. */
+export const ringColours = ['#683c9b', '#2f8f55', '#c27c2c', '#2c7cc2', '#b4443c', '#c2b22c'];
 /** Temp HP, a light blue that reads on a dark label: it takes the hits first. */
 export const tempHp = '#8db9f2';
 /** A path past the token's speed. */

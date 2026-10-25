@@ -9,7 +9,7 @@ import { drawFog, type FogLayers, type FogLook } from './fog.ts';
 import { distance, type Area } from './geometry.ts';
 import { cellAt, cellCenter, cellCorners, hexRadius } from './grid.ts';
 import { healthState, stateOf } from './health.ts';
-import { cellsAcross } from './size.ts';
+import { cellsAcross, ridesOn } from './size.ts';
 
 /** Around the map, darker than any floor, so the edge of the map reads. */
 const outside = '#121113';
@@ -25,7 +25,8 @@ export interface Viewport
 }
 
 /** A token as it shows mid walk: lift is how high it is off the map, 0 to 1, see map/walk.ts. */
-export type Lifted = Token & { lift?: number };
+/** A token as drawn: lifted while it walks, and smaller riding on its carrier's ring, see perched. */
+export type Lifted = Token & { lift?: number; radius?: number };
 
 /**
  * A drop of blood a badly hurt token left as it walked, see map/view.ts: seed shapes it, and
@@ -159,10 +160,58 @@ function drawDrop(ctx: CanvasRenderingContext2D, { x, y, radius, seed, alpha }: 
     ctx.fill();
 }
 
+/**
+ * How much smaller than the cell's usual token a creature smaller than Medium is drawn, so it reads
+ * as small. It still takes and walks whole cells, see map/size.ts.
+ */
+const shrink: Partial<Record<CreatureSize, number>> = { tiny: 0.55, small: 0.8 };
+
+/** How many cells across a token is drawn, for drawing and for which goes on top. */
+export function drawnAcross(size: CreatureSize): number
+{
+    return cellsAcross(size) * (shrink[size] ?? 1);
+}
+
 /** A token's radius, 60 percent across the cells it covers, so the grid shows around it. */
 export function tokenRadius(grid: Grid, size: CreatureSize = 'medium'): number
 {
-    return grid.size * 0.3 * cellsAcross(size);
+    return grid.size * 0.3 * drawnAcross(size);
+}
+
+/** A drawn token's radius, a rider's own smaller one, see perched. */
+export function shownRadius(grid: Grid, token: Lifted): number
+{
+    return token.radius ?? tokenRadius(grid, token.size);
+}
+
+/** Where on its carrier's ring a rider sits: the upper left, clear of the condition badges. */
+const perchAngle = (-135 * Math.PI) / 180;
+
+/**
+ * Tokens as they show, each rider moved onto its carrier's ring at under half its size and drawn
+ * over it, like a condition badge but bigger: a familiar on a shoulder, a player on their horse.
+ * One walking on its own only passes through, so it stays as it is; carried, both walk.
+ */
+export function perched(tokens: Lifted[], grid: Grid, walking: (id: string) => boolean = () => false): Lifted[]
+{
+    const riders: Lifted[] = [];
+    const rest = tokens.filter((token) =>
+    {
+        const carrier = tokens.find(
+            (other) => other.id !== token.id && ridesOn(grid, token, other) && (!walking(token.id) || walking(other.id)),
+        );
+
+        if (!carrier)
+            return true;
+
+        const radius = tokenRadius(grid, carrier.size);
+
+        riders.push({ ...token, x: carrier.x + Math.cos(perchAngle) * radius, y: carrier.y + Math.sin(perchAngle) * radius, radius: radius * 0.45 });
+
+        return false;
+    });
+
+    return [...rest, ...riders];
 }
 
 /**
@@ -926,10 +975,10 @@ export function conditionBadges(token: Token, radius: number): Badge[]
 }
 
 /** The badge on top under a point, the last token drawn winning, for its name on hover or tap. */
-export function conditionBadgeAt(tokens: Token[], grid: Grid, at: Point): Badge | undefined
+export function conditionBadgeAt(tokens: Lifted[], grid: Grid, at: Point): Badge | undefined
 {
     return tokens
-        .flatMap((token) => conditionBadges(token, tokenRadius(grid, token.size)))
+        .flatMap((token) => conditionBadges(token, shownRadius(grid, token)))
         .reverse()
         .find((badge) => distance(badge, at) <= badge.radius * 1.2);
 }
@@ -1163,12 +1212,12 @@ export function render(
 
         // Not while it walks: the lift and the trail of fog say enough, and a ring would chase it.
         if (token.id === own && token.lift === undefined)
-            drawPulse(ctx, token, tokenRadius(grid, token.size), time - ownRestedAt, motion);
+            drawPulse(ctx, token, shownRadius(grid, token), time - ownRestedAt, motion);
 
         if (token.id === turn)
-            drawTurn(ctx, token, tokenRadius(grid, token.size));
+            drawTurn(ctx, token, shownRadius(grid, token));
 
-        drawToken(ctx, token, tokenRadius(grid, token.size), token.avatar ? picture(token.avatar) : null, time, motion, wounds);
+        drawToken(ctx, token, shownRadius(grid, token), token.avatar ? picture(token.avatar) : null, time, motion, wounds);
     }
 
     ctx.globalAlpha = 1;

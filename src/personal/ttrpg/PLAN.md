@@ -788,6 +788,14 @@ Built into play mode neatly, it should look and feel good.
 - A player makes them from the settings on their phone: a name, a picture, HP and AC.
 - They turn them on and off, or delete them.
 - Not in the initiative order, see 6.
+- **Built** (`convex/summons.ts`, `components/SummonList.tsx`). A summon is a player token with
+  `summonOf` set to its owner's token, so it sees through the fog and is seen like a player. It
+  walks on its owner's paths and turn, and Freeze stops it. It stays out of initiative and group
+  checks, and does not count towards the table's players. At most four. Off, it waits on the tray,
+  off the map; at 0 HP it goes there too, until its player summons it again at full HP. The
+  player changes its name, max HP and AC as they level up. Signed in with Discord, each is kept with the character as a
+  companion, which owns its picture, and comes along, off, to the next table. Leaving or being
+  removed takes a player's summons; the GM removing one only takes it off the table.
 
 ### 9. Polygon reveal
 

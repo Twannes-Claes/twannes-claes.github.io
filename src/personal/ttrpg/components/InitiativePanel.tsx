@@ -61,7 +61,8 @@ export function InitiativePanel({ fight, tokens, system, onChange, onClose }: In
 
         return token ? [{ token, roll: entry.roll }] : [];
     });
-    const waiting = tokens.filter((token) => !hasRolled(fight, token.id));
+    // Summons stay out of the fight, see Token.
+    const waiting = tokens.filter((token) => !hasRolled(fight, token.id) && !token.summonOf);
 
     const rollField = (token: Token, roll?: number) => (
         <input

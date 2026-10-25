@@ -10,7 +10,7 @@ import { landingAt } from './size.ts';
  * hidden until the GM shows it, clear of the others on the map. A second of the same name on the
  * map gets a number, from the names already there.
  */
-export function monsterFrom(preset: Pick<Preset, 'name' | 'markdown' | 'color' | 'downs' | 'avatar'>, map: Pick<Scenario, 'grid' | 'width' | 'height'>, at: Point, names: Set<string>, others: Pick<Token, 'x' | 'y' | 'size'>[]): Omit<Token, 'id' | 'presetId'>
+export function monsterFrom(preset: Pick<Preset, 'name' | 'markdown' | 'color' | 'downs' | 'avatar'>, map: Pick<Scenario, 'grid' | 'width' | 'height'>, at: Point, names: Set<string>, others: Pick<Token, 'x' | 'y' | 'size'>[]): Omit<Token, 'id' | 'presetId' | 'summonOf'>
 {
     const stats = statsOf(preset.markdown);
     const size = stats.size ?? 'medium';

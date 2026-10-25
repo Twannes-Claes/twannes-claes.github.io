@@ -56,13 +56,18 @@ export async function upload(blob: Blob): Promise<Id<'_storage'>>
 const siteUrl = import.meta.env.VITE_CONVEX_SITE_URL || convexUrl.replace(/\.cloud$/, '.site');
 
 /**
- * Sends a player's token picture to the /avatar route in convex/http.ts, which checks it before it
- * is stored and deletes their old one. authToken is the anonymous sign in, from useAuthToken. False
- * when the picture was refused.
+ * Sends a picture to the /avatar route in convex/http.ts, which checks it before it is stored and
+ * deletes the old one: a player's token's, with token one of their summons', or from the account
+ * page a saved character's or summon's. authToken is the sign in, from useAuthToken. False when
+ * the picture was refused.
  */
-export async function uploadAvatar(sessionId: string, picture: Blob, authToken: string | null): Promise<boolean>
+export async function uploadAvatar(
+    to: { session: string; token?: string } | { character: string } | { companion: string },
+    picture: Blob,
+    authToken: string | null,
+): Promise<boolean>
 {
-    const response = await fetch(`${siteUrl}/avatar?session=${encodeURIComponent(sessionId)}`, {
+    const response = await fetch(`${siteUrl}/avatar?${new URLSearchParams(to).toString()}`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${authToken ?? ''}`, 'Content-Type': picture.type },
         body: picture,

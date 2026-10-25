@@ -18,6 +18,7 @@ import type * as play from "../play.js";
 import type * as presets from "../presets.js";
 import type * as sessions from "../sessions.js";
 import type * as sight from "../sight.js";
+import type * as summons from "../summons.js";
 import type * as usage from "../usage.js";
 
 import type {
@@ -37,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   presets: typeof presets;
   sessions: typeof sessions;
   sight: typeof sight;
+  summons: typeof summons;
   usage: typeof usage;
 }>;
 

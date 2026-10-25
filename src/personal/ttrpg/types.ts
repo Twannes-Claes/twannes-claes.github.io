@@ -141,6 +141,12 @@ export interface Token
     downs?: boolean;
     /** The preset a monster was placed from, for its stat block, see Preset. */
     presetId?: string;
+    /**
+     * A summon or companion: the player's token it belongs to. It sees and moves like that player,
+     * stays out of initiative and group checks, and at 0 HP vanishes off the map until summoned
+     * again, see convex/summons.ts.
+     */
+    summonOf?: string;
 }
 
 /** A monster's stat block in the GM's library, for all their sessions, see Monster presets. */

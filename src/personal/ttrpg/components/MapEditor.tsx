@@ -1260,7 +1260,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
             )}
 
             {mode === 'gm' && !pending && !idle && panel === 'check' && (
-                <CheckPanel check={check} players={shown.filter((token) => token.kind === 'player')} onSend={setCheck} onClose={() => setPanel(null)} />
+                <CheckPanel check={check} players={shown.filter((token) => token.kind === 'player' && !token.summonOf)} onSend={setCheck} onClose={() => setPanel(null)} />
             )}
 
             {mode === 'gm' && !pending && !idle && panel === 'monsters' && (

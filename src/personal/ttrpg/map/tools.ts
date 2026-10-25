@@ -917,7 +917,7 @@ function eraseTool(change: Change, eraseMonsters: EraseMonsters): MapTool
     {
         const { grid } = pointer.scenario;
         // The last drawn is the one on top.
-        const monster = [...monsters].reverse().find((token) => distance(token, pointer.world) <= tokenRadius(grid, token.size));
+        const monster = [...monsters].reverse().find((token) => distance(token, pointer.world) <= Math.max(tokenRadius(grid, token.size), tokenRadius(grid)));
 
         if (monster)
             return { monster };

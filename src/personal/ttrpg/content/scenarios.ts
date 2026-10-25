@@ -104,7 +104,7 @@ const demoPlayers = [
  * only show once a player sees them. A saved example session gets it as a real monster, see
  * addExample in convex/sessions.ts.
  */
-export function demoOgre(grid: Grid): Omit<Token, 'id' | 'presetId'>
+export function demoOgre(grid: Grid): Omit<Token, 'id' | 'presetId' | 'summonOf'>
 {
     return {
         kind: 'npc',

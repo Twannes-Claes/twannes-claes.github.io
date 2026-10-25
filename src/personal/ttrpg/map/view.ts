@@ -23,6 +23,7 @@ import { extendPath, lineFeet, pathBlocked, pathFeet } from './path.ts';
 import {
     badgeName,
     conditionBadgeAt,
+    drawnAcross,
     drawHealth,
     drawHit,
     drawPill,
@@ -32,7 +33,9 @@ import {
     drawSelected,
     drawTarget,
     drawUnknownStep,
+    perched,
     render,
+    shownRadius,
     tokenRadius,
     type Drop,
     type HitEffect,
@@ -40,7 +43,7 @@ import {
     type Scene,
     type Viewport,
 } from './render.ts';
-import { anchorAt, cellsAcross, footprint, footprintCenter, footprintKeys, landingAt } from './size.ts';
+import { anchorAt, footprint, footprintCenter, footprintKeys, landingAt, partners } from './size.ts';
 import { createTool, drawBox, drawMark, type MapTool, type ToolId, type ToolPointer } from './tools.ts';
 import { insidePolygon, sightSegments, visibilityPolygon, type Segment } from './visibility.ts';
 import { startWalk, walkAt, type Walk } from './walk.ts';
@@ -195,8 +198,8 @@ export interface MapView
     /** Other screens' rulers and areas, in their player's colour, see Mark. */
     setMarks: (marks: SharedMark[]) => void;
     /**
-     * On a player's phone, their own token: the only one they can draw a path from. Every other
-     * press pans. Null is the game master's screen, where every token answers, the Player view on
+     * On a player's phone, their own token: with their summons the only ones they can draw a path
+     * from. Every other press pans. Null is the game master's screen, where every token answers, the Player view on
      * the table screen too.
      */
     setOwn: (id: string | null) => void;
@@ -366,6 +369,8 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
         return image.complete && image.naturalWidth > 0 ? image : null;
     };
+
+    const walksNow = (id: string) => walks.has(id);
 
     /** Tokens where they show at a moment: walking ones partway along their path. */
     const tokensAt = (time: number): Lifted[] =>
@@ -835,7 +840,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
         // Peeking, the GM view, the game master sees every monster too, and the fog at half
         // strength: clear enough to see through, dark enough to tell what the players see.
-        const visible = fogEnabled && !peek ? shown.filter(seenByPlayers) : shown;
+        const visible = perched(fogEnabled && !peek ? shown.filter(seenByPlayers) : shown, scenario.grid, walksNow);
 
         layDrops(visible, time);
 
@@ -901,7 +906,8 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
             for (const token of scene.tokens)
             {
-                if (!staying.has(token.id))
+                // A rider's HP would cover its carrier's picture; its own phone and the Players list have it.
+                if (!staying.has(token.id) || token.radius !== undefined)
                     continue;
 
                 context.globalAlpha = token.alpha ?? 1;
@@ -916,7 +922,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             for (const token of scene.tokens)
             {
                 if (targets.includes(token.id))
-                    drawTarget(context, token, tokenRadius(scenario.grid, token.size), camera.zoom);
+                    drawTarget(context, token, shownRadius(scenario.grid, token), camera.zoom);
 
             }
         }
@@ -926,7 +932,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             for (const token of scene.tokens)
             {
                 if (selection.includes(token.id))
-                    drawSelected(context, token, tokenRadius(scenario.grid, token.size), camera.zoom);
+                    drawSelected(context, token, shownRadius(scenario.grid, token), camera.zoom);
 
             }
         }
@@ -1060,13 +1066,18 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     const tokenAt = (screen: Point, current: Scenario): Token | undefined =>
     {
         const world = toWorld(camera, screen);
-        const shown = fogEnabled && !peek ? tokens.filter(seenByPlayers) : tokens;
+        const shown = perched(fogEnabled && !peek ? tokens.filter(seenByPlayers) : tokens, current.grid, walksNow);
 
         // Last drawn is on top. The project targets ES2022, which has no findLast. A press reaches
-        // a bit past the token's edge, as tokens leave room in their cell and fingers are wide.
-        return [...shown]
+        // a bit past the token's edge, as tokens leave room in their cell and fingers are wide, and
+        // never less than around a Medium one, so a Tiny one is as easy to grab. A rider is small
+        // on its carrier's ring, so only its own circle grabs it.
+        const hit = [...shown]
             .reverse()
-            .find((token) => distance(world, token) <= tokenRadius(current.grid, token.size) * 1.5);
+            .find((token) => distance(world, token) <= (token.radius ?? Math.max(tokenRadius(current.grid, token.size), tokenRadius(current.grid)) * 1.5));
+
+        // Where it really stands, not where it is drawn.
+        return hit && tokens.find((token) => token.id === hit.id);
     };
 
     /** Names the condition badge under a screen point, or none with null, redrawing on a change. */
@@ -1076,7 +1087,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
         badgePoint = screen && toWorld(camera, screen);
 
-        const badge = badgePoint && scenario ? conditionBadgeAt(shown, scenario.grid, badgePoint) : undefined;
+        const badge = badgePoint && scenario ? conditionBadgeAt(perched(shown, scenario.grid, walksNow), scenario.grid, badgePoint) : undefined;
         const key = badge ? `${badge.tokenId} ${badge.kind.id}` : '';
 
         if (key !== badgeKey)
@@ -1184,7 +1195,8 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     const endTaken = (current: Scenario, token: Token, end: Point) =>
     {
         const { grid } = current;
-        const others = tokens.filter((other) => other.id !== token.id && (peek || !fogEnabled || seenByPlayers(other)));
+        // A player and their companion share a space, see ridesOn in map/size.ts.
+        const others = tokens.filter((other) => other.id !== token.id && !partners(token, other) && (peek || !fogEnabled || seenByPlayers(other)));
 
         if (grid.type === 'none')
         {
@@ -1317,7 +1329,8 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
         const point = local(event);
         const pressed = idle && scenario ? tokenAt(point, scenario) : undefined;
-        const token = own === null || pressed?.id === own ? pressed : undefined;
+        // On a phone its own token answers, and its summons, see convex/summons.ts.
+        const token = own === null || pressed?.id === own || (pressed?.summonOf !== undefined && pressed.summonOf === own) ? pressed : undefined;
 
         // In play mode a token draws a path, a player's unless the game master froze movement, so
         // the GM sees how far a monster gets too. On the GM's screens any token with Alt held drags
@@ -1569,7 +1582,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
         for (const token of moved)
         {
-            const to = landingAt(scenario, token, token.size, stay);
+            const to = landingAt(scenario, token, token.size, stay.filter((other) => !partners(token, other)));
 
             landed.set(token.id, to);
             stay.push({ ...token, ...to });
@@ -1786,7 +1799,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             const holding = new Map(tokens.filter((token) => held(token.id)).map((token) => [token.id, token]));
 
             // Bigger first, so a small token standing in a big one's space is drawn and picked on top.
-            tokens = next.map((token) => holding.get(token.id) ?? token).sort((a, b) => cellsAcross(b.size) - cellsAcross(a.size));
+            tokens = next.map((token) => holding.get(token.id) ?? token).sort((a, b) => drawnAcross(b.size) - drawnAcross(a.size));
             focusOwn();
             // From where walking tokens are now: their end would light up first and jump back.
             refreshFog(tokensAt(performance.now()));

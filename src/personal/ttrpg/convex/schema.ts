@@ -187,12 +187,17 @@ export default defineSchema({
         presetId: v.optional(v.id('presets')),
         /** The saved character a player joined as, which owns the picture, see characters.ts. */
         characterId: v.optional(v.id('characters')),
+        /** A summon or companion: the player's token it belongs to, see summons.ts. */
+        summonOf: v.optional(v.id('tokens')),
+        /** The saved companion a summon came from, which owns the picture. */
+        companionId: v.optional(v.id('companions')),
     })
         .index('by_sessionId_and_userId', ['sessionId', 'userId'])
         .index('by_sessionId_and_scenarioId', ['sessionId', 'scenarioId'])
         .index('by_avatarId', ['avatarId'])
         .index('by_presetId', ['presetId'])
-        .index('by_characterId', ['characterId']),
+        .index('by_characterId', ['characterId'])
+        .index('by_summonOf', ['summonOf']),
     /**
      * What the party has seen of each scenario of a session, see SharedFog in types.ts. Its own
      * table, so the frequent fog saves never rewrite the scenario.
@@ -357,5 +362,17 @@ export default defineSchema({
         avatarId: v.optional(v.id('_storage')),
     })
         .index('by_userId', ['userId'])
+        .index('by_avatarId', ['avatarId']),
+    /** A saved character's summons and companions, which come along to every table, see summons.ts. */
+    companions: defineTable({
+        characterId: v.id('characters'),
+        name: v.string(),
+        size: sizeValidator,
+        maxHp: v.number(),
+        ac: v.number(),
+        avatar: v.optional(v.string()),
+        avatarId: v.optional(v.id('_storage')),
+    })
+        .index('by_characterId', ['characterId'])
         .index('by_avatarId', ['avatarId']),
 });

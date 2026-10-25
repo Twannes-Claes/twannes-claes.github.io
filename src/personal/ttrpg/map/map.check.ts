@@ -23,7 +23,7 @@ import { applyHit, cleanStats, healthState, hitOn, withoutNumbers } from './heal
 import { begun, cleanRoll, newFight, nextTurn, swapped, upNext, withoutRoll, withRoll } from './initiative.ts';
 import { extendPath, pathBlocked, pathFeet } from './path.ts';
 import { placedSize, propAt, snapCenter, snapSize } from './props.ts';
-import { anchorAt, footprint, footprintCenter, footprintKeys, landingAt } from './size.ts';
+import { anchorAt, footprint, footprintCenter, footprintKeys, landingAt, ridesOn } from './size.ts';
 import { spawnCells } from './spawn.ts';
 import { createTool, measure, toggleDoor, wallInBox, type ToolPointer } from './tools.ts';
 import { scenarioFromUvtt } from './uvtt.ts';
@@ -747,3 +747,22 @@ assert.deepEqual(hitOn({ kind: 'npc', hp: 5, maxHp: 30, downs: true }, 'attack',
 
 // The example session's ogre preset gives the numbers its token starts with.
 assert.deepEqual(statsOf(demoOgreStatBlock), { name: 'Ogre', size: 'large', ac: 11, maxHp: 59, speed: 40, perception: 8 });
+
+// A companion shares its player's space: the smaller rides, the player at the same size, and
+// only while it stands on the other.
+{
+    const square: Grid = { ...base, size: 50, offsetX: 0, offsetY: 0 };
+    const hero = { id: 'hero', x: 75, y: 75, size: 'medium' as const };
+    const owl = { id: 'owl', x: 75, y: 75, size: 'tiny' as const, summonOf: 'hero' };
+    const horse = { id: 'horse', x: 100, y: 100, size: 'large' as const, summonOf: 'hero' };
+    const wolf = { id: 'wolf', x: 75, y: 75, size: 'medium' as const, summonOf: 'hero' };
+
+    assert.equal(ridesOn(square, owl, hero), true);
+    assert.equal(ridesOn(square, hero, owl), false);
+    assert.equal(ridesOn(square, hero, horse), true);
+    assert.equal(ridesOn(square, horse, hero), false);
+    assert.equal(ridesOn(square, wolf, hero), false);
+    assert.equal(ridesOn(square, hero, wolf), true);
+    assert.equal(ridesOn(square, { ...owl, x: 125 }, hero), false);
+    assert.equal(ridesOn(square, { ...owl, summonOf: undefined }, hero), false);
+}

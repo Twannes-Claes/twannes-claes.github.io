@@ -178,3 +178,35 @@ export function landingAt(
     // On top of someone in a crowd, and past the edge only on a map smaller than the creature.
     return nearest(clear) ?? nearest(onIt) ?? footprintCenter(grid, start, size);
 }
+
+/** What riding needs of a token, on the map or a Convex document mapped to it. */
+type Mount = Pick<Token, 'id' | 'x' | 'y' | 'size' | 'summonOf' | 'tray'>;
+
+const sizeOrder: CreatureSize[] = ['tiny', 'small', 'medium', 'large', 'huge', 'gargantuan'];
+
+/** A player and their companion, who may share a space, see convex/summons.ts. */
+export function partners(a: Pick<Token, 'id' | 'summonOf'>, b: Pick<Token, 'id' | 'summonOf'>): boolean
+{
+    return a.summonOf === b.id || b.summonOf === a.id;
+}
+
+/**
+ * Whether rider shares carrier's space and rides it: a familiar on a shoulder, a player on their
+ * horse. The smaller one rides, the player at the same size like on a mount, and goes where the
+ * carrier goes.
+ */
+export function ridesOn(grid: Grid, rider: Mount, carrier: Mount): boolean
+{
+    if (!partners(rider, carrier) || rider.tray || carrier.tray)
+        return false;
+
+    const by = sizeOrder.indexOf(rider.size) - sizeOrder.indexOf(carrier.size);
+
+    if (by > 0 || (by === 0 && carrier.summonOf !== rider.id))
+        return false;
+
+    if (grid.type === 'none')
+        return distance(rider, carrier) < grid.size / 2;
+
+    return footprintKeys(grid, anchorAt(grid, carrier, carrier.size), carrier.size).has(cellKey(anchorAt(grid, rider, 'medium')));
+}

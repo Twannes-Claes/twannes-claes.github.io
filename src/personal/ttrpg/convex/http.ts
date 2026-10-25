@@ -33,12 +33,18 @@ http.route({
     {
         const answer = (status: number) => new Response(null, { status, headers: cors });
         const userId = await getAuthUserId(ctx);
-        const sessionId = new URL(request.url).searchParams.get('session');
+        const { searchParams } = new URL(request.url);
+        const sessionId = searchParams.get('session');
+        // A summon's picture names the summon, see summons.ts; without it, the player's own.
+        const tokenId = searchParams.get('token') ?? undefined;
+        // From the account page, a saved character's or summon's picture, see characters.ts.
+        const characterId = searchParams.get('character') ?? undefined;
+        const companionId = searchParams.get('companion') ?? undefined;
 
         if (!userId)
             return answer(401);
 
-        if (!sessionId)
+        if (!sessionId && !characterId && !companionId)
             return answer(400);
 
         if (!pictureTypes.includes(request.headers.get('Content-Type') ?? ''))
@@ -54,8 +60,10 @@ http.route({
             return answer(413);
 
         const storageId = await ctx.storage.store(picture);
-        const result = await ctx
-            .runMutation(internal.play.keepAvatar, { sessionId: sessionId as Id<'sessions'>, userId, storageId })
+        const keep = sessionId
+            ? ctx.runMutation(internal.play.keepAvatar, { sessionId: sessionId as Id<'sessions'>, userId, storageId, tokenId })
+            : ctx.runMutation(internal.characters.keepPicture, { userId, storageId, characterId, companionId });
+        const result = await keep
             .catch(async () =>
             {
                 // A session id that is not one fails the arguments check, before keepAvatar can

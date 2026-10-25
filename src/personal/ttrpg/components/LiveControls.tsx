@@ -79,7 +79,9 @@ export function Players({ tokens, onSetStats, system, onSetConditions, onSetSize
     const [open, setOpen] = useState(false);
     // The one player opened under their row, and the one folding away.
     const rows = useOpenRow();
-    const players = tokens.filter((token) => token.kind === 'player');
+    const players = tokens.filter((token) => token.kind === 'player' && !token.summonOf);
+    // Each player's companions right under them, so the GM sees their numbers too.
+    const rowsShown = players.flatMap((player) => [player, ...tokens.filter((token) => token.summonOf === player.id)]);
 
     return (
         <>
@@ -101,8 +103,8 @@ export function Players({ tokens, onSetStats, system, onSetConditions, onSetSize
                         <p className="ttrpg-empty">Nobody has joined yet.</p>
                     ) : (
                         <ul className="ttrpg-rows">
-                            {players.map((player) => (
-                                <li key={player.id} className={`ttrpg-row${rows.open === player.id ? ' ttrpg-row--open' : ''}`}>
+                            {rowsShown.map((player) => (
+                                <li key={player.id} className={`ttrpg-row${rows.open === player.id ? ' ttrpg-row--open' : ''}${player.summonOf ? ' ttrpg-row--companion' : ''}`}>
                                     <button
                                         type="button"
                                         className="ttrpg-row__main ttrpg-row__main--swatch"
@@ -112,7 +114,10 @@ export function Players({ tokens, onSetStats, system, onSetConditions, onSetSize
                                         <span className="ttrpg-swatch" style={{ background: player.color }} />
                                         {/* The name, with the numbers under it. */}
                                         <span className="ttrpg-row__text">
-                                            <span className="ttrpg-row__name">{player.name}</span>
+                                            <span className="ttrpg-row__name">
+                                                {player.name}
+                                                {player.summonOf && <span className="ttrpg-tag">Companion</span>}
+                                            </span>
                                             <StatChips token={player} />
                                         </span>
                                     </button>

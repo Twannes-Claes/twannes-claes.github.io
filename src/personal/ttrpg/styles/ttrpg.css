@@ -1342,6 +1342,201 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
     object-fit: cover;
 }
 
+/* A player's summons in the phone's settings, see SummonList.tsx: a card each, with where it is
+   beside its name and what to do with it underneath. */
+.ttrpg-summons {
+    display: grid;
+    gap: 8px;
+}
+
+.ttrpg-summon {
+    display: grid;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid var(--ttrpg-edge);
+    border-radius: 14px;
+    background: var(--ttrpg-well);
+}
+
+.ttrpg-summon__head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.ttrpg-summon__head .ttrpg-row__text {
+    flex: 1;
+    min-width: 0;
+}
+
+.ttrpg-summon__state {
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    background: var(--ttrpg-edge);
+    color: var(--ttrpg-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.ttrpg-summon__state--on {
+    background: color-mix(in srgb, var(--ttrpg-accent) 35%, transparent);
+    color: var(--ttrpg-ink);
+}
+
+.ttrpg-summon__state--fallen {
+    background: color-mix(in srgb, var(--ttrpg-danger) 25%, transparent);
+    color: var(--ttrpg-danger);
+}
+
+/* Two to a row, the same width each, whichever show. */
+.ttrpg-summon__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.ttrpg-summon__actions .ttrpg-segment {
+    justify-content: center;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--ttrpg-edge);
+}
+
+/* Summon again for a fallen one, the only way back, across the whole card. */
+.ttrpg-summon__wide {
+    grid-column: 1 / -1;
+}
+
+.ttrpg-summon__actions .ttrpg-summon__delete {
+    color: var(--ttrpg-danger);
+}
+
+.ttrpg-summon__actions .ttrpg-summon__delete:hover {
+    background: color-mix(in srgb, var(--ttrpg-danger) 15%, transparent);
+}
+
+/* A saved character's summons, under its card on the account page, see CharacterList.tsx. */
+.ttrpg-kept-summons {
+    display: grid;
+    gap: 6px;
+}
+
+.ttrpg-sheet__avatar--small {
+    width: 34px;
+    height: 34px;
+    border-width: 2px;
+    font-size: 0.9rem;
+}
+
+/* Something new to add, dashed so it reads as a free spot rather than a thing already there. */
+.ttrpg-add {
+    justify-content: center;
+    border: 1px dashed var(--ttrpg-edge);
+}
+
+.ttrpg-add:hover {
+    border-color: var(--ttrpg-muted);
+    color: var(--ttrpg-ink);
+}
+
+/* Making or changing a character or summon, see PieceForm in CharacterList.tsx. */
+.ttrpg-piece-form {
+    display: grid;
+    gap: 1rem;
+}
+
+/* The form's title tops its card, so it needs no line above it like a subhead lower down. */
+.ttrpg-piece-form > .ttrpg-subhead {
+    padding-top: 0;
+    border-top: none;
+}
+
+.ttrpg-piece-form__top {
+    display: flex;
+    align-items: end;
+    gap: 1rem;
+}
+
+.ttrpg-piece-form__name {
+    flex: 1;
+    min-width: 0;
+}
+
+/* The picture in its ring, which is also the way to pick one. */
+.ttrpg-piece-form__picture {
+    position: relative;
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 76px;
+    height: 76px;
+    border: 4px solid var(--ttrpg-edge);
+    border-radius: 50%;
+    background: var(--ttrpg-well);
+    color: var(--ttrpg-muted);
+    font-size: 1.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: border-color 150ms var(--ttrpg-ease);
+}
+
+.ttrpg-piece-form__picture img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.ttrpg-piece-form__camera {
+    position: absolute;
+    right: -6px;
+    bottom: -6px;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border: 2px solid var(--ttrpg-bg);
+    border-radius: 50%;
+    background: var(--ttrpg-accent);
+    color: var(--ttrpg-ink);
+    font-size: 0.75rem;
+}
+
+.ttrpg-piece-form__picture:hover .ttrpg-piece-form__camera {
+    filter: brightness(1.2);
+}
+
+/* Ring colours to pick from, see RingPicker in CharacterList.tsx. */
+.ttrpg-rings {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.ttrpg-ring {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border: 2px solid transparent;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 2px var(--ttrpg-bg);
+    color: var(--ttrpg-ink);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: border-color 150ms var(--ttrpg-ease);
+}
+
+.ttrpg-ring[aria-checked='true'],
+.ttrpg-ring--picked {
+    border-color: var(--ttrpg-ink);
+}
+
+.ttrpg-ring--custom {
+    background: conic-gradient(#b4443c, #c2b22c, #2f8f55, #2c7cc2, #683c9b, #b4443c);
+}
+
 /* The way to those players, under the join form. */
 .ttrpg-rejoin {
     justify-self: center;
@@ -2498,6 +2693,22 @@ button.ttrpg-row__main {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* A companion in the Players list, indented under the player it belongs to, see LiveControls.tsx. */
+.ttrpg-row--companion {
+    margin-left: 1.25rem;
+}
+
+.ttrpg-tag {
+    margin-left: 0.5rem;
+    padding: 0.05rem 0.45rem;
+    border-radius: 999px;
+    background: var(--ttrpg-edge);
+    color: var(--ttrpg-muted);
+    font-size: 0.7rem;
+    font-weight: 600;
+    vertical-align: 1px;
 }
 
 .ttrpg-row__detail {

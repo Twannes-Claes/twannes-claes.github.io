@@ -11,9 +11,10 @@ import { faDiscord } from '@fortawesome/free-brands-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useAuthActions, useAuthToken, useConvexAuth } from '@convex-dev/auth/react';
 import { useConvex, useMutation, useQuery } from 'convex/react';
+import { ConvexError } from 'convex/values';
 import { useActionState, useEffect, useState, type ReactNode } from 'react';
 
-import type { BloodSettings, CreatureSize, FogSettings, GameSystem, HitKind, PlayerCheck, PlayerFight, Scenario } from '../types';
+import type { BloodSettings, FogSettings, GameSystem, HitKind, PlayerCheck, PlayerFight, Scenario } from '../types';
 
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
@@ -26,6 +27,7 @@ import { toAvatar } from '../services/images';
 import { sendDoor } from '../services/tableChannel';
 
 import { Backend } from './Backend';
+import { CharacterList, PieceForm } from './CharacterList';
 import { ConditionPicker } from './ConditionPicker';
 import { Loading, Spinner, Toast, Toasts } from './Feedback';
 import { MapCanvas } from './MapCanvas';
@@ -34,14 +36,11 @@ import { MoveSheet } from './MoveSheet';
 import { RollSheet } from './RollSheet';
 import { RulerPicker, type Measure } from './RulerPicker';
 import { Settings } from './Settings';
-import { SizePicker } from './SizePicker';
 import { StatsForm } from './StatsForm';
+import { SummonList } from './SummonList';
 import { useMessage } from './useMessage';
 import { useFullscreen, useIdle, useWakeLock } from './useScreen';
 import { useScreenSettings } from './useScreenSettings';
-
-/** Ring colours to start from, the portfolio's accent first. The player can pick any other. */
-const ringColours = ['#683c9b', '#2f8f55', '#c27c2c', '#2c7cc2', '#b4443c', '#c2b22c'];
 
 interface PlayerViewProps
 {
@@ -158,8 +157,8 @@ interface Character
 }
 
 /**
- * Joining in two short steps: the password the game master says out loud, then the character's
- * name, ring colour and picture. The token appears at the spawn point when it is done. Someone
+ * Joining in two short steps: the password the game master says out loud, then the character,
+ * made here or, signed in, one of the saved ones, see CharacterList.tsx. The token appears at the spawn point when it is done. Someone
  * coming back whose phone forgot them picks their character instead, see rejoin in convex/play.ts.
  */
 function JoinForm({ sessionId, name }: JoinFormProps)
@@ -167,30 +166,16 @@ function JoinForm({ sessionId, name }: JoinFormProps)
     const convex = useConvex();
     const join = useMutation(api.play.join);
     const rejoin = useMutation(api.play.rejoin);
-    const authToken = useAuthToken();
     const [password, setPassword] = useState<string | null>(null);
     const [characters, setCharacters] = useState<Character[]>([]);
     // The character being taken back, and why that did not work.
     const [taking, setTaking] = useState<Id<'tokens'> | null>(null);
     const [takeFailure, setTakeFailure] = useState('');
     const [returning, setReturning] = useState(false);
-    const [colour] = useState(() => ringColours[Math.floor(Math.random() * ringColours.length)]);
-    const [pictureName, setPictureName] = useState('');
-    const [size, setSize] = useState<CreatureSize>('medium');
-    // Signed in with Discord, the saved characters, and the one the form starts from. Null when
-    // anonymous, which keeps none.
+    // Signed in with Discord, the saved characters to join as. Null when anonymous, which keeps none.
     const saved = useQuery(api.characters.mine);
-    const [pickedId, setPickedId] = useState<Id<'characters'> | null>(null);
-    const picked = saved?.find((character) => character.id === pickedId) ?? null;
     const { signIn } = useAuthActions();
     const [leaving, setLeaving] = useState(false);
-
-    const pick = (character: NonNullable<typeof saved>[number] | null) =>
-    {
-        setPickedId(character?.id ?? null);
-        setSize(character?.size ?? 'medium');
-        setPictureName('');
-    };
 
     // Discord sends the browser back to this join page, at the address the phone opened it on,
     // where Backend finishes the sign in, see redirect in convex/auth.ts.
@@ -222,46 +207,18 @@ function JoinForm({ sessionId, name }: JoinFormProps)
         '',
     );
 
-    // The picture is shrunk first, so one the phone cannot read is said here, before joining. It
-    // goes up after the token exists, since only a player who joined may upload, and by then this
-    // form is gone: a picture that fails to upload leaves the token with its initial.
-    const [failure, create, creating] = useActionState((_: string, form: FormData) =>
+    // The GM changed the password since it was checked, by starting again.
+    const joined = (tokenId: Id<'tokens'> | null) =>
     {
-        const picture = form.get('picture');
-        const avatar = picture instanceof File && picture.size > 0 ? toAvatar(picture) : Promise.resolve(null);
+        if (!tokenId)
+            throw new ConvexError('The password changed. Reload the page and type the new one.');
 
-        // The form empties its file field itself once this is done, so the name shown goes now.
-        setPictureName('');
-        const character = {
-            sessionId,
-            password: password ?? '',
-            name: String(form.get('name')),
-            color: String(form.get('color')),
-            maxHp: Number(form.get('maxHp')),
-            ac: Number(form.get('ac')),
-            perception: Number(form.get('perception')),
-            size,
-            characterId: picked?.id,
-        };
+        return { session: sessionId };
+    };
 
-        return avatar.then(
-            (blob) =>
-                join(character)
-                    .then(async (tokenId) =>
-                    {
-                        // The GM changed the password since it was checked, by starting again.
-                        if (!tokenId)
-                            return 'The password changed. Reload the page and type the new one.';
-
-                        if (blob)
-                            await uploadAvatar(sessionId, blob, authToken);
-
-                        return '';
-                    })
-                    .catch((reason: unknown) => explain(reason, 'Joining did not work. Check the connection and try again.')),
-            () => 'That picture could not be read. Pick another one, or join without one.',
-        );
-    }, '');
+    // A saved character joins as it is, picture and companions with it, see join in convex/play.ts.
+    const joinAs = ({ id, name, color, size, maxHp, ac, perception }: NonNullable<typeof saved>[number]) =>
+        join({ sessionId, password: password ?? '', name, color, size, maxHp, ac, perception, characterId: id }).then(joined);
 
     // Once it is back the page follows the token to the map, see Player.
     const takeBack = (id: Id<'tokens'>) =>
@@ -319,71 +276,26 @@ function JoinForm({ sessionId, name }: JoinFormProps)
                 <h1>Your character</h1>
                 <p>
                     {saved
-                        ? 'Pick a saved character or make a new one. What you join as is kept for next time.'
+                        ? 'Pick a character to join as, or make a new one.'
                         : 'A name, a colour for the ring around your token, a picture, and a few numbers off your sheet.'}
                 </p>
             </header>
-            {saved && saved.length > 0 && (
-                <div className="ttrpg-picks" role="group" aria-label="Your characters">
-                    {saved.map((character) => (
-                        <button key={character.id} type="button" className="ttrpg-pick" aria-pressed={character.id === pickedId} onClick={() => pick(character)}>
-                            <span className="ttrpg-swatch" style={{ background: character.color }} />
-                            {character.name}
-                        </button>
-                    ))}
-                    <button type="button" className="ttrpg-pick" aria-pressed={pickedId === null} onClick={() => pick(null)}>
-                        New character
-                    </button>
+            {saved ? (
+                <CharacterList onJoin={joinAs} />
+            ) : (
+                // The picture goes up after the token exists, since only a player who joined may
+                // upload. One that fails leaves the token with its initial.
+                <div className="ttrpg-panel ttrpg-card">
+                    <PieceForm
+                        title="Your character"
+                        start={{}}
+                        character
+                        joining
+                        onSave={(fields) => join({ sessionId, password: password ?? '', ...fields }).then(joined)}
+                        onDone={() => undefined}
+                    />
                 </div>
             )}
-            {/* Keyed on the pick, so its fields start from that character. */}
-            <form key={pickedId ?? 'new'} action={create} className="ttrpg-panel ttrpg-card">
-                <label className="ttrpg-field">
-                    Name
-                    <input name="name" maxLength={30} autoComplete="off" required autoFocus defaultValue={picked?.name} />
-                </label>
-                <label className="ttrpg-field">
-                    Ring colour
-                    <input name="color" type="color" defaultValue={picked?.color ?? colour} />
-                </label>
-                <div className="ttrpg-field">
-                    Picture, from the camera or your photos
-                    <label className="ttrpg-segment">
-                        <FontAwesomeIcon icon={faImage} />
-                        <span>{pictureName || (picked?.avatar ? 'Change the picture' : 'Choose a picture')}</span>
-                        <input
-                            name="picture"
-                            type="file"
-                            accept="image/*"
-                            className="ttrpg-hidden-input"
-                            onChange={(event) => setPictureName(event.target.files?.[0]?.name ?? '')}
-                        />
-                    </label>
-                </div>
-                <div className="ttrpg-field">
-                    Size
-                    <SizePicker size={size} onChange={setSize} />
-                </div>
-                {/* Only you and the GM see these. The rest of the table sees how hurt you look. */}
-                <div className="ttrpg-fields">
-                    <label className="ttrpg-field">
-                        Max HP
-                        <input name="maxHp" type="number" inputMode="numeric" min={1} max={9999} required defaultValue={picked?.maxHp} />
-                    </label>
-                    <label className="ttrpg-field">
-                        AC
-                        <input name="ac" type="number" inputMode="numeric" min={0} max={50} required defaultValue={picked?.ac} />
-                    </label>
-                    <label className="ttrpg-field" title="Passive Perception">
-                        Perception
-                        <input name="perception" type="number" inputMode="numeric" min={0} max={50} required defaultValue={picked?.perception} />
-                    </label>
-                </div>
-                {failure && <p className="ttrpg-error" role="alert">{failure}</p>}
-                <button type="submit" className="ttrpg-button ttrpg-button--confirm" disabled={creating}>
-                    {creating ? 'Joining' : 'Join'}
-                </button>
-            </form>
             {/* Behind a link, so someone new is not asked to pick from the others' characters. */}
             {characters.length > 0 && !returning && (
                 <button type="button" className="ttrpg-link ttrpg-rejoin" onClick={() => setReturning(true)}>
@@ -608,7 +520,7 @@ function Table({ sessionId, mine, frozen, fogLook, blood, system, fight, check }
             .then(
                 async (blob) =>
                 {
-                    const kept = await uploadAvatar(sessionId, blob, authToken);
+                    const kept = await uploadAvatar({ session: sessionId }, blob, authToken);
 
                     if (kept)
                         message.done('Your token has its new picture.');
@@ -711,6 +623,7 @@ function Table({ sessionId, mine, frozen, fogLook, blood, system, fight, check }
                                 />
                             </section>
                         )}
+                        {mine && <SummonList sessionId={sessionId} system={system} onError={message.error} />}
                         {token && mine && (
                             <section className="ttrpg-shortcuts" aria-label="Your conditions">
                                 <h3 className="ttrpg-subhead">Your conditions</h3>

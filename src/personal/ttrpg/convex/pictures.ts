@@ -49,8 +49,12 @@ async function claimed(ctx: QueryCtx, storageId: Id<'_storage'>): Promise<boolea
         .query('characters')
         .withIndex('by_avatarId', (q) => q.eq('avatarId', storageId))
         .first();
+    const companion = await ctx.db
+        .query('companions')
+        .withIndex('by_avatarId', (q) => q.eq('avatarId', storageId))
+        .first();
 
-    return prop !== null || map !== null || avatar !== null || preset !== null || character !== null;
+    return prop !== null || map !== null || avatar !== null || preset !== null || character !== null || companion !== null;
 }
 
 /**

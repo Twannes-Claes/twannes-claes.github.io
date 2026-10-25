@@ -8,7 +8,7 @@ import { cleanStats, downedPool, hitOn, withoutNumbers } from '../map/health';
 import { cleanFight, cleanRoll, hasRolled, nextTurn, upNext, withRoll } from '../map/initiative';
 import { pathBlocked } from '../map/path';
 import { monsterFrom } from '../map/presets';
-import { anchorAt, footprintCenter, footprintKeys, resizedAt } from '../map/size';
+import { anchorAt, footprintCenter, footprintKeys, resizedAt, ridesOn } from '../map/size';
 import { spawnCells } from '../map/spawn';
 import { startWalk } from '../map/walk';
 
@@ -19,6 +19,7 @@ import { requireSession, requireUser } from './access';
 import { saveCharacter } from './characters';
 import { bloodSettingsValidator, conditionValidator, fogSettingsValidator, initiativeValidator, sizeValidator } from './schema';
 import { refreshSight, tokensOf, tokensOn } from './sight';
+import { bringCompanions, controllerOf, dropSummonsOf } from './summons';
 import { dropFile } from './usage';
 import { storedPicture } from './pictures';
 
@@ -72,7 +73,7 @@ function waitsTurn(session: Doc<'sessions'>, tokenId: Id<'tokens'>): boolean
     return fight !== undefined && (!fight.begun || (hasRolled(fight, tokenId) && fight.turn !== tokenId));
 }
 
-function ownToken(ctx: QueryCtx, sessionId: Id<'sessions'>, userId: Id<'users'>)
+export function ownToken(ctx: QueryCtx, sessionId: Id<'sessions'>, userId: Id<'users'>)
 {
     return ctx.db
         .query('tokens')
@@ -80,7 +81,7 @@ function ownToken(ctx: QueryCtx, sessionId: Id<'sessions'>, userId: Id<'users'>)
         .unique();
 }
 
-async function scenarioOf(ctx: QueryCtx, sessionId: Id<'sessions'>, scenarioId: string): Promise<Scenario | null>
+export async function scenarioOf(ctx: QueryCtx, sessionId: Id<'sessions'>, scenarioId: string): Promise<Scenario | null>
 {
     const doc = await ctx.db
         .query('scenarios')
@@ -125,7 +126,7 @@ async function memberOf(ctx: QueryCtx, sessionId: Id<'sessions'>): Promise<Doc<'
  * Where tokens arriving at a scenario stand: around its spawn point, clear of everyone already
  * there. On the spawn point itself when the walls leave no room.
  */
-function spawnSpots(
+export function spawnSpots(
     scenario: Scenario,
     arriving: Pick<Token, 'size'>[],
     staying: Pick<Token, 'x' | 'y' | 'size'>[],
@@ -151,9 +152,14 @@ async function respawn(ctx: MutationCtx, session: Doc<'sessions'>, scenarioId: s
         throw new ConvexError('That map is not saved yet. Wait for Saved and try again.');
 
     const tokens = await tokensOf(ctx, session._id);
-    const players = tokens.filter((token) => token.kind === 'player');
+    // Summons waiting off the map come along to it, still off.
+    const players = tokens.filter((token) => token.kind === 'player' && token.tray !== true);
     const monsters = tokens.filter((token) => token.kind === 'npc' && token.scenarioId === scenarioId && token.tray !== true);
     const spots = spawnSpots(scenario, players, monsters);
+
+    for (const summon of tokens.filter((token) => token.kind === 'player' && token.tray === true))
+        await ctx.db.patch('tokens', summon._id, { scenarioId });
+
 
     for (const [index, player] of players.entries())
     {
@@ -275,6 +281,7 @@ export const tokens = query({
             return [];
 
         const here = await tokensOn(ctx, sessionId, session.activeScenarioId);
+        const mine = here.find((token) => userId !== null && token.userId === userId);
 
         return here
             .filter((token) => host || token.kind === 'player' || (token.inSight === true && token.hidden !== true))
@@ -282,14 +289,15 @@ export const tokens = query({
             {
                 // Only the host can open a stat block, so only the host hears which.
                 const token = { ...tokenOf(doc), presetId: host ? doc.presetId : undefined };
+                const own = doc.userId === userId || (mine !== undefined && doc.summonOf === mine._id);
 
-                return host || doc.userId === userId ? token : withoutNumbers(token);
+                return host || own ? token : withoutNumbers(token);
             });
     },
 });
 
 /** A token as the host's screen gets it, everything but its storage and bookkeeping. */
-function tokenOf(doc: Doc<'tokens'>): Token
+export function tokenOf(doc: Doc<'tokens'>): Token
 {
     const { kind, name, color, size, speed, avatar, x, y, path, movedAt, hidden, tray, conditions } = doc;
     const { hp, maxHp, tempHp, ac, perception, downs, presetId } = doc;
@@ -316,6 +324,7 @@ function tokenOf(doc: Doc<'tokens'>): Token
         conditions,
         downs,
         presetId,
+        summonOf: doc.summonOf,
     };
 }
 
@@ -358,7 +367,7 @@ export const setStats = mutation({
 
         const session = await sessionOf(ctx, token.sessionId);
 
-        if (session.ownerId !== userId && token.userId !== userId)
+        if (session.ownerId !== userId && !(await controllerOf(ctx, token, userId)))
             throw new ConvexError('That is not your token.');
 
         await ctx.db.patch('tokens', tokenId, cleanStats(stats));
@@ -383,7 +392,7 @@ export const setConditions = mutation({
 
         const session = await sessionOf(ctx, token.sessionId);
 
-        if (session.ownerId !== userId && token.userId !== userId)
+        if (session.ownerId !== userId && !(await controllerOf(ctx, token, userId)))
             throw new ConvexError('That is not your token.');
 
         await ctx.db.patch('tokens', tokenId, { conditions: cleanConditions(session.system ?? '5e', conditions.slice(0, 50)) });
@@ -590,7 +599,7 @@ export const join = mutation({
 
         const all = await tokensOf(ctx, sessionId);
 
-        if (all.filter((token) => token.kind === 'player').length >= maxPlayers)
+        if (all.filter((token) => token.kind === 'player' && !token.summonOf).length >= maxPlayers)
             throw new ConvexError('The table is full.');
 
         const here = all.filter((token) => token.scenarioId === session.activeScenarioId && token.tray !== true);
@@ -610,6 +619,15 @@ export const join = mutation({
             ...kept,
         });
 
+        if (saved)
+        {
+            const owner = await ctx.db.get('tokens', tokenId);
+
+            if (owner)
+                await bringCompanions(ctx, owner, saved._id);
+
+        }
+
         await refreshSight(ctx, sessionId, scenario);
 
         return tokenId;
@@ -617,16 +635,20 @@ export const join = mutation({
 });
 
 /**
- * Puts a stored picture on the player's token and deletes the one before. Only the /avatar route
- * in http.ts calls it, with a file it already checked and stored, so a player never gets an upload
- * address of their own to fill storage with. The file is deleted when it cannot be kept: from
- * someone who has not joined, or refused by storedPicture in pictures.ts.
+ * Puts a stored picture on the player's token, or with tokenId one of their summons, and deletes
+ * the one before. Only the /avatar route in http.ts calls it, with a file it already checked and
+ * stored, so a player never gets an upload address of their own to fill storage with. The file is
+ * deleted when it cannot be kept: from someone who has not joined, or refused by storedPicture in
+ * pictures.ts.
  */
 export const keepAvatar = internalMutation({
-    args: { sessionId: v.id('sessions'), userId: v.id('users'), storageId: v.id('_storage') },
-    handler: async (ctx, { sessionId, userId, storageId }) =>
+    args: { sessionId: v.id('sessions'), userId: v.id('users'), storageId: v.id('_storage'), tokenId: v.optional(v.string()) },
+    handler: async (ctx, { sessionId, userId, storageId, tokenId }) =>
     {
-        const token = await ownToken(ctx, sessionId, userId);
+        const own = await ownToken(ctx, sessionId, userId);
+        const summonId = tokenId ? ctx.db.normalizeId('tokens', tokenId) : null;
+        const summon = summonId ? await ctx.db.get('tokens', summonId) : null;
+        const token = tokenId ? (summon && own && summon.summonOf === own._id ? summon : null) : own;
 
         if (!token)
         {
@@ -643,15 +665,21 @@ export const keepAvatar = internalMutation({
         if (token.avatarId && token.avatarId !== storageId)
             await dropFile(ctx, token.avatarId);
 
+        // A saved character or companion keeps the file for next time; the token only shows it.
         const character = token.characterId ? await ctx.db.get('characters', token.characterId) : null;
+        const companion = token.companionId ? await ctx.db.get('companions', token.companionId) : null;
+        const keeper = character ?? companion;
 
-        // A saved character keeps the file for next time; the token only shows it.
-        if (character)
+        if (keeper)
         {
-            if (character.avatarId && character.avatarId !== storageId)
-                await dropFile(ctx, character.avatarId);
+            if (keeper.avatarId && keeper.avatarId !== storageId)
+                await dropFile(ctx, keeper.avatarId);
 
-            await ctx.db.patch('characters', character._id, { avatar, avatarId: storageId });
+            if (character)
+                await ctx.db.patch('characters', character._id, { avatar, avatarId: storageId });
+            else if (companion)
+                await ctx.db.patch('companions', companion._id, { avatar, avatarId: storageId });
+
             await ctx.db.patch('tokens', token._id, { avatar, avatarId: undefined });
 
             return 'kept';
@@ -662,6 +690,19 @@ export const keepAvatar = internalMutation({
         return 'kept';
     },
 });
+
+/** The player or companion riding a token where it stands, see ridesOn in map/size.ts. */
+async function ridersOf(ctx: QueryCtx, carrier: Doc<'tokens'>, grid: Scenario['grid'])
+{
+    const owner = carrier.summonOf ? await ctx.db.get('tokens', carrier.summonOf) : null;
+    const companions = await ctx.db
+        .query('tokens')
+        .withIndex('by_summonOf', (q) => q.eq('summonOf', carrier._id))
+        .take(10);
+    const mount = (doc: Doc<'tokens'>) => ({ ...doc, id: doc._id as string, summonOf: doc.summonOf as string | undefined });
+
+    return [...(owner ? [owner] : []), ...companions].filter((other) => other.scenarioId === carrier.scenarioId && ridesOn(grid, mount(other), mount(carrier)));
+}
 
 /**
  * A token moves. A player walks their own along the path they drew, while the session is live
@@ -687,13 +728,16 @@ export const move = mutation({
 
         if (!host)
         {
-            if (token.userId !== userId)
+            // A summon walks on its owner's turn, see summons.ts.
+            const owner = await controllerOf(ctx, token, userId);
+
+            if (!owner)
                 throw new ConvexError('That is not your token.');
 
             if (session.live !== true || session.frozen === true)
                 throw new ConvexError('Movement is paused by the GM.');
 
-            if (waitsTurn(session, tokenId))
+            if (waitsTurn(session, owner._id))
                 throw new ConvexError('Wait for your turn.');
 
             if (token.scenarioId !== session.activeScenarioId)
@@ -735,8 +779,16 @@ export const move = mutation({
         const leavingUntil = walk ? now + walk.duration : undefined;
 
         await ctx.db.patch('tokens', tokenId, { x, y, path, movedAt: path ? now : undefined, leavingUntil });
-        await refreshSight(ctx, token.sessionId, scenario);
         await dropDraftOf(ctx, tokenId);
+
+        // Whoever rides it comes along: the familiar on a shoulder, the player on their horse.
+        for (const rider of await ridersOf(ctx, token, scenario.grid))
+        {
+            await ctx.db.patch('tokens', rider._id, { x, y, path, movedAt: path ? now : undefined });
+            await dropDraftOf(ctx, rider._id);
+        }
+
+        await refreshSight(ctx, token.sessionId, scenario);
 
         // A moment past leavingUntil, so the walk counts as over when sight is judged again.
         if (walk)
@@ -821,6 +873,7 @@ export const leave = mutation({
 
         await ctx.db.delete('tokens', token._id);
         await dropDraftOf(ctx, token._id);
+        await dropSummonsOf(ctx, token._id);
 
         const scenario = await scenarioOf(ctx, sessionId, token.scenarioId);
 
@@ -846,7 +899,7 @@ export const kick = mutation({
 
         const session = await requireSession(ctx, token.sessionId);
 
-        if (token.kind !== 'player' || !token.userId)
+        if (token.kind !== 'player' || (!token.userId && !token.summonOf))
             throw new ConvexError('Only players can be removed.');
 
         if (token.avatarId)
@@ -854,11 +907,16 @@ export const kick = mutation({
 
         await ctx.db.delete('tokens', tokenId);
         await dropDraftOf(ctx, tokenId);
+        await dropSummonsOf(ctx, tokenId);
 
         const scenario = await scenarioOf(ctx, token.sessionId, token.scenarioId);
 
         if (scenario)
             await refreshSight(ctx, token.sessionId, scenario);
+
+        // A summon only leaves the table; a saved one comes back with its player next time.
+        if (!token.userId)
+            return null;
 
         // One entry per removal by hand, and emptied on every start, so the list stays short.
         await ctx.db.patch('sessions', session._id, { kicked: [...(session.kicked ?? []), token.userId] });
@@ -1541,7 +1599,13 @@ export const hit = mutation({
 
             targets.push({ x: token.x, y: token.y, size: token.size, seen, died });
 
-            if (died)
+            // A summon brought to 0 vanishes off the map, for its player to summon again, see summons.ts.
+            if (died && token.summonOf)
+            {
+                await dropDraftOf(ctx, tokenId);
+                await ctx.db.patch('tokens', tokenId, { ...after, tray: true, path: undefined, movedAt: undefined });
+            }
+            else if (died)
             {
                 if (token.avatarId)
                     await dropFile(ctx, token.avatarId);
@@ -1591,7 +1655,7 @@ function draftOf(ctx: QueryCtx, tokenId: Id<'tokens'>)
         .unique();
 }
 
-async function dropDraftOf(ctx: MutationCtx, tokenId: Id<'tokens'>)
+export async function dropDraftOf(ctx: MutationCtx, tokenId: Id<'tokens'>)
 {
     const doc = await draftOf(ctx, tokenId);
 
@@ -1649,10 +1713,12 @@ export const draw = mutation({
         const session = await sessionOf(ctx, token.sessionId);
         const host = session.ownerId === userId;
 
-        if (!host && token.userId !== userId)
+        const owner = host ? null : await controllerOf(ctx, token, userId);
+
+        if (!host && !owner)
             throw new ConvexError('That is not your token.');
 
-        const allowed = session.live === true && token.scenarioId === session.activeScenarioId && (host || (session.frozen !== true && !waitsTurn(session, tokenId)));
+        const allowed = session.live === true && token.scenarioId === session.activeScenarioId && (host || (session.frozen !== true && !waitsTurn(session, owner?._id ?? tokenId)));
         const scenario = points && allowed ? await scenarioOf(ctx, token.sessionId, token.scenarioId) : null;
 
         if (!points || !scenario)
