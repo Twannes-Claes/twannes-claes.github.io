@@ -355,6 +355,10 @@ export interface Live
     initiative: Initiative | null;
     /** Sends the fight whole, see map/initiative.ts. Null ends it. */
     setInitiative: (fight: Initiative | null) => Promise<void>;
+    /** The group check out to the players, null while there is none. */
+    check: GroupCheck | null;
+    /** Sends a new check to the asked players' phones, or with null closes it. */
+    setCheck: (check: { text: string; asked: string[] } | null) => Promise<void>;
     /** Whoever comes after the current turn hears so. */
     upNext: boolean;
     setUpNext: (on: boolean) => Promise<void>;
@@ -401,6 +405,26 @@ export interface PlayerFight
     turn: string | 'enemy' | null;
     /** The own token comes after the current turn, when the GM turned Up next on. */
     upNext: boolean;
+}
+
+/**
+ * A roll the GM asks every player on the map for at once, like a Reflex save, see Group checks in
+ * PLAN.md. Only the GM sees the numbers; a phone only hears what to roll, see PlayerCheck.
+ */
+export interface GroupCheck
+{
+    /** What to roll and why, as the GM wrote it. */
+    text: string;
+    /** The players' tokens the GM sent it to. */
+    asked: string[];
+    rolls: { tokenId: string; roll: number }[];
+}
+
+/** A group check as a phone hears of it: what to roll, and whether it has. */
+export interface PlayerCheck
+{
+    text: string;
+    rolled: boolean;
 }
 
 /**

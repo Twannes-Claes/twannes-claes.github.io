@@ -228,6 +228,12 @@ export const status = query({
             // The whole fight only for the GM view; everyone else hears only what concerns them.
             initiative: host ? (session.initiative ?? null) : null,
             fight: await fightFor(ctx, session, mine?._id ?? null),
+            // Like the fight: the numbers only for the GM, an asked phone hears what to roll.
+            check: host ? (session.check ?? null) : null,
+            playerCheck:
+                mine && session.check && session.check.asked.includes(mine._id)
+                    ? { text: session.check.text, rolled: session.check.rolls.some((entry) => entry.tokenId === mine._id) }
+                    : null,
             password: host ? (session.password ?? '') : null,
         };
     },
@@ -730,7 +736,7 @@ export const start = mutation({
             throw new ConvexError('Keep the password under 50 characters.');
 
         // Starting again forgives whoever was removed: they still need the password.
-        await ctx.db.patch('sessions', sessionId, { live: true, password: secret, frozen: false, kicked: undefined, initiative: undefined });
+        await ctx.db.patch('sessions', sessionId, { live: true, password: secret, frozen: false, kicked: undefined, initiative: undefined, check: undefined });
 
         if (session.activeScenarioId !== scenarioId)
             await respawn(ctx, session, scenarioId);
@@ -1181,6 +1187,63 @@ export const endTurn = mutation({
 });
 
 /**
+ * The host sends a group check to the players they picked, a new one replacing the last, or with
+ * null closes it.
+ */
+export const setCheck = mutation({
+    args: { sessionId: v.id('sessions'), check: v.union(v.object({ text: v.string(), asked: v.array(v.string()) }), v.null()) },
+    handler: async (ctx, { sessionId, check }) =>
+    {
+        await requireSession(ctx, sessionId);
+
+        if (!check)
+        {
+            await ctx.db.patch('sessions', sessionId, { check: undefined });
+
+            return null;
+        }
+
+        const text = check.text.trim().slice(0, 200);
+        const asked = [...new Set(check.asked)].slice(0, maxPlayers);
+
+        if (!text)
+            throw new ConvexError('Write what to roll.');
+
+        if (asked.length === 0)
+            throw new ConvexError('Pick who rolls.');
+
+        await ctx.db.patch('sessions', sessionId, { check: { text, asked, rolls: [] } });
+
+        return null;
+    },
+});
+
+/** A player's roll for the group check. A second one is quietly nothing, like a second press. */
+export const rollCheck = mutation({
+    args: { sessionId: v.id('sessions'), roll: v.number() },
+    handler: async (ctx, { sessionId, roll }) =>
+    {
+        const userId = await requireUser(ctx);
+        const session = await sessionOf(ctx, sessionId);
+        const own = await ownToken(ctx, sessionId, userId);
+        const value = cleanRoll(roll);
+
+        if (!own || !session.check || !session.check.asked.includes(own._id))
+            throw new ConvexError('There is no check to roll for.');
+
+        if (value === null)
+            throw new ConvexError('Type the number you rolled.');
+
+        if (session.check.rolls.some((entry) => entry.tokenId === own._id))
+            return null;
+
+        await ctx.db.patch('sessions', sessionId, { check: { ...session.check, rolls: [...session.check.rolls, { tokenId: own._id, roll: value }] } });
+
+        return null;
+    },
+});
+
+/**
  * The host ends the session: phones say so, and the players leave the table with their tokens and
  * pictures, so the next start begins with nobody there. Monsters stay, they belong to the maps.
  */
@@ -1200,7 +1263,7 @@ export const end = mutation({
             await dropDraftOf(ctx, player._id);
         }
 
-        await ctx.db.patch('sessions', sessionId, { live: false, frozen: false, initiative: undefined });
+        await ctx.db.patch('sessions', sessionId, { live: false, frozen: false, initiative: undefined, check: undefined });
 
         const scenario = session.activeScenarioId ? await scenarioOf(ctx, sessionId, session.activeScenarioId) : null;
 

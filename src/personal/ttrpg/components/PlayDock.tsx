@@ -9,6 +9,7 @@ import {
     faExpand,
     faForwardStep,
     faCircle,
+    faListCheck,
     faObjectGroup,
     faSnowflake,
     faSquare,
@@ -60,6 +61,9 @@ interface PlayDockProps
     initiativeOpen: boolean;
     /** Passes the turn on, only while the turns of a fight run. */
     onNextTurn?: () => void;
+    /** Opens or closes the group check, see CheckPanel.tsx. */
+    onCheck: () => void;
+    checkOpen: boolean;
 }
 
 /**
@@ -87,6 +91,8 @@ export function PlayDock({
     onInitiative,
     initiativeOpen,
     onNextTurn,
+    onCheck,
+    checkOpen,
 }: PlayDockProps)
 {
     const { fullscreen, toggle } = useFullscreen();
@@ -198,6 +204,17 @@ export function PlayDock({
                         Next
                     </button>
                 )}
+                <button
+                    type="button"
+                    className="ttrpg-segment"
+                    aria-pressed={checkOpen}
+                    aria-expanded={checkOpen}
+                    title="Ask every player for the same roll"
+                    onClick={onCheck}
+                >
+                    <FontAwesomeIcon icon={faListCheck} />
+                    Check
+                </button>
             </div>
             {onMonsters && (
                 <div className="ttrpg-dock__group">

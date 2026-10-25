@@ -12,7 +12,7 @@ import { useAuthActions, useAuthToken, useConvexAuth } from '@convex-dev/auth/re
 import { useConvex, useMutation, useQuery } from 'convex/react';
 import { useActionState, useEffect, useState, type ReactNode } from 'react';
 
-import type { BloodSettings, CreatureSize, FogSettings, GameSystem, HitKind, PlayerFight, Scenario } from '../types';
+import type { BloodSettings, CreatureSize, FogSettings, GameSystem, HitKind, PlayerCheck, PlayerFight, Scenario } from '../types';
 
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
@@ -120,7 +120,7 @@ function Player({ sessionId, table }: PlayerViewProps)
     }
 
     if (table && status.host)
-        return <Table sessionId={status.sessionId} mine={null} frozen={status.frozen} fogLook={status.fogLook} blood={status.blood} system={status.system} fight={status.fight} />;
+        return <Table sessionId={status.sessionId} mine={null} frozen={status.frozen} fogLook={status.fogLook} blood={status.blood} system={status.system} fight={status.fight} check={status.playerCheck} />;
 
     if (status.kicked)
     {
@@ -135,7 +135,7 @@ function Player({ sessionId, table }: PlayerViewProps)
     if (!status.mine)
         return <JoinForm sessionId={status.sessionId} name={status.name} />;
 
-    return <Table sessionId={status.sessionId} mine={status.mine} frozen={status.frozen} fogLook={status.fogLook} blood={status.blood} system={status.system} fight={status.fight} />;
+    return <Table sessionId={status.sessionId} mine={status.mine} frozen={status.frozen} fogLook={status.fogLook} blood={status.blood} system={status.system} fight={status.fight} check={status.playerCheck} />;
 }
 
 interface JoinFormProps
@@ -372,6 +372,8 @@ interface TableProps
     system: GameSystem;
     /** The fight as this screen hears of it, null while there is none. */
     fight: PlayerFight | null;
+    /** The GM's group check as a phone hears of it, null while there is none. */
+    check: PlayerCheck | null;
 }
 
 /**
@@ -381,7 +383,7 @@ interface TableProps
  * fade out like the GM view's controls, and it saves what the party saw, so the fog is remembered
  * while the GM view is in Edit, see saveFog in convex/play.ts.
  */
-function Table({ sessionId, mine, frozen, fogLook, blood, system, fight }: TableProps)
+function Table({ sessionId, mine, frozen, fogLook, blood, system, fight, check }: TableProps)
 {
     const onTable = mine === null;
     // What a press does with no ruler on: open doors on the table screen, as in the editor, or on
@@ -411,6 +413,7 @@ function Table({ sessionId, mine, frozen, fogLook, blood, system, fight }: Table
     const saveStats = useMutation(api.play.setStats);
     const saveConditions = useMutation(api.play.setConditions);
     const rollInitiative = useMutation(api.play.rollInitiative);
+    const rollCheck = useMutation(api.play.rollCheck);
     const endTurn = useMutation(api.play.endTurn);
     const authToken = useAuthToken();
     const [pending, setPending] = useState<PendingMove | null>(null);
@@ -456,10 +459,21 @@ function Table({ sessionId, mine, frozen, fogLook, blood, system, fight }: Table
     const sitsOut = fight?.begun === true && !fight.rolled;
     const held = frozen || (!onTable && fight !== null && !myTurn && !sitsOut);
     const rolling = !onTable && mine !== null && fight !== null && !fight.begun && !fight.rolled;
+    // A group check waits behind an initiative roll, so only one sheet shows at a time.
+    const checking = !onTable && !rolling && check !== null && !check.rolled;
     const turnName = fight?.turn === 'enemy' ? 'Enemy' : tokens.find((candidate) => candidate.id === fight?.turn)?.name;
 
     const sendRoll = (roll: number) =>
         rollInitiative({ sessionId, roll }).then(
+            () => undefined,
+            (reason: unknown) =>
+            {
+                throw new Error(explain(reason, 'That roll did not go through. Try again.'));
+            },
+        );
+
+    const sendCheck = (roll: number) =>
+        rollCheck({ sessionId, roll }).then(
             () => undefined,
             (reason: unknown) =>
             {
@@ -566,7 +580,7 @@ function Table({ sessionId, mine, frozen, fogLook, blood, system, fight }: Table
             )}
 
             {/* Both corners make way for the move sheet and the hit sheet at the bottom. */}
-            {!pending && !targets && !rolling && (
+            {!pending && !targets && !rolling && !checking && (
                 <div className={`ttrpg-panel ttrpg-corner ttrpg-corner--left${idle ? ' ttrpg-hidden' : ''}`}>
                     <RulerPicker
                         tool={tool}
@@ -591,6 +605,9 @@ function Table({ sessionId, mine, frozen, fogLook, blood, system, fight }: Table
             {rolling && !pending && !targets && (
                 <RollSheet title="Roll initiative" note={system === 'pf2e' ? 'Usually your Perception' : undefined} onSend={sendRoll} />
             )}
+
+            {/* Keyed on the text, so a new check starts with an empty field. */}
+            {check && checking && !pending && !targets && <RollSheet key={check.text} title={check.text} onSend={sendCheck} />}
 
             {!onTable && !pending && !targets && (
                 <div className="ttrpg-panel ttrpg-corner">

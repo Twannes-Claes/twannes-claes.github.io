@@ -34,6 +34,13 @@ export const initiativeValidator = v.object({
     turn: v.union(v.string(), v.null()),
 });
 
+/** A roll everyone at the table makes at once, see GroupCheck in types.ts. */
+export const checkValidator = v.object({
+    text: v.string(),
+    asked: v.array(v.string()),
+    rolls: v.array(v.object({ tokenId: v.string(), roll: v.number() })),
+});
+
 /** A condition on a token, see Condition in types.ts. */
 export const conditionValidator = v.object({ id: v.string(), value: v.optional(v.number()) });
 
@@ -125,6 +132,8 @@ export default defineSchema({
         system: v.optional(systemValidator),
         /** The fight on the map being played, only for the host, see Initiative in types.ts. */
         initiative: v.optional(initiativeValidator),
+        /** The group check out to the players, only whole for the host, see GroupCheck in types.ts. */
+        check: v.optional(checkValidator),
         /** Whoever comes after the current turn hears so, see Up next in PLAN.md. */
         upNext: v.optional(v.boolean()),
     }).index('by_ownerId', ['ownerId']),

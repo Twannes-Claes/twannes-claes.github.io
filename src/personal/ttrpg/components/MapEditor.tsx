@@ -2,7 +2,7 @@ import { faCheck, faDiceD20, faHatWizard, faPen, faSnowflake, faTriangleExclamat
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useEffectEvent, useRef, useState, type DragEvent, type MouseEvent } from 'react';
 
-import type { BloodSettings, Decal, FogSettings, GameSystem, HitKind, Initiative, Live, MonsterControls, PictureBytes, Ping, Point, Preset, PropPicture, Scenario, SharedHit, Store, Token } from '../types';
+import type { BloodSettings, Decal, FogSettings, GameSystem, GroupCheck, HitKind, Initiative, Live, MonsterControls, PictureBytes, Ping, Point, Preset, PropPicture, Scenario, SharedHit, Store, Token } from '../types';
 
 import { cleanConditions } from '../content/conditions';
 import { blankScenario, demoTokens } from '../content/scenarios';
@@ -24,6 +24,7 @@ import { Spinner, Toast, Toasts } from './Feedback';
 import { FogPanel } from './FogPanel';
 import { AttackButton, HitSheet } from './HitSheet';
 import { GridPanel } from './GridPanel';
+import { CheckPanel } from './CheckPanel';
 import { InitiativePanel } from './InitiativePanel';
 import { LiveControls, Players } from './LiveControls';
 import { MapCanvas } from './MapCanvas';
@@ -159,7 +160,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const [frozen, setFrozen] = useState(false);
     const [playTool, setPlayTool] = useState<PlayTool>('open-doors');
     // The one panel open above the play dock.
-    const [panel, setPanel] = useState<'monsters' | 'fog' | 'initiative' | null>(null);
+    const [panel, setPanel] = useState<'monsters' | 'fog' | 'initiative' | 'check' | null>(null);
     // The fog's look: the session's when it is saved, this screen's in the demo. While a slider
     // moves, the draft shows here only, and letting go saves it, see FogPanel.
     const [demoFog, setDemoFog] = useState<FogSettings>(defaultFogSettings);
@@ -174,6 +175,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const [demoPresets, setDemoPresets] = useState<Preset[]>(() => [demoOgrePreset]);
     // The fight off a live map, with the test players, and whether Up next is on in the demo.
     const [localFight, setLocalFight] = useState<Initiative | null>(null);
+    const [localCheck, setLocalCheck] = useState<GroupCheck | null>(null);
     const [demoUpNext, setDemoUpNext] = useState(false);
     // The tokens picked for an attack or a heal, or null when not picking, see HitSheet.
     const [targets, setTargets] = useState<string[] | null>(null);
@@ -601,6 +603,9 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const setSystem = (next: GameSystem) => (live ? fail(live.setSystem(next)) : setDemoSystem(next));
     const fight = liveMap ? liveMap.initiative : localFight;
     const setFight = (next: Initiative | null) => (liveMap ? fail(liveMap.setInitiative(next)) : setLocalFight(next));
+    // Off a live map nobody can answer it, but the GM can still try the panel.
+    const check = liveMap ? liveMap.check : localCheck;
+    const setCheck = (next: { text: string; asked: string[] } | null) => (liveMap ? fail(liveMap.setCheck(next)) : setLocalCheck(next && { ...next, rolls: [] }));
     const upNext = live ? live.upNext : demoUpNext;
     const setUpNext = (on: boolean) => (live ? fail(live.setUpNext(on)) : setDemoUpNext(on));
 
@@ -671,7 +676,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 ? () => kickPlayer(liveMap, menuToken.id, menuToken.name, message.done, message.error)
                 : undefined;
 
-    const togglePanel = (next:'monsters' | 'fog' | 'initiative') => setPanel((open) => (open === next ? null : next));
+    const togglePanel = (next: 'monsters' | 'fog' | 'initiative' | 'check') => setPanel((open) => (open === next ? null : next));
 
     const fogSettings = fogDraft ?? (live ? (live.fogLook ?? defaultFogSettings) : demoFog);
 
@@ -1221,6 +1226,8 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                         onInitiative={() => togglePanel('initiative')}
                         initiativeOpen={panel === 'initiative'}
                         onNextTurn={fight?.begun ? () => setFight(nextTurn(fight, (id) => shown.some((token) => token.id === id))) : undefined}
+                        onCheck={() => togglePanel('check')}
+                        checkOpen={panel === 'check'}
                     />
                 )
             )}
@@ -1250,6 +1257,10 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
             {mode === 'gm' && !pending && !idle && panel === 'initiative' && (
                 <InitiativePanel fight={fight} tokens={shown} system={system} onChange={setFight} onClose={() => setPanel(null)} />
+            )}
+
+            {mode === 'gm' && !pending && !idle && panel === 'check' && (
+                <CheckPanel check={check} players={shown.filter((token) => token.kind === 'player')} onSend={setCheck} onClose={() => setPanel(null)} />
             )}
 
             {mode === 'gm' && !pending && !idle && panel === 'monsters' && (

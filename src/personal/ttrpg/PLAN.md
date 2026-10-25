@@ -893,6 +893,11 @@ Built into play mode neatly, it should look and feel good.
   initiative roll (6), so they are built together.
 - The GM view lists who rolled what, and who is still missing. Only the GM sees the numbers. The GM
   closes the check when it is done.
+- **Built.** **Check** in the GM view's dock (`components/CheckPanel.tsx`): the GM writes what to
+  roll, picks who rolls (everyone on the map at first) and sends it (`play.setCheck`), kept in
+  `sessions.check`. Each asked phone gets a `RollSheet` with that text and sends its number once (`play.rollCheck`); an initiative roll
+  asked at the same time comes first. `play.status` gives the GM the whole check and a phone only
+  the text and whether it rolled. Start and End session clear it.
 
 ### 18. Music
 
