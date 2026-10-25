@@ -957,6 +957,28 @@ Built into play mode neatly, it should look and feel good.
   (`components/CharacterList.tsx`). A signed-in player's character is never on the rejoin list
   and cannot be taken over (`takeable` in `convex/play.ts`); they sign in again instead.
 
+### 20. Style pass
+
+- The **Numbers** tab (`StatsForm`), in the token menu and the Players and Monsters lists, looks
+  out of style next to the other tabs: restyle it to match.
+- The green confirm buttons look out of style too.
+
+### 21. Animations
+
+- Everything that pops in also pops out smoothly.
+- A companion getting on or off its rider moves smoother.
+
+### 22. Theme
+
+- A light theme next to the dark one.
+- A setting to change the accent colour, purple now.
+
+### 23. Abuse limits
+
+- Anyone signed in with Discord could make characters over and over, or spam other mutations,
+  eating the free plan's quota. Check the join flow and add rate limits to character creation and
+  the busiest mutations.
+
 ### Build order
 
 1 first, since it splits what the GM sees from what the players see, which everything after it
