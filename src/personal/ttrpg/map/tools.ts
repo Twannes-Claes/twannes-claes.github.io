@@ -44,7 +44,7 @@ export type ToolId =
 export type Change = (next: Scenario, final?: boolean) => void;
 
 /**
- * Hears what Reveal uncovers, a box or a circle, as a polygon in world pixels, and whether it hides
+ * Hears what Reveal uncovers, a polygon or a circle, as a polygon in world pixels, and whether it hides
  * it again instead.
  */
 export type Reveal = (polygon: Point[], hide: boolean) => void;
@@ -58,6 +58,8 @@ export interface ToolPointer
     world: Point;
     /** Alt is held: place freely rather than on the grid. */
     free: boolean;
+    /** Shift is held: keep a line at 0, 45 or 90 degrees. */
+    straight?: boolean;
     /** Screen pixels per world pixel, so hit areas feel the same size at any zoom. */
     zoom: number;
     scenario: Scenario;
@@ -798,55 +800,112 @@ function coneTool(share: ShareMark): MapTool
 }
 
 /**
- * The game master's Reveal area: drag a box and everything in it counts as seen before, or, hiding,
- * as never seen. The box shows red while it hides.
+ * The point at from's nearest 0, 45 or 90 degrees towards to, for Shift held. A diagonal takes
+ * the longer side, so a corner on the grid leads to another one.
  */
-function revealTool(reveal: Reveal, hide: boolean): MapTool
+export function straighten(from: Point, to: Point): Point
 {
-    let drag: Drag | null = null;
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    // Within 22.5 degrees of flat or upright, the line lies flat or stands up.
+    const slack = Math.tan(Math.PI / 8);
+
+    if (Math.abs(dy) <= Math.abs(dx) * slack)
+        return { x: to.x, y: from.y };
+
+    if (Math.abs(dx) <= Math.abs(dy) * slack)
+        return { x: from.x, y: to.y };
+
+    const side = Math.max(Math.abs(dx), Math.abs(dy));
+
+    return { x: from.x + Math.sign(dx) * side, y: from.y + Math.sign(dy) * side };
+}
+
+/**
+ * The game master's Reveal area: click its corners, which snap like walls do, and clicking the
+ * first one again closes it. Everything inside counts as seen before, or, hiding, as never seen,
+ * red while it is drawn. Shift keeps each side at 0, 45 or 90 degrees, for clean boxes.
+ */
+function revealTool(reveal: Reveal, hide: boolean, snap: number): MapTool
+{
+    let corners: Point[] = [];
+    let hover: Point | null = null;
+
+    const cornerAt = (pointer: ToolPointer) =>
+    {
+        const point = cornerPoint(pointer, snap);
+        const last = corners.at(-1);
+
+        return pointer.straight && last ? straighten(last, point) : point;
+    };
+
+    // Close enough to the first corner, in screen pixels, to close the shape on a click.
+    const closes = (point: Point, zoom: number) => corners.length > 2 && distance(corners[0], point) * zoom < reach;
+
+    const drop = () =>
+    {
+        const had = corners.length > 0;
+
+        corners = [];
+
+        return had;
+    };
 
     return {
         cursor: 'crosshair',
-        down: ({ world }) =>
+        down: (pointer) =>
         {
-            drag = { start: world, end: world };
+            const point = cornerAt(pointer);
+            const last = corners.at(-1);
+
+            if (closes(pointer.world, pointer.zoom) || closes(point, pointer.zoom))
+            {
+                reveal(corners, hide);
+                corners = [];
+            }
+            else if (!last || distance(last, point) * pointer.zoom >= 4)
+                corners.push(point);
 
             return true;
         },
-        move: ({ world }, pressed) =>
+        move: (pointer) =>
         {
-            if (pressed && drag)
-                drag.end = world;
+            hover = cornerAt(pointer);
+
+            if (closes(pointer.world, pointer.zoom) || closes(hover, pointer.zoom))
+                hover = corners[0];
 
         },
-        up: () =>
-        {
-            if (drag)
-            {
-                const { left, top, right, bottom } = boxOf(drag.start, drag.end);
-
-                reveal([
-                    { x: left, y: top },
-                    { x: right, y: top },
-                    { x: right, y: bottom },
-                    { x: left, y: bottom },
-                ], hide);
-            }
-
-            drag = null;
-        },
-        cancel: () =>
-        {
-            const had = drag !== null;
-
-            drag = null;
-
-            return had;
-        },
+        key: (key) => key === 'Escape' && drop(),
+        cancel: drop,
         draw: (ctx, zoom) =>
         {
-            if (drag)
-                drawBox(ctx, drag, zoom, hide ? danger : highlight, true);
+            const colour = hide ? danger : highlight;
+            const outline = hover && corners.length > 0 ? [...corners, hover] : corners;
+
+            if (outline.length > 1)
+            {
+                ctx.beginPath();
+                outline.forEach((corner, index) => (index === 0 ? ctx.moveTo(corner.x, corner.y) : ctx.lineTo(corner.x, corner.y)));
+                ctx.closePath();
+                ctx.fillStyle = faded(colour, 0.14);
+                ctx.fill();
+                ctx.setLineDash([6 / zoom, 4 / zoom]);
+                ctx.strokeStyle = colour;
+                ctx.lineWidth = 2 / zoom;
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            for (const corner of corners)
+                dot(ctx, corner, 4 / zoom, colour);
+
+            // The first corner grows when the next click would close the shape.
+            if (corners.length > 0)
+                dot(ctx, corners[0], (hover === corners[0] ? 7 : 5) / zoom, colour);
+
+            if (hover && hover !== corners[0])
+                dot(ctx, hover, 4 / zoom, ink);
 
         },
     };
@@ -1438,7 +1497,7 @@ export function createTool(
             return coneTool(share);
         case 'reveal':
         case 'hide':
-            return revealTool(reveal, id === 'hide');
+            return revealTool(reveal, id === 'hide', snap);
         case 'reveal-circle':
         case 'hide-circle':
             return revealCircleTool(reveal, id === 'hide-circle');

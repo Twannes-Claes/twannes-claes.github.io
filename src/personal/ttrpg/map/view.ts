@@ -1223,6 +1223,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     const toolPointer = (event: PointerEvent, current: Scenario): ToolPointer => ({
         world: toWorld(camera, local(event)),
         free: event.altKey,
+        straight: event.shiftKey,
         zoom: camera.zoom,
         scenario: current,
         seen: (point) => peek || seenGround(point),

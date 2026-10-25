@@ -803,6 +803,9 @@ Built into play mode neatly, it should look and feel good.
 - Click the corners. A key held keeps a line at 0, 45 or 90 degrees, like Shift in Photoshop, for
   clean boxes.
 - Corners snap to walls and grid corners, and clicking the first corner closes the shape.
+- **Built.** Reveal's pop-out picks **Polygon** or Circle. `revealTool` in `map/tools.ts` takes
+  clicks: corners snap like walls (`cornerPoint`), Shift straightens each side with `straighten`,
+  and clicking the first corner uncovers or hides the shape. Esc or a right click drops it.
 
 ### 10. Smaller things
 

@@ -25,7 +25,7 @@ import { extendPath, pathBlocked, pathFeet } from './path.ts';
 import { placedSize, propAt, snapCenter, snapSize } from './props.ts';
 import { anchorAt, footprint, footprintCenter, footprintKeys, landingAt, ridesOn } from './size.ts';
 import { spawnCells } from './spawn.ts';
-import { createTool, measure, toggleDoor, wallInBox, type ToolPointer } from './tools.ts';
+import { createTool, measure, straighten, toggleDoor, wallInBox, type ToolPointer } from './tools.ts';
 import { scenarioFromUvtt } from './uvtt.ts';
 import { inSight, insidePolygon, sightSegments, visibilityPolygon } from './visibility.ts';
 import { startWalk, walkAt } from './walk.ts';
@@ -262,20 +262,31 @@ assert.equal(markSeen(explored, sight), false);
 // Players only walk where it was seen, see extendRoute in map/view.ts.
 assert.deepEqual([{ x: 125, y: 525 }, { x: 775, y: 525 }, { x: -10, y: 525 }].map((point) => wasSeen(explored, point)), [true, false, false]);
 
-// Reveal area marks the samples whose centres the box reaches, and nothing outside it.
+// Reveal area marks the samples whose centres the polygon reaches, and nothing outside it. Its
+// corners snap to grid corners, Shift keeps a side straight, and clicking the first corner closes it.
 const revealed = createExplored(walled);
-const press = (x: number, y: number): ToolPointer => ({ world: { x, y }, free: false, zoom: 1, scenario: walled, seen: () => true, system: '5e' });
+const press = (x: number, y: number, straight = false): ToolPointer => ({ world: { x, y }, free: false, straight, zoom: 1, scenario: walled, seen: () => true, system: '5e' });
 const uncover = (polygon: Point[]) => void markSeen(revealed, polygon);
 const revealTool = createTool('reveal', () => {}, null, uncover);
 
 assert.ok(revealTool);
-revealTool.down(press(600, 100));
-revealTool.move(press(700, 150), true);
-revealTool.up?.(press(700, 150));
+revealTool.down(press(604, 97));
+revealTool.down(press(812, 93));
+revealTool.down(press(790, 210));
+// Placed freely, the bottom would slant down over the row below.
+revealTool.down({ ...press(605, 260, true), free: true });
+assert.equal(revealed.seen.indexOf(1), -1);
+revealTool.down(press(598, 103));
 assert.deepEqual(
     [...revealed.seen.keys()].filter((index) => revealed.seen[index] === 1),
-    [2 * revealed.columns + 12, 2 * revealed.columns + 13],
+    [2, 3].flatMap((row) => [12, 13, 14, 15].map((column) => row * revealed.columns + column)),
 );
+// A diagonal takes the longer side, so it runs from grid corner to grid corner.
+assert.deepEqual(straighten({ x: 0, y: 0 }, { x: 300, y: -200 }), { x: 300, y: -300 });
+// Esc drops a half-drawn polygon.
+revealTool.down(press(100, 100));
+assert.equal(revealTool.key?.('Escape', walled), true);
+assert.equal(revealTool.key?.('Escape', walled), false);
 
 // A circle reveals whole cells round where it lands, 2.5 rounding to 3, and the wall stops it.
 const circleTool = createTool('reveal-circle', () => {}, null, uncover);
@@ -291,9 +302,9 @@ assert.deepEqual([425, 575, 125, 75].map((x) => wasSeen(revealed, { x, y: 525 })
 const hideTool = createTool('hide', () => {}, null, (polygon, hide) => void markSeen(revealed, polygon, hide ? 0 : 1));
 
 assert.ok(hideTool);
-hideTool.down(press(400, 500));
-hideTool.move(press(450, 550), true);
-hideTool.up?.(press(450, 550));
+for (const [x, y] of [[400, 500], [450, 500], [450, 550], [400, 550], [400, 500]])
+    hideTool.down({ ...press(x, y), free: true });
+
 assert.deepEqual([425, 125].map((x) => wasSeen(revealed, { x, y: 525 })), [false, true]);
 
 // A Universal VTT file: cells become pixels from the map's origin, every stretch of a line of
