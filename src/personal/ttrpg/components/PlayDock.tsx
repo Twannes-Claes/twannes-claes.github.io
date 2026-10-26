@@ -11,6 +11,7 @@ import {
     faForwardStep,
     faCircle,
     faListCheck,
+    faMusic,
     faObjectGroup,
     faSnowflake,
 } from '@fortawesome/free-solid-svg-icons';
@@ -70,6 +71,9 @@ interface PlayDockProps
     /** Opens or closes the group check, see CheckPanel.tsx. */
     onCheck: () => void;
     checkOpen: boolean;
+    /** Opens or closes the music, see MusicPanel.tsx. */
+    onMusic: () => void;
+    musicOpen: boolean;
 }
 
 /**
@@ -101,6 +105,8 @@ export function PlayDock({
     onNextTurn,
     onCheck,
     checkOpen,
+    onMusic,
+    musicOpen,
 }: PlayDockProps)
 {
     const { fullscreen, toggle } = useFullscreen();
@@ -274,6 +280,17 @@ export function PlayDock({
                 )}
             </div>
             <div className="ttrpg-dock__group">
+                <button
+                    type="button"
+                    className="ttrpg-segment"
+                    aria-pressed={musicOpen}
+                    aria-expanded={musicOpen}
+                    aria-label="Music"
+                    title="Music from YouTube"
+                    onClick={onMusic}
+                >
+                    <FontAwesomeIcon icon={faMusic} />
+                </button>
                 <button
                     type="button"
                     className="ttrpg-segment"

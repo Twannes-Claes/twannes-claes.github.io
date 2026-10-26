@@ -153,6 +153,15 @@ export interface Token
     summonOf?: string;
 }
 
+/** A YouTube link in the GM's music, for all their sessions, see Music in PLAN.md. */
+export interface Track
+{
+    id: string;
+    name: string;
+    /** All that is kept of the link, see content/music.ts. */
+    videoId: string;
+}
+
 /** A monster's stat block in the GM's library, for all their sessions, see Monster presets. */
 export interface Preset
 {
@@ -405,7 +414,15 @@ export interface Live
     /** Adds a preset, or with an id changes that one, with a new picture or null. Gives its id. */
     savePreset: (preset: Omit<Preset, 'id' | 'avatar'>, picture: Blob | null, id?: string) => Promise<string>;
     removePreset: (id: string) => Promise<void>;
+    /** The game master's music, by name. */
+    tracks: Track[];
+    /** Adds a link, or with an id renames or relinks that one. */
+    saveTrack: (track: { name: string; link: string }, id?: string) => Promise<void>;
+    removeTrack: (id: string) => Promise<void>;
 }
+
+/** What the music panel works with: a saved session's, see Live, or the demo's, kept in the tab. */
+export type MusicControls = Pick<Live, 'tracks' | 'saveTrack' | 'removeTrack'>;
 
 /**
  * What the Monsters panels work with: a saved session's, see Live, or the demo's, kept in the tab

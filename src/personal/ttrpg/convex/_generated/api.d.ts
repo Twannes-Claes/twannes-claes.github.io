@@ -14,6 +14,7 @@ import type * as characters from "../characters.js";
 import type * as hosts from "../hosts.js";
 import type * as http from "../http.js";
 import type * as limits from "../limits.js";
+import type * as music from "../music.js";
 import type * as pictures from "../pictures.js";
 import type * as play from "../play.js";
 import type * as presets from "../presets.js";
@@ -35,6 +36,7 @@ declare const fullApi: ApiFromModules<{
   hosts: typeof hosts;
   http: typeof http;
   limits: typeof limits;
+  music: typeof music;
   pictures: typeof pictures;
   play: typeof play;
   presets: typeof presets;

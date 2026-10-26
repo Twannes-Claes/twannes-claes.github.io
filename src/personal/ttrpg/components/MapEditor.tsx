@@ -2,10 +2,11 @@ import { faCheck, faDiceD20, faHatWizard, faPen, faSnowflake, faTriangleExclamat
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useEffectEvent, useRef, useState, type DragEvent, type MouseEvent } from 'react';
 
-import type { BloodSettings, Decal, Drawing, FogSettings, GameSystem, GroupCheck, HitKind, Initiative, Live, MonsterControls, PictureBytes, Pen, Ping, Point, Preset, PropPicture, Scenario, SharedHit, Store, Token } from '../types';
+import type { BloodSettings, Decal, Drawing, FogSettings, GameSystem, GroupCheck, HitKind, Initiative, Live, MonsterControls, MusicControls, PictureBytes, Pen, Ping, Point, Preset, PropPicture, Scenario, SharedHit, Store, Token, Track } from '../types';
 
 import { cleanConditions } from '../content/conditions';
 import { blankScenario, demoTokens } from '../content/scenarios';
+import { videoId } from '../content/music';
 import { demoOgrePreset } from '../content/statBlocks';
 import { gameSystems } from '../content/systems';
 import { highlight, ringColours } from '../map/colours';
@@ -34,6 +35,7 @@ import { LiveControls, Players } from './LiveControls';
 import { MapCanvas } from './MapCanvas';
 import { MonsterList, Monsters } from './Monsters';
 import { MoveSheet } from './MoveSheet';
+import { MusicPanel } from './MusicPanel';
 import { PlayDock, type PlayTool } from './PlayDock';
 import { Popover } from './Popover';
 import { PresetLibrary } from './PresetLibrary';
@@ -166,7 +168,11 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const [frozen, setFrozen] = useState(false);
     const [playTool, setPlayTool] = useState<PlayTool>('open-doors');
     // The one panel open above the play dock.
-    const [panel, setPanel] = useState<'monsters' | 'fog' | 'initiative' | 'check' | null>(null);
+    const [panel, setPanel] = useState<'monsters' | 'fog' | 'initiative' | 'check' | 'music' | null>(null);
+    // The music panel stays once opened, so it plays on in Edit and while closed.
+    const [musicOpened, setMusicOpened] = useState(false);
+    // The demo's music, kept in this tab.
+    const [demoTracks, setDemoTracks] = useState<Track[]>([]);
     // The fog's look: the session's when it is saved, this screen's in the demo. While a slider
     // moves, the draft shows here only, and letting go saves it, see FogPanel.
     const [demoFog, setDemoFog] = useState<FogSettings>(defaultFogSettings);
@@ -437,6 +443,24 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
         setSize: (id, size) => changeToken(id, (token) => ({ ...token, size, ...resizedAt(active.grid, token, size) })),
     };
     const monsterControls = live ?? demoMonsters;
+
+    // The demo's music, checked and sorted here the way convex/music.ts does for a saved session.
+    const demoMusic: MusicControls = {
+        tracks: demoTracks,
+        saveTrack: async ({ name, link }, id) =>
+        {
+            const linked = videoId(link);
+
+            if (!linked)
+                throw new Error('That is not a YouTube video link.');
+
+            const track = { id: id ?? crypto.randomUUID(), name: name.trim().slice(0, 60) || 'Music', videoId: linked };
+
+            setDemoTracks((current) => [...current.filter((other) => other.id !== track.id), track].sort((a, b) => a.name.localeCompare(b.name)));
+        },
+        removeTrack: async (id) => setDemoTracks((current) => current.filter((track) => track.id !== id)),
+    };
+
 
     // The test players off a live map, changed here in the tab.
     const testPlayers: Pick<Live, 'setStats' | 'setConditions' | 'setSize'> = {
@@ -731,7 +755,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 ? () => kickPlayer(liveMap, menuToken.id, menuToken.name, message.done, message.error)
                 : () => removeTestPlayer(menuToken.id);
 
-    const togglePanel = (next: 'monsters' | 'fog' | 'initiative' | 'check') => setPanel((open) => (open === next ? null : next));
+    const togglePanel = (next: 'monsters' | 'fog' | 'initiative' | 'check' | 'music') => setPanel((open) => (open === next ? null : next));
 
     const fogSettings = fogDraft ?? (live ? (live.fogLook ?? defaultFogSettings) : demoFog);
 
@@ -1310,6 +1334,12 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                         onNextTurn={fight?.begun ? () => setFight(nextTurn(fight, (id) => shown.some((token) => token.id === id))) : undefined}
                         onCheck={() => togglePanel('check')}
                         checkOpen={panel === 'check'}
+                        onMusic={() =>
+                        {
+                            setMusicOpened(true);
+                            togglePanel('music');
+                        }}
+                        musicOpen={panel === 'music'}
                     />
                 )
             )}
@@ -1351,6 +1381,10 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
             {mode === 'gm' && !pending && !idle && panel === 'check' && (
                 <CheckPanel check={check} players={shown.filter((token) => token.kind === 'player' && !token.summonOf)} onSend={setCheck} onClose={() => setPanel(null)} />
+            )}
+
+            {musicOpened && (
+                <MusicPanel controls={live ?? demoMusic} shown={mode === 'gm' && !pending && !idle && panel === 'music'} onClose={() => setPanel(null)} onError={message.error} />
             )}
 
             {mode === 'gm' && !pending && !idle && panel === 'monsters' && (

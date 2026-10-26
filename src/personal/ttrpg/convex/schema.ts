@@ -354,6 +354,12 @@ export default defineSchema({
         .index('by_ownerId', ['ownerId'])
         .index('by_ownerId_and_hash', ['ownerId', 'hash'])
         .index('by_storageId', ['storageId']),
+    /** The music of each game master, YouTube video ids with a name, see music.ts. */
+    music: defineTable({
+        ownerId: v.id('users'),
+        name: v.string(),
+        videoId: v.string(),
+    }).index('by_ownerId', ['ownerId']),
     /** The monster presets of each game master, stat blocks in Markdown, see presets.ts. */
     presets: defineTable({
         ownerId: v.id('users'),

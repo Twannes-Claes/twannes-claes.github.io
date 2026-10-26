@@ -10,7 +10,7 @@ const minute = 60 * 1000;
  * pingGap and tryPassword in play.ts.
  */
 const rates = {
-    /** Joining, making characters and companions, calling summons. */
+    /** Joining, making characters and companions, calling summons, music links. */
     make: { max: 30, window: 10 * minute },
     /** Map, prop and player pictures. */
     upload: { max: 60, window: 10 * minute },

@@ -2394,6 +2394,51 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
     max-height: calc(100dvh / var(--ttrpg-ui, 1) - 180px);
 }
 
+/* Unseen rather than gone, so the music plays on while it is closed, see MusicPanel.tsx. */
+.ttrpg-away {
+    visibility: hidden;
+}
+
+.ttrpg-music__screen {
+    overflow: hidden;
+    border-radius: 8px;
+    aspect-ratio: 16 / 9;
+    background: #000;
+}
+
+/* Folded rather than gone with nothing picked, so the player keeps its iframe. */
+.ttrpg-music__screen--empty {
+    height: 0;
+}
+
+.ttrpg-music__screen iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
+.ttrpg-music__controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 8px;
+}
+
+.ttrpg-music__volume {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 8px;
+    padding-left: 8px;
+}
+
+/* No width of its own, so it takes only the room the buttons leave and never widens the panel. */
+.ttrpg-music__volume input {
+    flex: 1;
+    width: 0;
+}
+
 /* An empty list with what to do about it, like nobody at the table yet. */
 .ttrpg-empty {
     display: grid;
@@ -2849,7 +2894,7 @@ button.ttrpg-row__main {
     text-align: center;
 }
 
-/* A session's name being renamed, in the place of its row. */
+/* A session's or a music link's name being renamed, in the place of its row. */
 .ttrpg-row__input {
     flex: 1;
     min-width: 0;

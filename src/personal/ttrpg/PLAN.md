@@ -945,6 +945,12 @@ Built into play mode neatly, it should look and feel good.
 - A music button in the GM view's dock opens the list: play one, switch to another, loop and
   volume, with the YouTube player embedded in the panel.
 - It plays from the GM's laptop, in the editor's tab, so it keeps playing in Edit too.
+- **Built.** The `music` table (`convex/music.ts`) keeps a name and the video id each link names,
+  checked on the server by `videoId` in `content/music.ts`, with the `make` limit. **Music** in the
+  GM view's dock opens `components/MusicPanel.tsx`: the player, then the links or the form to add
+  one. Rename, remove, play one, pause, stop, loop, mute and volume; switching back to a link carries on where
+  it was left. The IFrame API loads on the first opening, and the panel then stays in the editor, unseen
+  while closed or in Edit, so the music plays on. The demo keeps its links in the tab.
 
 ### 19. Player accounts
 

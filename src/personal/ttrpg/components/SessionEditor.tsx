@@ -4,7 +4,7 @@ import { ConvexError } from 'convex/values';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import type { Decal, Draft, Drawing, Live, PictureBytes, Preset, PropPicture, Scenario, SharedMark, Token } from '../types';
+import type { Decal, Draft, Drawing, Live, PictureBytes, Preset, PropPicture, Scenario, SharedMark, Token, Track } from '../types';
 
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
@@ -62,6 +62,7 @@ const noMarks: SharedMark[] = [];
 const noDrawings: Drawing[] = [];
 const noDecals: Decal[] = [];
 const noPresets: Preset[] = [];
+const noTracks: Track[] = [];
 const noMonsters: Live['monsters'] = [];
 
 /**
@@ -107,6 +108,9 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const setMonster = useMutation(api.play.setMonster);
     const savePreset = useMutation(api.presets.save);
     const removePreset = useMutation(api.presets.remove);
+    const tracks = useQuery(api.music.list, following ? {} : 'skip');
+    const saveTrack = useMutation(api.music.save);
+    const removeTrack = useMutation(api.music.remove);
     const saveFog = useMutation(api.play.saveFog);
     const resetFog = useMutation(api.play.resetFog);
     const setFogLook = useMutation(api.play.setFogLook);
@@ -234,6 +238,9 @@ function Session({ sessionId, debug }: SessionEditorProps)
                         throw new Error(explain(reason, 'That preset did not save. Try again.'));
                     }),
             removePreset: (presetId) => friendly(removePreset({ presetId: presetId as Id<'presets'> })),
+            tracks: tracks ?? noTracks,
+            saveTrack: (track, trackId) => friendly(saveTrack({ ...track, trackId: trackId as Id<'music'> | undefined })),
+            removeTrack: (trackId) => friendly(removeTrack({ trackId: trackId as Id<'music'> })),
         }
         : undefined;
 
