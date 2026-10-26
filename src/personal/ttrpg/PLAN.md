@@ -977,6 +977,13 @@ Built into play mode neatly, it should look and feel good.
 
 - Everything that pops in also pops out smoothly.
 - A companion getting on or off its rider moves smoother.
+- **Built.** One watcher in `components/Shell.tsx` (`useLeaving`) puts back whatever pops in as
+  React takes it off: panels, pop-outs, sheets, the token menu, toasts, the tray, tooltips,
+  dialogs, the QR code, the tool panels, the save badge and the phone's corner. Marked
+  `ttrpg-leaving`, it plays its own way in backwards, inert, then goes. Folding sections unfold. No
+  component keeps a closing state, so the Move sheet lost its own. A companion getting on or off
+  its rider glides between its space and the rider's ring and resizes on the way, 300 ms, from
+  where it last showed (`easeMounts` in `map/view.ts`). Reduced motion does both at once.
 
 ### 22. Theme
 

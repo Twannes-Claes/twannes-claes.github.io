@@ -1,6 +1,6 @@
 import { faPersonWalking } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useState, type CSSProperties } from 'react';
+import type { CSSProperties } from 'react';
 
 import type { Token } from '../types';
 
@@ -10,7 +10,7 @@ import { useKeydown } from './useKeys';
 
 interface MoveSheetProps
 {
-    /** The path waiting, or null when there is none and the sheet slides away. */
+    /** The path waiting, or null when there is none. */
     move: PendingMove | null;
     token: Token | undefined;
     onMove: () => void;
@@ -25,14 +25,7 @@ interface MoveSheetProps
  */
 export function MoveSheet({ move, token, onMove, onCancel }: MoveSheetProps)
 {
-    // The last path shown, kept on screen while the sheet slides away once it is gone.
-    const [last, setLast] = useState<{ move: PendingMove; token: Token } | null>(null);
     const open = move && token ? { move, token } : null;
-
-    if (open && (open.move !== last?.move || open.token !== last.token))
-        setLast(open);
-
-    const shown = open ?? last;
 
     useKeydown((event) =>
     {
@@ -43,31 +36,21 @@ export function MoveSheet({ move, token, onMove, onCancel }: MoveSheetProps)
 
     }, open !== null);
 
-    if (!shown)
+    if (!open)
         return null;
 
-    return (
-        <Sheet
-            {...shown}
-            closing={!open}
-            onMove={onMove}
-            onCancel={onCancel}
-            onGone={() => setLast(null)}
-        />
-    );
+    return <Sheet {...open} onMove={onMove} onCancel={onCancel} />;
 }
 
 interface SheetProps
 {
     move: PendingMove;
     token: Token;
-    closing: boolean;
     onMove: () => void;
     onCancel: () => void;
-    onGone: () => void;
 }
 
-function Sheet({ move, token, closing, onMove, onCancel, onGone }: SheetProps)
+function Sheet({ move, token, onMove, onCancel }: SheetProps)
 {
 
     const over = move.feet > token.speed;
@@ -80,16 +63,9 @@ function Sheet({ move, token, closing, onMove, onCancel, onGone }: SheetProps)
 
     return (
         <div
-            className={closing ? 'ttrpg-panel ttrpg-sheet ttrpg-sheet--closing' : 'ttrpg-panel ttrpg-sheet'}
+            className="ttrpg-panel ttrpg-sheet"
             role="dialog"
             aria-label={`Move ${token.name}`}
-            inert={closing}
-            onAnimationEnd={() =>
-            {
-                if (closing)
-                    onGone();
-
-            }}
         >
             <div className="ttrpg-sheet__head">
                 {/* The token as it is on the map: its picture, or its initial, in its ring colour. */}

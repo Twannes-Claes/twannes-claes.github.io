@@ -24,11 +24,14 @@ export function ConfirmHost()
             dialog.current?.showModal();
     }, [question]);
 
+    // Taken off once answered, which Shell plays out the way it came in.
+    if (!question)
+        return null;
+
     const answer = (yes: boolean) =>
     {
-        question?.answer(yes);
+        question.answer(yes);
         setQuestion(null);
-        dialog.current?.close();
     };
 
     return (
@@ -47,24 +50,22 @@ export function ConfirmHost()
                     answer(false);
             }}
         >
-            {question && (
-                <div className="ttrpg-confirm__card">
-                    <p>{question.message}</p>
-                    <div className="ttrpg-confirm__actions">
-                        <button type="button" className="ttrpg-button" onClick={() => answer(false)}>
-                            Cancel
-                        </button>
-                        <button
-                            type="button"
-                            className="ttrpg-button ttrpg-button--danger"
-                            autoFocus
-                            onClick={() => answer(true)}
-                        >
-                            {question.action}
-                        </button>
-                    </div>
+            <div className="ttrpg-confirm__card">
+                <p>{question.message}</p>
+                <div className="ttrpg-confirm__actions">
+                    <button type="button" className="ttrpg-button" onClick={() => answer(false)}>
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        className="ttrpg-button ttrpg-button--danger"
+                        autoFocus
+                        onClick={() => answer(true)}
+                    >
+                        {question.action}
+                    </button>
                 </div>
-            )}
+            </div>
         </dialog>
     );
 }

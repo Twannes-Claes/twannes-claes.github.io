@@ -19,7 +19,7 @@ import {
     type FogLayers,
 } from './fog.ts';
 import { accent, ground, highlight, tooFar } from './colours.ts';
-import { distance, midpoint, onMap } from './geometry.ts';
+import { distance, lerp, midpoint, onMap } from './geometry.ts';
 import { defaultBlood, stateOf } from './health.ts';
 import { extendPath, lineFeet, pathBlocked, pathFeet } from './path.ts';
 import {
@@ -63,6 +63,8 @@ const ownCells = 8;
  * card for nothing. Panning, dragging, walks and fog changes still draw every frame.
  */
 const smokeFps = 30;
+/** How long a companion takes to get on or off its rider's ring, see perched in map/render.ts. */
+const mountTime = 300;
 /** How long the table screen waits after the fog last changed before it saves it: not every step of a walk. */
 const exploredDelay = 1500;
 /** How long a press is held still before it pings, a little under a phone's own long press. */
@@ -315,6 +317,14 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     let lastShown = new Map<string, Lifted>();
     /** Tokens fading in or out, by id: since when, which way, and the token as it last showed. */
     const fading = new Map<string, { at: number; in: boolean; token?: Lifted }>();
+    /** Companions getting on or off their rider, by id: since when, and how they showed before. */
+    const mounting = new Map<string, { at: number; from: Lifted }>();
+    /** The tokens the last frame drew, by id, perched or not, so one that changes can ease. */
+    let lastDrawn = new Map<string, Lifted>();
+    /** The companions riding last frame, before easing, which gives every eased one a radius. */
+    let lastRiders = new Set<string>();
+    /** The companions riding once every walk ends, getting on ones too, see easeMounts. */
+    let boarding = new Set<string>();
     /** Where the players stood, to a quarter cell, the last time a walk redrew the fog. */
     let walkFogKey = '';
     let tool: MapTool | null = null;
@@ -431,6 +441,54 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             current && current.in !== fadingIn ? time - (1 - fadeProgress(current.at, time)) * fogSettings.fade : time;
 
         fading.set(id, { at, in: fadingIn, token: token ?? current?.token });
+    };
+
+    /**
+     * A companion getting on or off its rider glides between its own space and the rider's ring,
+     * and grows or shrinks on the way, rather than jumping. It eases from where it last showed,
+     * so turning round halfway does not jump either. Reduced motion moves it at once. One getting
+     * on or off, or walking to get on, is drawn over its rider, rather than sliding under it.
+     */
+    const easeMounts = (visible: Lifted[], time: number, grid: Scenario['grid']): Lifted[] =>
+    {
+        const radiusOf = (token: Lifted) => token.radius ?? tokenRadius(grid, token.size);
+        const moving = new Set<string>();
+
+        boarding = new Set(perched(tokens, grid).flatMap((token) => (token.radius === undefined ? [] : [token.id])));
+
+        const eased = visible.map((token) =>
+        {
+            const before = lastDrawn.get(token.id);
+
+            if (calm.matches)
+                return token;
+
+            if (before && lastRiders.has(token.id) !== (token.radius !== undefined))
+                mounting.set(token.id, { at: time, from: before });
+
+            const mount = mounting.get(token.id);
+
+            if (!mount)
+                return token;
+
+            moving.add(token.id);
+            const step = Math.min(1, (time - mount.at) / mountTime);
+
+            if (step === 1)
+                mounting.delete(token.id);
+
+            const ease = 1 - (1 - step) ** 3;
+            const from = radiusOf(mount.from);
+
+            return { ...token, ...lerp(mount.from, token, ease), radius: from + (radiusOf(token) - from) * ease };
+        });
+
+        lastDrawn = new Map(eased.map((token) => [token.id, token]));
+        lastRiders = new Set(visible.filter((token) => token.radius !== undefined).map((token) => token.id));
+
+        const onTop = (token: Lifted) => moving.has(token.id) || boarding.has(token.id);
+
+        return [...eased.filter((token) => !onTop(token)), ...eased.filter(onTop)];
     };
 
     /**
@@ -839,7 +897,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         ];
         const decalsMoving = blood.ground && (clearedDecals.length > 0 || decals.some((decal) => progress(decal.at, decalSpread) < 1));
         const settling =
-            fading.size > 0 || pings.length > 0 || hits.length > 0 || decalsMoving || (layers !== null && time - layers.changedAt < fogSettings.fade);
+            fading.size > 0 || mounting.size > 0 || pings.length > 0 || hits.length > 0 || decalsMoving || (layers !== null && time - layers.changedAt < fogSettings.fade);
 
         // Only the smoke is moving: skip frames until its own rate comes round.
         if (!urgent && !walking && !settling && time - drawnAt < 1000 / smokeFps)
@@ -892,7 +950,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
         // Peeking, the GM view, the game master sees every monster too, and the fog at half
         // strength: clear enough to see through, dark enough to tell what the players see.
-        const visible = perched(fogEnabled && !peek ? shown.filter(seenByPlayers) : shown, scenario.grid, walksNow);
+        const visible = easeMounts(perched(fogEnabled && !peek ? shown.filter(seenByPlayers) : shown, scenario.grid, walksNow), time, scenario.grid);
 
         layDrops(visible, time);
 
@@ -960,8 +1018,9 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
             for (const token of scene.tokens)
             {
-                // A rider's HP would cover its carrier's picture; its own phone and the Players list have it.
-                if (!staying.has(token.id) || token.radius !== undefined)
+                // A rider's HP would cover its carrier's picture; its own phone and the Players list
+                // have it. Hidden too while it walks to get on, and gets on or off.
+                if (!staying.has(token.id) || token.radius !== undefined || boarding.has(token.id))
                     continue;
 
                 context.globalAlpha = token.alpha ?? 1;

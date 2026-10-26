@@ -464,6 +464,7 @@ html:has(.ttrpg) {
        is divided by it. A panel that can grow scrolls inside, see .ttrpg-presets. */
     max-height: calc(100dvh / var(--ttrpg-ui, 1) - 88px);
     padding: 1rem;
+    animation: ttrpg-menu-in 150ms var(--ttrpg-ease);
 }
 
 /* The Monsters panel in Edit, which grows with monsters and one opened: the title, the presets
@@ -1245,6 +1246,7 @@ html:has(.ttrpg) {
     display: flex;
     gap: 4px;
     padding: 4px;
+    animation: ttrpg-fade 150ms var(--ttrpg-ease);
 }
 
 /* The ruler of a phone or the Player view, bottom left, the other thumb's corner from the
@@ -1706,16 +1708,34 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
     }
 }
 
-/* The move sheet slides back down the way it came, a little quicker. */
-.ttrpg-sheet--closing {
-    animation: ttrpg-sink 120ms var(--ttrpg-ease) forwards;
+/* What pops in pops out the way it came, its own animation backwards, and stays gone until Shell
+   takes it off, see useLeaving. Important, as each sets its animation in full with the shorthand,
+   some in rules that win over this one. */
+.ttrpg-leaving,
+.ttrpg-leaving * {
+    animation-direction: reverse !important;
+    animation-fill-mode: forwards !important;
 }
 
-@keyframes ttrpg-sink {
-    to {
+/* For what pops in where it stands, without sliding. */
+@keyframes ttrpg-fade {
+    from {
         opacity: 0;
-        translate: -50% 12px;
     }
+}
+
+/* A folding section opens and closes rather than jumping, see ttrpg-row-edit for the height. */
+details::details-content {
+    height: 0;
+    overflow: clip;
+    transition:
+        height 150ms var(--ttrpg-ease),
+        content-visibility 150ms allow-discrete;
+    interpolate-size: allow-keywords;
+}
+
+details[open]::details-content {
+    height: auto;
 }
 
 /* Panels and messages appear without moving; the spinner turns slowly, since it still has to
@@ -1725,18 +1745,24 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
         animation: none;
     }
 
-    /* No animation ends to take it away, so it hides until the next path replaces it. */
-    .ttrpg-sheet--closing {
-        visibility: hidden;
-    }
-
     .ttrpg-sheet,
     .ttrpg-popover,
     .ttrpg-pop__menu,
     .ttrpg-toast,
     .ttrpg-tip,
+    .ttrpg-tray,
+    .ttrpg-properties,
+    .ttrpg-corner,
+    .ttrpg-saved,
+    .ttrpg-music__idle,
+    .ttrpg-qr,
+    .ttrpg-qr__card,
     .ttrpg-confirm[open] {
         animation: none;
+    }
+
+    details::details-content {
+        transition: none;
     }
 
     .ttrpg-spinner {
@@ -2059,6 +2085,7 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
     padding: 0.35rem 0.75rem;
     color: var(--ttrpg-muted);
     font-size: 0.8125rem;
+    animation: ttrpg-fade 150ms var(--ttrpg-ease);
 }
 
 .ttrpg-saved > svg {
@@ -2414,6 +2441,7 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
         ),
         var(--ttrpg-well);
     font-weight: 500;
+    animation: ttrpg-fade 150ms var(--ttrpg-ease);
 }
 
 .ttrpg-music__disc {
@@ -2495,6 +2523,7 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
     background: rgb(0 0 0 / 0.6);
     backdrop-filter: blur(6px);
     cursor: pointer;
+    animation: ttrpg-fade 150ms var(--ttrpg-ease);
 }
 
 .ttrpg-qr__card {
@@ -2506,6 +2535,7 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
     padding: clamp(1.25rem, 3vmin, 2.5rem);
     border-radius: 24px;
     text-align: center;
+    animation: ttrpg-pop 150ms var(--ttrpg-ease);
 }
 
 /* Headings here stand on their own, without the rule a panel's second heading has above it. */
