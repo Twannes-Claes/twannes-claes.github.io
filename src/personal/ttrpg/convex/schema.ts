@@ -131,6 +131,8 @@ export default defineSchema({
         fogLook: v.optional(fogSettingsValidator),
         /** Which blood every screen shows, see BloodSettings in types.ts. Missing shows it all. */
         blood: v.optional(bloodSettingsValidator),
+        /** Death saves only the host sees, kept off the players' screens, see isSave. */
+        secretSaves: v.optional(v.boolean()),
         /** The game it is played in. Missing is 5e. */
         system: v.optional(systemValidator),
         /** The fight on the map being played, only for the host, see Initiative in types.ts. */

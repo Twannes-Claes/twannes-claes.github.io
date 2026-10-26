@@ -636,7 +636,7 @@ giving anything away.
 | Critical | 25% or less         |
 | Down     | 0, a player is down |
 
-A player at 0 is down and stays on the map. Death saves are kept at the table, see Optional.
+A player at 0 is down and stays on the map, and in 5e makes death saves.
 
 - **Built.** The rules live in `map/health.ts`, shared by the server and every screen;
   `play.tokens` sends a screen without the numbers only each token's `state`. On the map, red
@@ -645,6 +645,13 @@ A player at 0 is down and stays on the map. Death saves are kept at the table, s
   as a blue +4 and a bar of the HP left. The GM sets any token's numbers from the heart button in the Players and Monsters lists, a player their own from
   their phone's settings (`play.setStats`, `components/StatsForm.tsx`). A monster added without HP
   has no numbers and shows no damage.
+- **Death saves, built.** A Death saves block heads a token's conditions: in 5e and Other a
+  downed player's successes and failures, 1 to 3 each, Stable or Dead at 3; in Pathfinder 2e
+  Dying and Wounded. Once up, it lists only the ones still on, to take off. The GM or that player sets them like any condition and they
+  show as badges on the token (`save` in `content/conditions.ts`). Healing above 0 clears the
+  5e saves and Dying (`conditionsAt` in `map/health.ts`). The GM's Table settings have **Death
+  saves: Players see them**; off, `play.tokens` leaves them out for every player and a phone
+  cannot set them (`play.setSecretSaves`).
 
 ### 3. Attack and heal
 
@@ -1030,7 +1037,6 @@ on their own.
 
 | Feature          | What                                                                                      |
 | ---------------- | ----------------------------------------------------------------------------------------- |
-| Death saves      | Tracked for a downed player, instead of at the table                                      |
 | Better decals    | Blood, bodies and loot from art the GM uploads, instead of drawn in code                  |
 | Lights           | The `.dd2vtt` light sources, for dark dungeons                                            |
 | Smaller pictures | Shrink map and prop uploads further, to cut file egress (the bulk of it, not the queries) |

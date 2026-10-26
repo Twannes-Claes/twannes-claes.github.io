@@ -12,7 +12,7 @@ import { gameSystems } from '../content/systems';
 import { highlight, ringColours } from '../map/colours';
 import { penWidths } from '../map/drawings';
 import { defaultFogSettings } from '../map/fog';
-import { cleanStats, defaultBlood, downedPool, hitOn, withoutNumbers } from '../map/health';
+import { cleanStats, conditionsAt, defaultBlood, downedPool, hitOn, withoutNumbers, withoutSaves } from '../map/health';
 import { nextTurn } from '../map/initiative';
 import { monsterFrom } from '../map/presets';
 import { newProp } from '../map/props';
@@ -182,6 +182,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const [localDecals, setLocalDecals] = useState<Decal[]>([]);
     // Which blood shows: the session's when it is saved, this tab's in the demo.
     const [demoBlood, setDemoBlood] = useState(defaultBlood);
+    const [demoSecretSaves, setDemoSecretSaves] = useState(false);
     const [demoSystem, setDemoSystem] = useState<GameSystem>('5e');
     // The demo's monster presets, kept in this tab, starting with the ogre on its map.
     const [demoPresets, setDemoPresets] = useState<Preset[]>(() => [demoOgrePreset]);
@@ -464,7 +465,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
     // The test players off a live map, changed here in the tab.
     const testPlayers: Pick<Live, 'setStats' | 'setConditions' | 'setSize'> = {
-        setStats: (id, stats) => changeToken(id, (token) => ({ ...token, ...cleanStats(stats) })),
+        setStats: (id, stats) => changeToken(id, (token) => ({ ...token, ...cleanStats(stats), conditions: conditionsAt(token.conditions, cleanStats(stats).hp) })),
         setConditions: (id, conditions) => changeToken(id, (token) => ({ ...token, conditions })),
         setSize: (id, size) => changeToken(id, (token) => ({ ...token, size, ...resizedAt(active.grid, token, size) })),
     };
@@ -665,6 +666,8 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
             : setLocalDrawings((current) => [...current.filter((drawing) => drawing.id !== key), { id: key, points, ...used, erasable: true, scenarioId: active.id }]);
     const eraseDrawings = (ids: string[]) => (liveMap ? fail(liveMap.eraseDrawings(ids)) : setLocalDrawings((current) => current.filter((drawing) => !ids.includes(drawing.id))));
     const blood = live ? (live.blood ?? defaultBlood) : demoBlood;
+    const secretSaves = live ? live.secretSaves : demoSecretSaves;
+    const setSecretSaves = (secret: boolean) => (live ? fail(live.setSecretSaves(secret)) : setDemoSecretSaves(secret));
 
     const setBlood = (change: Partial<BloodSettings>) =>
     {
@@ -1002,7 +1005,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
             <MapCanvas
                 scenario={active}
                 // The Player view shows how hurt everyone looks, not the numbers.
-                tokens={mode === 'players' ? shown.map(withoutNumbers) : shown}
+                tokens={mode === 'players' ? shown.map((token) => (secretSaves ? withoutSaves(withoutNumbers(token)) : withoutNumbers(token))) : shown}
                 mode={playing ? 'play' : 'edit'}
                 tool={playing ? playTool : tool === 'walls' ? wallTools[wallKind] : tool}
                 placing={playing ? null : placing}
@@ -1192,6 +1195,20 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                                         onClick={() => setBlood({ wounds: !blood.wounds })}
                                     >
                                         On tokens
+                                    </button>
+                                </div>
+                            </section>
+                            <section className="ttrpg-shortcuts" aria-label="Death saves">
+                                <h3 className="ttrpg-subhead">Death saves</h3>
+                                <div className="ttrpg-settings__choices">
+                                    <button
+                                        type="button"
+                                        className="ttrpg-segment"
+                                        aria-pressed={!secretSaves}
+                                        title="Players see death saves on their phones and on the tokens"
+                                        onClick={() => setSecretSaves(!secretSaves)}
+                                    >
+                                        Players see them
                                     </button>
                                 </div>
                             </section>

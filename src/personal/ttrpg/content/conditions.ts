@@ -24,6 +24,7 @@ import {
     faGhost,
     faHand,
     faHeart,
+    faHeartCircleCheck,
     faHeartPulse,
     faHourglassEnd,
     faLink,
@@ -32,6 +33,7 @@ import {
     faPersonFallingBurst,
     faPersonRunning,
     faShuffle,
+    faSkullCrossbones,
     faStar,
     faSun,
     faUserSecret,
@@ -48,6 +50,12 @@ export interface ConditionKind
     name: string;
     icon: IconDefinition;
     max?: number;
+    /** What it reads at its max instead, like Stable. */
+    full?: string;
+    /** In the picker's Death saves block, which the GM can keep from the players, see isSave. */
+    save?: boolean;
+    /** Only for a player at 0 HP, cleared once healed above it, see conditionsAt in map/health.ts. */
+    atZero?: boolean;
 }
 
 /** The highest value Pathfinder's conditions take at a real table, past Dying's 4. */
@@ -69,6 +77,8 @@ const dnd5e: ConditionKind[] = [
     { id: 'restrained', name: 'Restrained', icon: faLink },
     { id: 'stunned', name: 'Stunned', icon: faFaceDizzy },
     { id: 'unconscious', name: 'Unconscious', icon: faBed },
+    { id: 'saved', name: 'Death save successes', icon: faHeartCircleCheck, max: 3, full: 'Stable', save: true, atZero: true },
+    { id: 'failed', name: 'Death save failures', icon: faSkullCrossbones, max: 3, full: 'Dead', save: true, atZero: true },
 ];
 
 // Observed, Unnoticed and Encumbered are left out: nothing to show on a map.
@@ -82,7 +92,7 @@ const pf2e: ConditionKind[] = [
     { id: 'deafened', name: 'Deafened', icon: faEarDeaf },
     { id: 'doomed', name: 'Doomed', icon: faHourglassEnd, max: pf2eMax },
     { id: 'drained', name: 'Drained', icon: faDroplet, max: pf2eMax },
-    { id: 'dying', name: 'Dying', icon: faHeartPulse, max: 4 },
+    { id: 'dying', name: 'Dying', icon: faHeartPulse, max: 4, save: true, atZero: true },
     { id: 'enfeebled', name: 'Enfeebled', icon: faDumbbell, max: pf2eMax },
     { id: 'fascinated', name: 'Fascinated', icon: faStar },
     { id: 'fatigued', name: 'Fatigued', icon: faBatteryHalf },
@@ -105,7 +115,7 @@ const pf2e: ConditionKind[] = [
     { id: 'stupefied', name: 'Stupefied', icon: faBrain, max: pf2eMax },
     { id: 'unconscious', name: 'Unconscious', icon: faBed },
     { id: 'undetected', name: 'Undetected', icon: faCircleQuestion },
-    { id: 'wounded', name: 'Wounded', icon: faBandage, max: pf2eMax },
+    { id: 'wounded', name: 'Wounded', icon: faBandage, max: pf2eMax, save: true },
 ];
 
 /** The conditions of a system, in the order the picker lists them. Other plays as 5e. */
@@ -123,6 +133,12 @@ const everyKind = new Map([...dnd5e, ...pf2e].map((kind) => [kind.id, kind]));
 export function conditionKind(id: string): ConditionKind | undefined
 {
     return everyKind.get(id);
+}
+
+/** A death save, or Pathfinder's Dying or Wounded, see ConditionKind. */
+export function isSave(condition: Condition)
+{
+    return conditionKind(condition.id)?.save === true;
 }
 
 /**

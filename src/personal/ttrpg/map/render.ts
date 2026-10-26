@@ -992,9 +992,12 @@ export function conditionBadgeAt(tokens: Lifted[], grid: Grid, at: Point): Badge
         .find((badge) => distance(badge, at) <= badge.radius * 1.2);
 }
 
-/** A badge's label, like Frightened 2. */
+/** A badge's label, like Frightened 2, or Stable at the most death save successes. */
 export function badgeName(badge: Badge): string
 {
+    if (badge.kind.full && badge.value === badge.kind.max)
+        return badge.kind.full;
+
     return badge.value === undefined ? badge.kind.name : `${badge.kind.name} ${badge.value}`;
 }
 

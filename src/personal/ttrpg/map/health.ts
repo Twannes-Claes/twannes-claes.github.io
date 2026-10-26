@@ -1,4 +1,6 @@
-import type { BloodSettings, HealthState, HitKind, Stats, Token } from '../types';
+import type { BloodSettings, Condition, HealthState, HitKind, Stats, Token } from '../types';
+
+import { conditionKind, isSave } from '../content/conditions.ts';
 
 /*
  * Hit points, shared by the server and every screen, see "Health and stats" in PLAN.md. The game
@@ -36,16 +38,23 @@ export function applyHit(stats: { hp: number; maxHp: number; tempHp?: number }, 
     return { hp: Math.max(0, hp - (amount - absorbed)), tempHp: tempHp - absorbed };
 }
 
+/** A token's conditions at hp: above 0 without its death saves or Dying, see ConditionKind. */
+export function conditionsAt(conditions: Condition[] | undefined, hp: number)
+{
+    return hp > 0 ? conditions?.filter((condition) => conditionKind(condition.id)?.atZero !== true) : conditions;
+}
+
 /**
  * What a hit does to a token: its HP after, null for one without numbers, which takes nothing,
  * whether it dies of it, a monster brought to 0, and whether it goes down, a player brought to 0
  * from above it, or a monster that goes down at 0. A summon dies like a monster. One at 0 is down
- * and stays; hit again there, it goes down no further.
+ * and stays; hit again there, it goes down no further. Healed above 0, its death saves go.
  */
-export function hitOn(token: Pick<Token, 'kind' | 'hp' | 'maxHp' | 'tempHp' | 'downs' | 'summonOf'>, kind: HitKind, amount: number)
+export function hitOn(token: Pick<Token, 'kind' | 'hp' | 'maxHp' | 'tempHp' | 'downs' | 'summonOf' | 'conditions'>, kind: HitKind, amount: number)
 {
     const { hp, maxHp, tempHp } = token;
-    const after = hp !== undefined && maxHp !== undefined ? applyHit({ hp, maxHp, tempHp }, kind, amount) : null;
+    const hit = hp !== undefined && maxHp !== undefined ? applyHit({ hp, maxHp, tempHp }, kind, amount) : null;
+    const after = hit && { ...hit, conditions: conditionsAt(token.conditions, hit.hp) };
     const zero = after !== null && after.hp === 0;
     const goesDown = (token.kind === 'player' && !token.summonOf) || token.downs === true;
 
@@ -64,6 +73,12 @@ export function stateOf(token: Pick<Token, 'hp' | 'maxHp' | 'state'>): HealthSta
     return token.hp !== undefined && token.maxHp ? healthState(token.hp, token.maxHp) : token.state;
 }
 
+/** A player, not a summon, at 0 HP, who makes death saves in 5e. */
+export function downPlayer(token: Pick<Token, 'kind' | 'summonOf' | 'hp' | 'maxHp' | 'state'>)
+{
+    return token.kind === 'player' && !token.summonOf && stateOf(token) === 'down';
+}
+
 /**
  * A token as a screen that may not see its numbers gets it: only how hurt it looks. Whether a
  * monster goes down at 0 stays home too, as it tells whether a hit can kill it.
@@ -73,6 +88,12 @@ export function withoutNumbers<T extends Token>(token: T): T
     const hidden = { hp: undefined, maxHp: undefined, tempHp: undefined, ac: undefined, perception: undefined, downs: undefined };
 
     return { ...token, ...hidden, state: stateOf(token) };
+}
+
+/** A token as a player gets it while the GM keeps death saves from them, see isSave. */
+export function withoutSaves<T extends Token>(token: T): T
+{
+    return { ...token, conditions: token.conditions?.filter((condition) => !isSave(condition)) };
 }
 
 /** The highest number each stat takes, past any creature in the common systems. HP stops at max. */

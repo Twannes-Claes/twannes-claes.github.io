@@ -396,6 +396,9 @@ export interface Live
     /** Which blood every screen shows, null until the game master changes it. */
     blood: BloodSettings | null;
     setBlood: (blood: BloodSettings) => Promise<void>;
+    /** Death saves only the game master sees, see isSave in content/conditions.ts. */
+    secretSaves: boolean;
+    setSecretSaves: (secret: boolean) => Promise<void>;
     system: GameSystem;
     setSystem: (system: GameSystem) => Promise<void>;
     /** The fight on the map being played, null while there is none. */

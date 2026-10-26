@@ -115,6 +115,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const resetFog = useMutation(api.play.resetFog);
     const setFogLook = useMutation(api.play.setFogLook);
     const setBlood = useMutation(api.play.setBlood);
+    const setSecretSaves = useMutation(api.play.setSecretSaves);
     const setSystem = useMutation(api.sessions.setSystem);
     const setInitiative = useMutation(api.play.setInitiative);
     const setUpNext = useMutation(api.play.setUpNext);
@@ -214,6 +215,8 @@ function Session({ sessionId, debug }: SessionEditorProps)
             setFogLook: (look) => friendly(setFogLook({ sessionId: id, look })),
             blood: status.blood,
             setBlood: (blood) => friendly(setBlood({ sessionId: id, blood })),
+            secretSaves: status.secretSaves,
+            setSecretSaves: (secret) => friendly(setSecretSaves({ sessionId: id, secret })),
             system: status.system,
             setSystem: (system) => friendly(setSystem({ sessionId: id, system })),
             initiative: status.initiative,

@@ -16,6 +16,7 @@ import { createPortal } from 'react-dom';
 
 import type { Condition, CreatureSize, GameSystem, Grid, Live, Stats, Token } from '../types';
 
+import { downPlayer } from '../map/health';
 import { confirmAction, kickPlayer } from '../services/confirm';
 
 import { ConditionPicker } from './ConditionPicker';
@@ -152,6 +153,7 @@ export function Players({ tokens, onSetStats, system, onSetConditions, onSetSize
                                                         <ConditionPicker
                                                             system={system}
                                                             conditions={player.conditions ?? []}
+                                                            down={downPlayer(player)}
                                                             onChange={(conditions) => onSetConditions(player.id, conditions)}
                                                         />
                                                     ),

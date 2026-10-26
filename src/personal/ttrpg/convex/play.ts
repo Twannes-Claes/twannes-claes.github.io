@@ -2,10 +2,10 @@ import { getAuthUserId } from '@convex-dev/auth/server';
 import { ConvexError, v } from 'convex/values';
 
 import type { Decal, Draft, Drawing, PlayerFight, Point, Scenario, SharedHit, SharedMark, Token } from '../types';
-import { cleanConditions } from '../content/conditions';
+import { cleanConditions, isSave } from '../content/conditions';
 import { maxDrawingPoints, maxDrawings, penWidths } from '../map/drawings';
 import { distance } from '../map/geometry';
-import { cleanStats, downedPool, hitOn, withoutNumbers } from '../map/health';
+import { cleanStats, conditionsAt, downedPool, hitOn, withoutNumbers, withoutSaves } from '../map/health';
 import { cleanFight, cleanRoll, hasRolled, nextTurn, upNext, withRoll } from '../map/initiative';
 import { pathBlocked } from '../map/path';
 import { monsterFrom } from '../map/presets';
@@ -232,6 +232,7 @@ export const status = query({
             kicked: session.kicked?.includes(userId) === true,
             fogLook: session.fogLook ?? null,
             blood: session.blood ?? null,
+            secretSaves: session.secretSaves === true,
             system: session.system ?? '5e',
             upNext: session.upNext === true,
             // The whole fight only for the GM view; everyone else hears only what concerns them.
@@ -288,6 +289,7 @@ export const tokens = query({
 
         const here = await tokensOn(ctx, sessionId, session.activeScenarioId);
         const mine = here.find((token) => userId !== null && token.userId === userId);
+        const hideSaves = !host && session.secretSaves === true;
 
         return here
             .filter((token) => host || token.kind === 'player' || (token.inSight === true && token.hidden !== true))
@@ -297,7 +299,9 @@ export const tokens = query({
                 const token = { ...tokenOf(doc), presetId: host ? doc.presetId : undefined };
                 const own = doc.userId === userId || (mine !== undefined && doc.summonOf === mine._id);
 
-                return host || own ? token : withoutNumbers(token);
+                const shown = host || own ? token : withoutNumbers(token);
+
+                return hideSaves ? withoutSaves(shown) : shown;
             });
     },
 });
@@ -376,7 +380,9 @@ export const setStats = mutation({
         if (session.ownerId !== userId && !(await controllerOf(ctx, token, userId)))
             throw new ConvexError('That is not your token.');
 
-        await ctx.db.patch('tokens', tokenId, cleanStats(stats));
+        const clean = cleanStats(stats);
+
+        await ctx.db.patch('tokens', tokenId, { ...clean, conditions: conditionsAt(token.conditions, clean.hp) });
 
         return null;
     },
@@ -401,7 +407,11 @@ export const setConditions = mutation({
         if (session.ownerId !== userId && !(await controllerOf(ctx, token, userId)))
             throw new ConvexError('That is not your token.');
 
-        await ctx.db.patch('tokens', tokenId, { conditions: cleanConditions(session.system ?? '5e', conditions.slice(0, 50)) });
+        // A player who cannot see their death saves keeps the ones the GM set.
+        const kept = session.ownerId !== userId && session.secretSaves === true ? (token.conditions ?? []).filter(isSave) : [];
+        const sent = conditions.slice(0, 50).filter((condition) => kept.length === 0 || !isSave(condition));
+
+        await ctx.db.patch('tokens', tokenId, { conditions: cleanConditions(session.system ?? '5e', [...kept, ...sent]) });
 
         return null;
     },
@@ -1192,6 +1202,18 @@ export const setFogLook = mutation({
                 smoke: clamp(look.smoke, 0, 1),
             },
         });
+
+        return null;
+    },
+});
+
+/** The host keeps death saves off the players' screens, or shows them again. */
+export const setSecretSaves = mutation({
+    args: { sessionId: v.id('sessions'), secret: v.boolean() },
+    handler: async (ctx, { sessionId, secret }) =>
+    {
+        await requireSession(ctx, sessionId);
+        await ctx.db.patch('sessions', sessionId, { secretSaves: secret });
 
         return null;
     },

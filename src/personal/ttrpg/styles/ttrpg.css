@@ -2271,8 +2271,19 @@ details[open]::details-content {
     text-align: center;
 }
 
-.ttrpg-conditions > .ttrpg-error {
+/* A death save takes a whole row, and so does one with levels, for its minus and plus, after the
+   rest, so turning one on moves nothing. */
+.ttrpg-conditions
+    > :is(.ttrpg-error, .ttrpg-subhead, .ttrpg-condition--save, .ttrpg-condition--levels) {
     grid-column: 1 / -1;
+}
+
+.ttrpg-condition--levels {
+    order: 1;
+}
+
+.ttrpg-conditions > .ttrpg-error {
+    order: 2;
 }
 
 /* A token's numbers under its name in a list, see StatChips. They wrap as a whole, so none is cut
@@ -2807,16 +2818,10 @@ button.ttrpg-row__main {
     padding: 0;
 }
 
-/* Two to a row in the narrow card, half as long. One with levels takes the whole row while it is
-   on, for its minus and plus; a long name shortens itself rather than spill over. */
+/* Two to a row in the narrow card, half as long; a long name shortens itself rather than spill
+   over. */
 .ttrpg-row-edit .ttrpg-conditions {
     grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
-    /* The next one fills the hole a full-row one leaves beside the one before it. */
-    grid-auto-flow: dense;
-}
-
-.ttrpg-row-edit .ttrpg-condition:has(.ttrpg-condition__value) {
-    grid-column: 1 / -1;
 }
 
 .ttrpg-row-edit .ttrpg-condition > .ttrpg-segment {

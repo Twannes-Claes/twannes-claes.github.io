@@ -692,7 +692,8 @@ assert.deepEqual(applyHit({ hp: 25, maxHp: 30, tempHp: 2 }, 'heal', 10), { hp: 3
 // A player brought to 0 goes down once, not again while there; a monster dies instead.
 assert.equal(hitOn({ kind: 'player', hp: 5, maxHp: 30 }, 'attack', 9).downed, true);
 assert.equal(hitOn({ kind: 'player', hp: 0, maxHp: 30 }, 'attack', 9).downed, false);
-assert.deepEqual(hitOn({ kind: 'npc', hp: 5, maxHp: 30 }, 'attack', 9), { after: { hp: 0, tempHp: 0 }, died: true, downed: false });
+assert.deepEqual(hitOn({ kind: 'npc', hp: 5, maxHp: 30 }, 'attack', 9), { after: { hp: 0, tempHp: 0, conditions: undefined }, died: true, downed: false });
+assert.deepEqual(hitOn({ kind: 'player', hp: 0, maxHp: 30, conditions: [{ id: 'prone' }, { id: 'failed', value: 2 }] }, 'heal', 4).after?.conditions, [{ id: 'prone' }]);
 
 // Conditions keep to the system's list and order, once each, values whole and in range.
 assert.deepEqual(
@@ -756,7 +757,7 @@ assert.deepEqual(spansOf('***Bite.*** *Hit:* 5 x * 2'), [
 ]);
 
 // A monster that goes down at 0 lies there like a player rather than dying.
-assert.deepEqual(hitOn({ kind: 'npc', hp: 5, maxHp: 30, downs: true }, 'attack', 9), { after: { hp: 0, tempHp: 0 }, died: false, downed: true });
+assert.deepEqual(hitOn({ kind: 'npc', hp: 5, maxHp: 30, downs: true }, 'attack', 9), { after: { hp: 0, tempHp: 0, conditions: undefined }, died: false, downed: true });
 
 // The example session's ogre preset gives the numbers its token starts with.
 assert.deepEqual(statsOf(demoOgreStatBlock), { name: 'Ogre', size: 'large', ac: 11, maxHp: 59, speed: 40, perception: 8 });

@@ -5,6 +5,8 @@ import { createPortal } from 'react-dom';
 
 import type { Condition, CreatureSize, GameSystem, Grid, Point, Prop, Stats, Token } from '../types';
 
+import { downPlayer } from '../map/health';
+
 import { ConditionPicker } from './ConditionPicker';
 import { DetailsForm } from './Monsters';
 import { RowEditor } from './RowEditor';
@@ -227,7 +229,7 @@ export function TokenMenu({
                         id: 'conditions',
                         label: 'Conditions',
                         scrolls: true,
-                        content: <ConditionPicker system={system} conditions={token.conditions ?? []} onChange={onSetConditions} />,
+                        content: <ConditionPicker system={system} conditions={token.conditions ?? []} down={downPlayer(token)} onChange={onSetConditions} />,
                     },
                     {
                         id: 'size',

@@ -21,7 +21,7 @@ import type { Id } from '../convex/_generated/dataModel';
 import { highlight } from '../map/colours';
 import { penWidths } from '../map/drawings';
 import { defaultFogSettings } from '../map/fog';
-import { defaultBlood } from '../map/health';
+import { defaultBlood, downPlayer } from '../map/health';
 import type { FrameStats, PendingMove } from '../map/view';
 import { confirmAction } from '../services/confirm';
 import { buzz } from '../services/haptics';
@@ -126,7 +126,7 @@ function Player({ sessionId, table }: PlayerViewProps)
     }
 
     if (table && status.host)
-        return <Table sessionId={status.sessionId} mine={null} frozen={status.frozen} fogLook={status.fogLook} blood={status.blood} system={status.system} fight={status.fight} check={status.playerCheck} />;
+        return <Table sessionId={status.sessionId} mine={null} frozen={status.frozen} fogLook={status.fogLook} blood={status.blood} secretSaves={status.secretSaves} system={status.system} fight={status.fight} check={status.playerCheck} />;
 
     if (status.kicked)
     {
@@ -141,7 +141,7 @@ function Player({ sessionId, table }: PlayerViewProps)
     if (!status.mine)
         return <JoinForm sessionId={status.sessionId} name={status.name} />;
 
-    return <Table sessionId={status.sessionId} mine={status.mine} frozen={status.frozen} fogLook={status.fogLook} blood={status.blood} system={status.system} fight={status.fight} check={status.playerCheck} />;
+    return <Table sessionId={status.sessionId} mine={status.mine} frozen={status.frozen} fogLook={status.fogLook} blood={status.blood} secretSaves={status.secretSaves} system={status.system} fight={status.fight} check={status.playerCheck} />;
 }
 
 interface JoinFormProps
@@ -343,6 +343,8 @@ interface TableProps
     fogLook: FogSettings | null;
     /** Which blood the GM lets show, null for all of it. */
     blood: BloodSettings | null;
+    /** Death saves the GM keeps to themselves, which the player cannot set. */
+    secretSaves: boolean;
     /** The session's game, whose conditions the player picks from. */
     system: GameSystem;
     /** The fight as this screen hears of it, null while there is none. */
@@ -358,7 +360,7 @@ interface TableProps
  * fade out like the GM view's controls, and it saves what the party saw, so the fog is remembered
  * while the GM view is in Edit, see saveFog in convex/play.ts.
  */
-function Table({ sessionId, mine, frozen, fogLook, blood, system, fight, check }: TableProps)
+function Table({ sessionId, mine, frozen, fogLook, blood, secretSaves, system, fight, check }: TableProps)
 {
     const onTable = mine === null;
     // What a press does with no ruler on: open doors on the table screen, as in the editor, or on
@@ -677,6 +679,8 @@ function Table({ sessionId, mine, frozen, fogLook, blood, system, fight, check }
                                 <ConditionPicker
                                     system={system}
                                     conditions={token.conditions ?? []}
+                                    down={downPlayer(token)}
+                                    saves={!secretSaves}
                                     onChange={(conditions) =>
                                         saveConditions({ tokenId: mine, conditions }).then(
                                             () => undefined,
