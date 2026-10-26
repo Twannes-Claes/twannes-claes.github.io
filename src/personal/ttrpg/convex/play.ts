@@ -18,6 +18,7 @@ import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireSession, requireUser } from './access';
 import { saveCharacter } from './characters';
+import { limit, spend } from './limits';
 import { bloodSettingsValidator, conditionValidator, fogSettingsValidator, initiativeValidator, sizeValidator } from './schema';
 import { refreshSight, tokensOf, tokensOn } from './sight';
 import { bringCompanions, controllerOf, dropSummonsOf } from './summons';
@@ -576,6 +577,8 @@ export const join = mutation({
         if (!(await tryPassword(ctx, session, password)))
             return null;
 
+        await limit(ctx, userId, 'make');
+
         if (!character)
             throw new ConvexError('Your character needs a name.');
 
@@ -727,6 +730,8 @@ export const move = mutation({
 
         if (!token)
             throw new ConvexError('That token is gone.');
+
+        await limit(ctx, userId, 'move');
 
         const session = await sessionOf(ctx, token.sessionId);
         const host = session.ownerId === userId;
@@ -1578,6 +1583,8 @@ export const hit = mutation({
         if (!host && !own)
             throw new ConvexError('Join the session to attack or heal.');
 
+        await limit(ctx, userId, 'hit');
+
         if (!session.live || !scenarioId)
             throw new ConvexError('The session is not running.');
 
@@ -1739,6 +1746,10 @@ export const draw = mutation({
         if (points.length > maxPathPoints)
             throw new ConvexError('That path is too long.');
 
+        // Over the rate the path only shows a moment late, so nothing is said.
+        if (!(await spend(ctx, userId, 'drag')))
+            return null;
+
         if (!points.every((point) => onScenario(scenario, point)))
             throw new ConvexError('That is off the map.');
 
@@ -1855,6 +1866,9 @@ export const mark = mutation({
             return null;
         }
 
+        if (!(await spend(ctx, userId, 'drag')))
+            return null;
+
         const row = {
             sessionId,
             scenarioId: session.activeScenarioId,
@@ -1942,6 +1956,8 @@ export const drawLine = mutation({
         // Refused out loud, so the drawer's screen drops the line it still shows, see drawTool.
         if (!fine || !atTable || session.live !== true || !session.activeScenarioId)
             throw new ConvexError('That line could not be drawn.');
+
+        await limit(ctx, userId, 'drag');
 
         const doc = await ctx.db
             .query('drawings')

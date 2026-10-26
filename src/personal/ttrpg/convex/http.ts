@@ -24,7 +24,8 @@ const statusOf = { 'kept': 204, 'refused': 422, 'not joined': 403 } as const;
  * checked is checked before the file is stored: signed in, a picture, and small enough, so a
  * player cannot fill storage the way an open upload address would let them. keepAvatar then
  * checks they joined, and swaps it for their old picture. Answers 204 when kept, 422 when the
- * picture was refused, 403 for someone not at the table, and 400, 401, 413 or 415 before storing.
+ * picture was refused, 403 for someone not at the table, and 400, 401, 413, 415 or 429 (too many
+ * uploads, see limits.ts) before storing.
  */
 http.route({
     path: '/avatar',
@@ -53,6 +54,9 @@ http.route({
         // Without a length the body is not read at all, so nothing big is taken in to find out.
         if (Number(request.headers.get('Content-Length') ?? Infinity) > maxAvatarBytes)
             return answer(413);
+
+        if (!(await ctx.runMutation(internal.limits.spendOn, { userId, rate: 'upload' })))
+            return answer(429);
 
         const picture = await request.blob();
 

@@ -76,6 +76,9 @@ export async function uploadAvatar(
     if (response.status === 413 || response.status === 415 || response.status === 422)
         return false;
 
+    if (response.status === 429)
+        throw new Error('Too many uploads. Wait a moment and try again.');
+
     if (!response.ok)
         throw new Error('The picture did not upload. Check the connection and try again.');
 

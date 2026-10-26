@@ -7,6 +7,7 @@ import { cleanStats } from '../map/health';
 import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireAccount } from './access';
+import { limit } from './limits';
 import { storedPicture } from './pictures';
 import { maxAvatarBytes } from './play';
 import { sizeValidator } from './schema';
@@ -185,6 +186,8 @@ export const save = mutation({
         if (!colourPattern.test(color))
             throw new ConvexError('Pick a ring colour.');
 
+        await limit(ctx, userId, 'make');
+
         if (characterId)
             await ownCharacter(ctx, userId, characterId);
 
@@ -212,6 +215,7 @@ export const saveCompanion = mutation({
         const userId = await requireAccount(ctx);
 
         await ownCharacter(ctx, userId, characterId);
+        await limit(ctx, userId, 'make');
 
         const stats = cleanStats({ hp: maxHp, maxHp, tempHp: 0, ac, perception: 10 });
         const fields = { name: cleanName(name), size, maxHp: stats.maxHp, ac: stats.ac };

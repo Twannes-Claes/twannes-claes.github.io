@@ -177,8 +177,8 @@ app follows the same patterns rather than inventing new ones:
   imported by the pages themselves.
 - **House style** for every file: Allman braces, the import groups, comments that say why, no em
   dashes. `npm run format`, `lint`, `typecheck` and `build` clean at the end of each phase.
-- **No git writes by Claude.** Each phase ends with a suggested commit message (in the repo's
-  `feat(ttrpg): ...` form) and the list of files, and you commit.
+- **No git writes by Claude.** Each feature is built in its own session and ends with a suggested
+  commit message, in the repo's `feat(ttrpg): ...` form, and you commit.
 
 ### Routes and GitHub Pages
 
@@ -978,6 +978,12 @@ Built into play mode neatly, it should look and feel good.
 - Anyone signed in with Discord could make characters over and over, or spam other mutations,
   eating the free plan's quota. Check the join flow and add rate limits to character creation and
   the busiest mutations.
+- **Built.** `convex/limits.ts` counts tries per player in a `limits` table, a window at a time,
+  like the password counter: joining, characters, companions and summons 30 per 10 minutes,
+  uploads 60 (the `/avatar` route answers 429 before storing), moves and attacks 60 a minute, and
+  paths, rulers and lines 600 a minute. Paths and rulers past it are dropped quietly; the rest say
+  "Too many tries". Pings and wrong passwords keep their own. Someone signing in anonymously again
+  starts over, as a mutation cannot see who is behind an account.
 
 ### Build order
 

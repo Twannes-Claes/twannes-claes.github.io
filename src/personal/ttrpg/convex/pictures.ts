@@ -4,6 +4,7 @@ import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireHost, requireSession } from './access';
+import { limit } from './limits';
 import { scenariosOf } from './sessions';
 import { count, dropFile, totalBytes } from './usage';
 
@@ -106,7 +107,7 @@ export const uploadUrl = mutation({
     args: {},
     handler: async (ctx) =>
     {
-        await requireHost(ctx);
+        await limit(ctx, await requireHost(ctx), 'upload');
         await ctx.scheduler.runAfter(sweepDelay, internal.pictures.sweep, { since: Date.now() });
 
         return await ctx.storage.generateUploadUrl();

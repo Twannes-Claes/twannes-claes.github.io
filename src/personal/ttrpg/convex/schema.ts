@@ -319,6 +319,14 @@ export default defineSchema({
         /** When the current minute of counting began. */
         since: v.number(),
     }).index('by_sessionId', ['sessionId']),
+    /** How often each player did something lately, so a script cannot spam it, see limits.ts. */
+    limits: defineTable({
+        userId: v.id('users'),
+        rate: v.string(),
+        count: v.number(),
+        /** When the current window of counting began. */
+        since: v.number(),
+    }).index('by_userId_and_rate', ['userId', 'rate']),
     /**
      * The map pictures uploaded for a session, so each file is deleted once nothing can bring it
      * back, see freeMaps in sessions.ts. Scenarios keep only the address.

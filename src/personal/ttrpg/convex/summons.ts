@@ -7,6 +7,7 @@ import { cleanStats } from '../map/health';
 import type { Doc, Id } from './_generated/dataModel';
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireUser } from './access';
+import { limit } from './limits';
 import { dropDraftOf, ownToken, scenarioOf, spawnSpots, tokenOf } from './play';
 import { sizeValidator } from './schema';
 import { refreshSight, tokensOn } from './sight';
@@ -141,6 +142,8 @@ export const add = mutation({
 
         if ((await summonsOf(ctx, own._id)).length >= maxSummons)
             throw new ConvexError(`You can have ${maxSummons} companions at most.`);
+
+        await limit(ctx, userId, 'make');
 
         const stats = summonStats(maxHp, ac);
         const { scenario, spot } = await besideOwner(ctx, own, size);
