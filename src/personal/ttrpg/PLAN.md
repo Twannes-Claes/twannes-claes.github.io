@@ -645,13 +645,15 @@ A player at 0 is down and stays on the map, and in 5e makes death saves.
   as a blue +4 and a bar of the HP left. The GM sets any token's numbers from the heart button in the Players and Monsters lists, a player their own from
   their phone's settings (`play.setStats`, `components/StatsForm.tsx`). A monster added without HP
   has no numbers and shows no damage.
-- **Death saves, built.** A Death saves block heads a token's conditions: in 5e and Other a
-  downed player's successes and failures, 1 to 3 each, Stable or Dead at 3; in Pathfinder 2e
-  Dying and Wounded. Once up, it lists only the ones still on, to take off. The GM or that player sets them like any condition and they
-  show as badges on the token (`save` in `content/conditions.ts`). Healing above 0 clears the
-  5e saves and Dying (`conditionsAt` in `map/health.ts`). The GM's Table settings have **Death
-  saves: Players see them**; off, `play.tokens` leaves them out for every player and a phone
-  cannot set them (`play.setSecretSaves`).
+- **Death saves, built.** A card of pips heads a downed player's conditions: in 5e and Other
+  successes and failures, 1 to 3 each, Stable or Dead at 3; in Pathfinder 2e Dying, up to 5 for
+  a player with Diehard, the GM calling death as Doomed moves it, and Wounded. Once up, it lists
+  only the ones still on, to take off. The GM or that player sets them like any condition and
+  they show as badges on the token (`save` in `content/conditions.ts`). Healing above 0 clears
+  the 5e saves and Dying (`conditionsAt` in `map/health.ts`). The GM's Table settings have
+  **Death saves: Players see them**; off, `play.tokens` leaves them out for every player and a
+  phone cannot set them (`play.setSecretSaves`). The eraser by the Conditions heading takes off
+  every condition but the death saves.
 
 ### 3. Attack and heal
 

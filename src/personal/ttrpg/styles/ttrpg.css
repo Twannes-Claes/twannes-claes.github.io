@@ -2238,43 +2238,67 @@ details[open]::details-content {
 .ttrpg-conditions {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
-    gap: 4px;
+    gap: 6px;
     padding-block: 0.5rem 0.75rem;
 }
 
 .ttrpg-condition {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 6px;
     min-width: 0;
 }
 
-/* No fade: a level's minus and plus going widen the button at once, and the purple fading out
-   over the new width flashed. */
+/* A chip, edged so one that is off still reads as a button. No fade: a level's minus and plus
+   coming in widen the button at once, and the purple fading out over the new width flashed. */
 .ttrpg-condition > .ttrpg-segment {
     flex: 1;
     min-width: 0;
-    padding-inline: 0.6rem;
+    gap: 0.45rem;
+    padding: 0.45rem 0.65rem;
+    border: 1px solid var(--ttrpg-edge);
+    border-radius: 10px;
+    background: var(--ttrpg-well);
+    font-size: 0.8125rem;
     transition: none;
 }
 
+.ttrpg-condition > .ttrpg-segment > svg {
+    width: 1em;
+    opacity: 0.75;
+}
+
+.ttrpg-condition > .ttrpg-segment[aria-pressed='true'] {
+    border-color: transparent;
+    background: var(--ttrpg-accent);
+}
+
+.ttrpg-condition > .ttrpg-segment[aria-pressed='true'] > svg {
+    opacity: 1;
+}
+
+/* A minus, the level and a plus in one pill. */
 .ttrpg-condition__value {
     display: inline-flex;
     align-items: center;
+    padding: 2px;
+    border: 1px solid var(--ttrpg-edge);
+    border-radius: 12px;
+    background: var(--ttrpg-well);
 }
 
 .ttrpg-condition__number {
-    min-width: 1.5rem;
+    min-width: 1.75rem;
     color: var(--ttrpg-ink);
     font-family: var(--ttrpg-mono);
     font-size: 0.875rem;
+    font-weight: 600;
     text-align: center;
 }
 
-/* A death save takes a whole row, and so does one with levels, for its minus and plus, after the
-   rest, so turning one on moves nothing. */
-.ttrpg-conditions
-    > :is(.ttrpg-error, .ttrpg-subhead, .ttrpg-condition--save, .ttrpg-condition--levels) {
+/* One with levels takes a whole row, for its minus and plus, after the rest, so turning one on
+   moves nothing. */
+.ttrpg-conditions > :is(.ttrpg-error, .ttrpg-subhead, .ttrpg-saves, .ttrpg-condition--levels) {
     grid-column: 1 / -1;
 }
 
@@ -2284,6 +2308,97 @@ details[open]::details-content {
 
 .ttrpg-conditions > .ttrpg-error {
     order: 2;
+}
+
+.ttrpg-conditions > .ttrpg-subhead:first-child,
+.ttrpg-saves > .ttrpg-subhead {
+    padding-top: 0;
+    border-top: 0;
+}
+
+/* The death saves, in a card of their own above the conditions. */
+.ttrpg-saves {
+    display: grid;
+    gap: 0.4rem;
+    padding: 0.6rem 0.65rem;
+    border: 1px solid var(--ttrpg-edge);
+    border-radius: 14px;
+    background: var(--ttrpg-well);
+}
+
+.ttrpg-save {
+    --ttrpg-save: var(--ttrpg-danger);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 32px;
+}
+
+.ttrpg-save--saved {
+    --ttrpg-save: var(--ttrpg-success);
+}
+
+.ttrpg-save__name {
+    display: inline-flex;
+    flex: 1;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    color: var(--ttrpg-ink);
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+.ttrpg-save__name > svg {
+    width: 1em;
+    color: var(--ttrpg-save);
+}
+
+/* Stable or Dead, once all three are marked. */
+.ttrpg-save__result {
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ttrpg-save) 20%, transparent);
+    color: var(--ttrpg-save);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.ttrpg-pips {
+    display: inline-flex;
+    flex-shrink: 0;
+    gap: 5px;
+}
+
+/* One mark, a ring until it is lit. */
+.ttrpg-pip {
+    width: 20px;
+    height: 20px;
+    border: 2px solid color-mix(in srgb, var(--ttrpg-save) 45%, transparent);
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+    transition:
+        background-color 150ms var(--ttrpg-ease),
+        border-color 150ms var(--ttrpg-ease),
+        transform 150ms var(--ttrpg-ease);
+}
+
+.ttrpg-pip:hover {
+    border-color: var(--ttrpg-save);
+    transform: scale(1.1);
+}
+
+.ttrpg-pip:focus-visible {
+    outline: 2px solid var(--ttrpg-accent);
+    outline-offset: 2px;
+}
+
+.ttrpg-pip[aria-pressed='true'] {
+    border-color: var(--ttrpg-save);
+    background: var(--ttrpg-save);
 }
 
 /* A token's numbers under its name in a list, see StatChips. They wrap as a whole, so none is cut

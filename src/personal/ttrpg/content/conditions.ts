@@ -50,6 +50,8 @@ export interface ConditionKind
     name: string;
     icon: IconDefinition;
     max?: number;
+    /** Its name under the Death saves heading, like Successes. */
+    short?: string;
     /** What it reads at its max instead, like Stable. */
     full?: string;
     /** In the picker's Death saves block, which the GM can keep from the players, see isSave. */
@@ -58,7 +60,7 @@ export interface ConditionKind
     atZero?: boolean;
 }
 
-/** The highest value Pathfinder's conditions take at a real table, past Dying's 4. */
+/** The highest value Pathfinder's conditions take at a real table, past Dying's. */
 const pf2eMax = 9;
 
 const dnd5e: ConditionKind[] = [
@@ -77,8 +79,8 @@ const dnd5e: ConditionKind[] = [
     { id: 'restrained', name: 'Restrained', icon: faLink },
     { id: 'stunned', name: 'Stunned', icon: faFaceDizzy },
     { id: 'unconscious', name: 'Unconscious', icon: faBed },
-    { id: 'saved', name: 'Death save successes', icon: faHeartCircleCheck, max: 3, full: 'Stable', save: true, atZero: true },
-    { id: 'failed', name: 'Death save failures', icon: faSkullCrossbones, max: 3, full: 'Dead', save: true, atZero: true },
+    { id: 'saved', name: 'Death save successes', short: 'Successes', icon: faHeartCircleCheck, max: 3, full: 'Stable', save: true, atZero: true },
+    { id: 'failed', name: 'Death save failures', short: 'Failures', icon: faSkullCrossbones, max: 3, full: 'Dead', save: true, atZero: true },
 ];
 
 // Observed, Unnoticed and Encumbered are left out: nothing to show on a map.
@@ -92,7 +94,8 @@ const pf2e: ConditionKind[] = [
     { id: 'deafened', name: 'Deafened', icon: faEarDeaf },
     { id: 'doomed', name: 'Doomed', icon: faHourglassEnd, max: pf2eMax },
     { id: 'drained', name: 'Drained', icon: faDroplet, max: pf2eMax },
-    { id: 'dying', name: 'Dying', icon: faHeartPulse, max: 4, save: true, atZero: true },
+    // Up to 5, for a player who dies only at Dying 5, like with Diehard. The GM calls death.
+    { id: 'dying', name: 'Dying', icon: faHeartPulse, max: 5, save: true, atZero: true },
     { id: 'enfeebled', name: 'Enfeebled', icon: faDumbbell, max: pf2eMax },
     { id: 'fascinated', name: 'Fascinated', icon: faStar },
     { id: 'fatigued', name: 'Fatigued', icon: faBatteryHalf },
