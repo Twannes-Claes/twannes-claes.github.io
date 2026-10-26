@@ -1,4 +1,4 @@
-import { faPause, faPen, faPlay, faPlus, faRepeat, faStop, faTrash, faVolumeHigh, faVolumeXmark } from '@fortawesome/free-solid-svg-icons';
+import { faMusic, faPause, faPen, faPlay, faPlus, faRepeat, faStop, faTrash, faVolumeHigh, faVolumeXmark } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useEffectEvent, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 
@@ -52,6 +52,14 @@ function loadYouTube(): Promise<YouTubeApi>
 {
     youTube ??= new Promise((resolve, reject) =>
     {
+        // Loaded already, by this page before a reload of this module, and it only calls back once.
+        if (window.YT?.Player)
+        {
+            resolve(window.YT);
+
+            return;
+        }
+
         window.onYouTubeIframeAPIReady = () => resolve(window.YT as YouTubeApi);
 
         const script = document.createElement('script');
@@ -249,7 +257,18 @@ export function MusicPanel({ controls, shown, onClose, onError }: MusicPanelProp
     return (
         <Popover title="Music" className={`ttrpg-dock-panel ttrpg-music${shown ? '' : ' ttrpg-away'}`} onClose={onClose}>
             <div className="ttrpg-popover__body">
-                <div ref={host} className={`ttrpg-music__screen${current ? '' : ' ttrpg-music__screen--empty'}`} />
+                <div className="ttrpg-music__stage">
+                    <div ref={host} className="ttrpg-music__screen" />
+                    {!current && (
+                        <div className="ttrpg-music__idle">
+                            <span className="ttrpg-music__disc">
+                                <FontAwesomeIcon icon={faMusic} />
+                            </span>
+                            <span>Nothing playing</span>
+                            <span className="ttrpg-music__hint">Pick a link to play it here.</span>
+                        </div>
+                    )}
+                </div>
                 <div className="ttrpg-music__controls">
                     <button type="button" className="ttrpg-segment" disabled={!ready || !current} aria-label={paused ? 'Play' : 'Pause'} title={paused ? 'Play' : 'Pause'} onClick={toggle}>
                         <FontAwesomeIcon icon={paused ? faPlay : faPause} fixedWidth />

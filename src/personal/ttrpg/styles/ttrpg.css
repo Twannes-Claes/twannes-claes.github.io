@@ -17,7 +17,6 @@ html:has(.ttrpg) {
     --ttrpg-ink: #fcf8ec;
     --ttrpg-muted: color-mix(in srgb, var(--ttrpg-ink) 60%, var(--ttrpg-bg));
     --ttrpg-accent: #683c9b;
-    --ttrpg-confirm: #1e5631;
     --ttrpg-success: #6fcf8e;
     --ttrpg-danger: #e0565b;
     --ttrpg-panel: color-mix(in srgb, var(--ttrpg-bg) 80%, transparent);
@@ -407,16 +406,19 @@ html:has(.ttrpg) {
     border: 1px solid var(--ttrpg-edge);
 }
 
-/* A segment that says yes, like approving a host, in the confirm green. */
-.ttrpg-segment--confirm {
-    border-color: transparent;
-    background: var(--ttrpg-confirm);
+/* A segment or button that says yes, like approving a host or moving: a see-through accent that
+   fills in when hovered, set apart from a choice that is on. */
+.ttrpg-segment--confirm,
+.ttrpg-button.ttrpg-button--confirm {
+    border-color: color-mix(in srgb, var(--ttrpg-accent) 70%, transparent);
+    background: color-mix(in srgb, var(--ttrpg-accent) 35%, transparent);
     color: var(--ttrpg-ink);
-    transition: filter 150ms var(--ttrpg-ease);
 }
 
-.ttrpg-segment--confirm:is(:hover, :focus-visible):not(:disabled) {
-    filter: brightness(1.2);
+.ttrpg-segment--confirm:is(:hover, :focus-visible):not(:disabled),
+.ttrpg-button--confirm:is(:hover, :focus-visible):not(:disabled) {
+    background: var(--ttrpg-accent);
+    filter: none;
 }
 
 /* A number on a segment, like the players at the table. */
@@ -751,7 +753,7 @@ html:has(.ttrpg) {
 }
 
 /* The buttons at the foot of a popover or the move sheet, under a hairline, the one that does it
-   in green: starting the session, moving, the fog's default look and reset. */
+   in the accent: starting the session, moving, the fog's default look and reset. */
 .ttrpg-popover__foot {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1610,7 +1612,7 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
     color: var(--ttrpg-muted);
 }
 
-/* Damage, red like a wound, beside Heal's green. */
+/* Damage, red like a wound, beside Heal. */
 .ttrpg-segment--hit {
     border-color: transparent;
     background: #8c2f2b;
@@ -1684,11 +1686,6 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
 .ttrpg-button:hover,
 .ttrpg-button:focus-visible {
     filter: brightness(1.15);
-}
-
-.ttrpg-button--confirm {
-    border-color: transparent;
-    background: var(--ttrpg-confirm);
 }
 
 .ttrpg-button--danger {
@@ -2201,19 +2198,6 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
     padding: 0.5rem 0 0.75rem;
 }
 
-/* Two full rows on six columns: the three HP fields, then AC and Perception, half each. */
-.ttrpg-stats-form .ttrpg-fields {
-    grid-template-columns: repeat(6, 1fr);
-}
-
-.ttrpg-stats-form .ttrpg-field {
-    grid-column: span 2;
-}
-
-.ttrpg-stats-form .ttrpg-field:nth-child(n + 4) {
-    grid-column: span 3;
-}
-
 /* A token's conditions to turn on and off, two or more to a line, see ConditionPicker.tsx. */
 .ttrpg-conditions {
     display: grid;
@@ -2399,16 +2383,54 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
     visibility: hidden;
 }
 
-.ttrpg-music__screen {
+/* The player and, laid over it while nothing plays, the idle card, so both are one size. */
+.ttrpg-music__stage {
+    position: relative;
     overflow: hidden;
     border-radius: 8px;
     aspect-ratio: 16 / 9;
+}
+
+.ttrpg-music__screen {
+    height: 100%;
     background: #000;
 }
 
-/* Folded rather than gone with nothing picked, so the player keeps its iframe. */
-.ttrpg-music__screen--empty {
-    height: 0;
+/* Over the player while nothing plays, which YouTube would fill with an error. */
+.ttrpg-music__idle {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 0.25rem;
+    border: 1px solid var(--ttrpg-edge);
+    border-radius: 8px;
+    background:
+        radial-gradient(
+            circle at 50% 40%,
+            color-mix(in srgb, var(--ttrpg-accent) 35%, transparent),
+            transparent 65%
+        ),
+        var(--ttrpg-well);
+    font-weight: 500;
+}
+
+.ttrpg-music__disc {
+    display: grid;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
+    margin-bottom: 0.5rem;
+    border-radius: 50%;
+    background: var(--ttrpg-accent);
+    font-size: 1.25rem;
+}
+
+.ttrpg-music__hint {
+    color: var(--ttrpg-muted);
+    font-size: 0.8rem;
+    font-weight: 400;
 }
 
 .ttrpg-music__screen iframe {

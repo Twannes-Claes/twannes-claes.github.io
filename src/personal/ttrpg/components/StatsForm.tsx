@@ -74,30 +74,28 @@ export function StatsForm({ token, onSave }: StatsFormProps)
         <form
             key={[token.hp, token.maxHp, token.tempHp, token.ac, token.perception].join()}
             action={save}
-            className="ttrpg-stats-form"
+            className="ttrpg-stats-form ttrpg-settings"
         >
-            <div className="ttrpg-fields">
-                <label className="ttrpg-field">
-                    HP
-                    <input name="hp" type="number" inputMode="numeric" min={0} max={9999} defaultValue={token.hp} />
-                </label>
-                <label className="ttrpg-field">
-                    Max HP
-                    <input name="maxHp" type="number" inputMode="numeric" min={1} max={9999} defaultValue={token.maxHp} required />
-                </label>
-                <label className="ttrpg-field">
-                    Temp HP
-                    <input name="tempHp" type="number" inputMode="numeric" min={0} max={999} defaultValue={token.tempHp ?? 0} />
-                </label>
-                <label className="ttrpg-field">
-                    AC
-                    <input name="ac" type="number" inputMode="numeric" min={0} max={50} defaultValue={token.ac ?? 10} />
-                </label>
-                <label className="ttrpg-field" title="Passive Perception">
-                    Perception
-                    <input name="perception" type="number" inputMode="numeric" min={0} max={50} defaultValue={token.perception ?? 10} />
-                </label>
-            </div>
+            <label>
+                HP
+                <input name="hp" type="number" inputMode="numeric" min={0} max={9999} defaultValue={token.hp} />
+            </label>
+            <label>
+                Max HP
+                <input name="maxHp" type="number" inputMode="numeric" min={1} max={9999} defaultValue={token.maxHp} required />
+            </label>
+            <label>
+                Temp HP
+                <input name="tempHp" type="number" inputMode="numeric" min={0} max={999} defaultValue={token.tempHp ?? 0} />
+            </label>
+            <label>
+                AC
+                <input name="ac" type="number" inputMode="numeric" min={0} max={50} defaultValue={token.ac ?? 10} />
+            </label>
+            <label title="Passive Perception">
+                Perception
+                <input name="perception" type="number" inputMode="numeric" min={0} max={50} defaultValue={token.perception ?? 10} />
+            </label>
             {failure && (
                 <p className="ttrpg-error" role="alert">
                     {failure}

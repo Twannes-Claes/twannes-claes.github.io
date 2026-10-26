@@ -968,6 +968,10 @@ Built into play mode neatly, it should look and feel good.
 - The **Numbers** tab (`StatsForm`), in the token menu and the Players and Monsters lists, looks
   out of style next to the other tabs: restyle it to match.
 - The green confirm buttons look out of style too.
+- **Built.** `StatsForm` is now rows of a name with its field beside it, the `ttrpg-settings` look
+  the Details tab already had. The `--ttrpg-confirm` green is gone: `.ttrpg-segment--confirm` and
+  `.ttrpg-button--confirm` share one rule in `styles/ttrpg.css`, a see-through accent with an
+  accent edge that fills in when hovered, so a yes stays apart from a choice that is on.
 
 ### 21. Animations
 
