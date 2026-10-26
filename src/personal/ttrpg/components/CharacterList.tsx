@@ -181,17 +181,17 @@ export function PieceForm({ title, start, character, ring, onSave, onDone, joini
                 Size
                 <SizePicker size={size} onChange={setSize} />
             </div>
-            <div className="ttrpg-fields">
-                <label className="ttrpg-field">
+            <div className="ttrpg-settings">
+                <label>
                     Max HP
                     <input name="maxHp" type="number" inputMode="numeric" min={1} max={9999} required defaultValue={start.maxHp} />
                 </label>
-                <label className="ttrpg-field">
+                <label>
                     AC
                     <input name="ac" type="number" inputMode="numeric" min={0} max={50} required defaultValue={start.ac} />
                 </label>
                 {character && (
-                    <label className="ttrpg-field" title="Passive Perception">
+                    <label title="Passive Perception">
                         Perception
                         <input name="perception" type="number" inputMode="numeric" min={0} max={50} required defaultValue={start.perception} />
                     </label>

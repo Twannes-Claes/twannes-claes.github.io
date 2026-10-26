@@ -971,7 +971,11 @@ Built into play mode neatly, it should look and feel good.
 - **Built.** `StatsForm` is now rows of a name with its field beside it, the `ttrpg-settings` look
   the Details tab already had. The `--ttrpg-confirm` green is gone: `.ttrpg-segment--confirm` and
   `.ttrpg-button--confirm` share one rule in `styles/ttrpg.css`, a see-through accent with an
-  accent edge that fills in when hovered, so a yes stays apart from a choice that is on.
+  accent edge that fills in when hovered, so a yes stays apart from a choice that is on. Every
+  field, in the panels, the lists, the character and join forms and the session list, shares one
+  rule too: 40px high, rounded, words in the app's font and numbers in mono, 16px on a phone so
+  it does not zoom in. The character form (home page and join) and the summon forms put their
+  numbers in the same rows as the Numbers tab.
 
 ### 21. Animations
 

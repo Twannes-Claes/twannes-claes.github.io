@@ -665,21 +665,42 @@ html:has(.ttrpg) {
     text-align: right;
 }
 
+/* Every field in the app looks the same, in a panel, a list or a form on the phone: words in the
+   app's font, numbers in mono. */
 .ttrpg-settings input:not([type]),
 .ttrpg-settings input[type='number'],
 .ttrpg-settings select,
-.ttrpg-scenarios input {
+.ttrpg-scenarios input,
+.ttrpg-field :is(input:not([type='color']), select),
+.ttrpg-card__form input,
+.ttrpg-row__input {
     width: 100%;
     min-width: 0;
-    min-height: 36px;
-    padding: 0.4rem 0.7rem;
+    min-height: 40px;
+    padding: 0.4rem 0.75rem;
     border: 1px solid var(--ttrpg-edge);
     border-radius: 10px;
     background: var(--ttrpg-well);
     color: var(--ttrpg-ink);
-    font-family: var(--ttrpg-mono);
-    font-size: 0.8rem;
+    font-size: 0.875rem;
     white-space: nowrap;
+}
+
+/* A phone zooms in on a field under 16px when it gets focus. */
+@media (pointer: coarse) {
+    .ttrpg-settings input:not([type]),
+    .ttrpg-settings input[type='number'],
+    .ttrpg-settings select,
+    .ttrpg-scenarios input,
+    .ttrpg-field :is(input:not([type='color']), select),
+    .ttrpg-card__form input,
+    .ttrpg-row__input {
+        font-size: 1rem;
+    }
+}
+
+.ttrpg input[type='number'] {
+    font-family: var(--ttrpg-mono);
 }
 
 /*
@@ -743,9 +764,10 @@ html:has(.ttrpg) {
     box-shadow: 0 0 0 4px color-mix(in srgb, var(--ttrpg-accent) 60%, transparent);
 }
 
-.ttrpg-settings input[type='color'] {
+.ttrpg-settings input[type='color'],
+.ttrpg-field input[type='color'] {
     width: 100%;
-    height: 36px;
+    height: 40px;
     padding: 3px;
     border: 1px solid var(--ttrpg-edge);
     border-radius: 10px;
@@ -1986,12 +2008,6 @@ details[open]::details-content {
     margin-top: 0.875rem;
 }
 
-/* The name being renamed, in the dropdown's font rather than the mono of number fields. */
-.ttrpg-scenarios input:not([type]) {
-    font-family: inherit;
-    font-size: 0.875rem;
-}
-
 .ttrpg-scenarios__background {
     display: flex;
     align-items: center;
@@ -2171,13 +2187,6 @@ details[open]::details-content {
 
 .ttrpg-card__form input {
     flex: 1;
-    min-width: 0;
-    min-height: 48px;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--ttrpg-edge);
-    border-radius: 12px;
-    background: var(--ttrpg-well);
-    color: var(--ttrpg-ink);
 }
 
 /* A labelled field on its own line, in the join and start forms. */
@@ -2186,36 +2195,6 @@ details[open]::details-content {
     gap: 0.35rem;
     color: var(--ttrpg-muted);
     font-size: 0.875rem;
-}
-
-/* Short number fields side by side, like HP, AC and Perception. Their label stays above the
-   field, also inside a settings form, whose labels sit beside theirs. */
-.ttrpg-fields {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(5rem, 1fr));
-    gap: 0.5rem;
-}
-
-.ttrpg-fields .ttrpg-field {
-    grid-template-columns: none;
-    align-items: start;
-    gap: 0.35rem;
-    min-width: 0;
-}
-
-/* A number field is wide on its own, which pushed a narrow pop-out into scrolling sideways. No
-   spin arrows: they crowd a short field, and the keyboard's arrows still step it. */
-.ttrpg-fields input {
-    width: 100%;
-    min-width: 0;
-    font-family: var(--ttrpg-mono);
-    appearance: textfield;
-}
-
-.ttrpg-fields input::-webkit-inner-spin-button,
-.ttrpg-fields input::-webkit-outer-spin-button {
-    appearance: none;
-    margin: 0;
 }
 
 /* A token's numbers to change, under its row in a list or in the phone's settings. */
@@ -2314,22 +2293,6 @@ details[open]::details-content {
 .ttrpg-chip--temp {
     background: color-mix(in srgb, #8db9f2 16%, transparent);
     color: #8db9f2;
-}
-
-.ttrpg-field input,
-.ttrpg-field select {
-    min-height: 44px;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--ttrpg-edge);
-    border-radius: 12px;
-    background: var(--ttrpg-well);
-    color: var(--ttrpg-ink);
-    font-size: 1rem;
-}
-
-.ttrpg-field input[type='color'] {
-    width: 100%;
-    padding: 4px;
 }
 
 /*
@@ -2938,7 +2901,7 @@ button.ttrpg-row__main {
     margin-inline-start: 0.25rem;
     padding: 0.25rem 0.4rem;
     border: 1px solid var(--ttrpg-edge);
-    border-radius: 8px;
+    border-radius: 10px;
     background: var(--ttrpg-well);
     color: var(--ttrpg-ink);
     font-family: var(--ttrpg-mono);
@@ -2949,13 +2912,7 @@ button.ttrpg-row__main {
 /* A session's or a music link's name being renamed, in the place of its row. */
 .ttrpg-row__input {
     flex: 1;
-    min-width: 0;
-    min-height: 44px;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--ttrpg-accent);
-    border-radius: 10px;
-    background: var(--ttrpg-well);
-    color: var(--ttrpg-ink);
+    border-color: var(--ttrpg-accent);
 }
 
 /* The app's own confirm, in place of the browser's. A native dialog, so Esc and focus work. */

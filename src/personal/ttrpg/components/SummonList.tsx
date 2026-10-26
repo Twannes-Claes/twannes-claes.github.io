@@ -138,12 +138,12 @@ export function SummonList({ sessionId, system, onError }: SummonListProps)
                                         Name
                                         <input name="name" maxLength={30} autoComplete="off" required autoFocus defaultValue={summon.name} />
                                     </label>
-                                    <div className="ttrpg-fields">
-                                        <label className="ttrpg-field">
+                                    <div className="ttrpg-settings">
+                                        <label>
                                             Max HP
                                             <input name="maxHp" type="number" inputMode="numeric" min={1} max={9999} required defaultValue={summon.maxHp} />
                                         </label>
-                                        <label className="ttrpg-field">
+                                        <label>
                                             AC
                                             <input name="ac" type="number" inputMode="numeric" min={0} max={50} required defaultValue={summon.ac} />
                                         </label>
@@ -236,12 +236,12 @@ export function SummonList({ sessionId, system, onError }: SummonListProps)
                         Size
                         <SizePicker size={size} onChange={setSize} />
                     </div>
-                    <div className="ttrpg-fields">
-                        <label className="ttrpg-field">
+                    <div className="ttrpg-settings">
+                        <label>
                             Max HP
                             <input name="maxHp" type="number" inputMode="numeric" min={1} max={9999} required />
                         </label>
-                        <label className="ttrpg-field">
+                        <label>
                             AC
                             <input name="ac" type="number" inputMode="numeric" min={0} max={50} required />
                         </label>

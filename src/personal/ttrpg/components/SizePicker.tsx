@@ -13,13 +13,13 @@ const sizes: { id: CreatureSize; name: string }[] = [
     { id: 'gargantuan', name: 'Gargantuan' },
 ];
 
-/** How much of the map a size takes on this grid, like 2×2 or 3 hexes. Nothing without a grid. */
-function footprintLabel(grid: Grid, size: CreatureSize): string
+/** How much of the map a size takes on this grid, like 2×2 or 3 hexes, in squares without one. Nothing on a gridless map. */
+function footprintLabel(grid: Grid | undefined, size: CreatureSize): string
 {
-    if (grid.type === 'none')
+    if (grid?.type === 'none')
         return '';
 
-    if (grid.type === 'hex')
+    if (grid?.type === 'hex')
     {
         const count = footprint(grid, { q: 0, r: 0 }, size).length;
 
@@ -34,7 +34,7 @@ function footprintLabel(grid: Grid, size: CreatureSize): string
 interface SizePickerProps
 {
     size: CreatureSize;
-    /** The map's grid, to show how much of it each size takes. None on the join form. */
+    /** The map's grid, to show how much of it each size takes. None on the character forms, which count squares. */
     grid?: Grid;
     /** Saving fails with the message to show, like the conditions, see ConditionPicker. */
     onChange: (size: CreatureSize) => Promise<void> | void;
@@ -64,7 +64,7 @@ export function SizePicker({ size, grid, onChange }: SizePickerProps)
             {sizes.map((choice) => (
                 <button key={choice.id} type="button" className="ttrpg-segment" aria-pressed={current === choice.id} onClick={() => pick(choice.id)}>
                     {choice.name}
-                    {grid && grid.type !== 'none' && <span className="ttrpg-sizes__cells">{footprintLabel(grid, choice.id)}</span>}
+                    {grid?.type !== 'none' && <span className="ttrpg-sizes__cells">{footprintLabel(grid, choice.id)}</span>}
                 </button>
             ))}
             {failure && (
