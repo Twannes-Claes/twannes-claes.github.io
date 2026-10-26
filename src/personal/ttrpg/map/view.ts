@@ -1856,6 +1856,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
     observer.observe(canvas);
     canvas.addEventListener('pointerleave', leave);
+    window.addEventListener('ttrpg-paint', redraw);
     canvas.addEventListener('pointerdown', down);
     canvas.addEventListener('pointermove', move);
     canvas.addEventListener('pointerup', up);
@@ -2141,6 +2142,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             letGo();
             window.clearTimeout(draftTimer);
             observer.disconnect();
+            window.removeEventListener('ttrpg-paint', redraw);
             canvas.removeEventListener('pointerleave', leave);
             canvas.removeEventListener('pointerdown', down);
             canvas.removeEventListener('pointermove', move);

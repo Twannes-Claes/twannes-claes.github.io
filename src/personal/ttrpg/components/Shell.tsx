@@ -1,11 +1,12 @@
 import { faHouse } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
+import { useEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { Link } from 'react-router-dom';
 import { Head } from 'vite-react-ssg';
 
 import { ConfirmHost } from './Confirm';
 import { TooltipHost } from './Tooltip';
+import { useLook } from './useLook';
 
 /** What pops in, each with an animation of its own in styles/ttrpg.css. */
 const popsIn = [
@@ -96,14 +97,16 @@ export function Shell({ title, home = '/ttrpg', children }: ShellProps)
 {
     const root = useRef<HTMLDivElement>(null);
 
+    const { theme, accent } = useLook();
+
     useLeaving(root);
 
     return (
-        <div ref={root} className="ttrpg">
+        <div ref={root} className="ttrpg" data-theme={theme} style={{ '--ttrpg-accent': accent } as CSSProperties}>
             <Head>
                 <title>{`${title} | TTRPG`}</title>
                 <meta name="robots" content="noindex, nofollow" />
-                <meta name="theme-color" content="#1e1d1f" />
+                <meta name="theme-color" content={theme === 'light' ? '#fcf8ec' : '#1e1d1f'} />
             </Head>
 
             <Link

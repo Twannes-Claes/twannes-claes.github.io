@@ -1306,6 +1306,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                         onPicture={loadPicture}
                         onBackground={setBackground}
                         onRemoveBackground={removeBackground}
+                        onOutside={(colour) => updateScenario(active.id, (scenario) => ({ ...scenario, outside: colour }))}
                         backgroundBytes={active.background ? pictureBytes.get(active.background) : undefined}
                     />
                     {store.save && <SaveState unsaved={unsaved} failed={saveFailed} />}

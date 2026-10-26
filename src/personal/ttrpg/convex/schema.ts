@@ -54,6 +54,7 @@ export const scenarioValidator = v.object({
     width: v.number(),
     height: v.number(),
     background: v.union(v.string(), v.null()),
+    outside: v.optional(v.string()),
     grid: v.object({
         type: v.union(v.literal('square'), v.literal('hex'), v.literal('none')),
         hexOrientation: v.union(v.literal('pointy'), v.literal('flat')),

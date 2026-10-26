@@ -6,7 +6,7 @@ import type { Pen } from '../types';
 
 import { penWidths } from '../map/drawings';
 
-import { RingPicker } from './CharacterList';
+import { RingPicker } from './RingPicker';
 
 /** What the draw tool does: draw a line, or erase lines, see map/drawings.ts. */
 export type Sketch = 'draw' | 'rub-out';

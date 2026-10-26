@@ -2,6 +2,7 @@ import { faEye, faGear } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, type CSSProperties, type ReactNode } from 'react';
 
+import { LookSettings } from './LookSettings';
 import { Popover } from './Popover';
 import { largestScale, smallestScale, type ScreenSettings } from './useScreenSettings';
 
@@ -150,6 +151,7 @@ export function Settings({ settings, onChange, phone = false, children, table, h
                         {(!table || tab === 'editor') && (
                             <>
                                 {children}
+                                <LookSettings />
                                 <section className="ttrpg-shortcuts" aria-label="Control size" title="How big the controls are on this screen">
                                     <h3 className="ttrpg-subhead">Control size</h3>
                                     <div className="ttrpg-settings__line">

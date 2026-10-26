@@ -5,6 +5,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Link } from 'react-router-dom';
 
 import { Loading } from '../components/Feedback';
+import { LookSettings } from '../components/LookSettings';
 import { Shell } from '../components/Shell';
 import { useModule } from '../components/useModule';
 import { convexUrl } from '../services/config';
@@ -49,6 +50,13 @@ export default function Dashboard()
                             <FontAwesomeIcon icon={faMap} />
                             Open the demo map
                         </Link>
+                    </div>
+                </section>
+
+                <section className="ttrpg-panel ttrpg-card" aria-label="Look">
+                    <h2>Look</h2>
+                    <div className="ttrpg-settings">
+                        <LookSettings />
                     </div>
                 </section>
             </main>

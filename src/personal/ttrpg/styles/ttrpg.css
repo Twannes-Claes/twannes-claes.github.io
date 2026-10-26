@@ -3,7 +3,8 @@
 
    The portfolio's colours and fonts, re-declared as --ttrpg-* rather than read
    from index.css, so the app keeps its own look if the portfolio's changes.
-   Dark only, it is used at a table where the map is the bright thing on screen.
+   Dark by default, as it is used at a table where the map is the bright thing on
+   screen. Each screen can pick light and its own accent, see components/useLook.ts.
    Everything is scoped under .ttrpg, because after a visit here this file stays
    loaded when the router moves on to a portfolio page. Onest and JetBrains Mono
    are already loaded by main.tsx for the whole site.
@@ -17,6 +18,10 @@ html:has(.ttrpg) {
     --ttrpg-ink: #fcf8ec;
     --ttrpg-muted: color-mix(in srgb, var(--ttrpg-ink) 60%, var(--ttrpg-bg));
     --ttrpg-accent: #683c9b;
+    /* Words on a solid fill, the accent or a danger red, light in both themes. */
+    --ttrpg-on-accent: #fcf8ec;
+    /* The accent see-through, behind what is picked or says yes. */
+    --ttrpg-tint: color-mix(in srgb, var(--ttrpg-accent) 35%, transparent);
     --ttrpg-success: #6fcf8e;
     --ttrpg-danger: #e0565b;
     --ttrpg-panel: color-mix(in srgb, var(--ttrpg-bg) 80%, transparent);
@@ -30,6 +35,26 @@ html:has(.ttrpg) {
     /* Inherited, so every scrolling panel gets a quiet bar instead of the browser's light one. */
     scrollbar-color: color-mix(in srgb, var(--ttrpg-ink) 25%, transparent) transparent;
     color-scheme: dark;
+}
+
+/* The light theme swaps the base colours, and every shade mixed from them follows. */
+.ttrpg[data-theme='light'],
+html:has(.ttrpg[data-theme='light']) {
+    --ttrpg-bg: #fcf8ec;
+    --ttrpg-ink: #1e1d1f;
+    --ttrpg-success: #1e7a43;
+    --ttrpg-danger: #b4302f;
+    --ttrpg-well: rgb(0 0 0 / 0.06);
+    /* Lighter, or a dark accent turns a cream panel muddy behind dark words. */
+    --ttrpg-tint: color-mix(in srgb, var(--ttrpg-accent) 18%, transparent);
+
+    color-scheme: light;
+}
+
+/* Pale colours picked to read on the dark theme, darkened to read on the light one. */
+.ttrpg[data-theme='light']
+    :is([class*='ttrpg-chip--'], .ttrpg-toast--info > svg, .ttrpg-error, .ttrpg-sheet__warning) {
+    filter: brightness(0.55);
 }
 
 .ttrpg {
@@ -153,6 +178,7 @@ html:has(.ttrpg) {
 /* A choice that takes something away, red when on, like the box it drags on the map. */
 .ttrpg-segment.ttrpg-segment--danger[aria-pressed='true'] {
     background: #8c2f2b;
+    color: var(--ttrpg-on-accent);
 }
 
 /* A thin line between groups that share a row. */
@@ -338,7 +364,7 @@ html:has(.ttrpg) {
 .ttrpg-rail__history {
     display: grid;
     border-radius: 12px;
-    background: rgb(255 255 255 / 0.04);
+    background: color-mix(in srgb, var(--ttrpg-ink) 4%, transparent);
 }
 
 .ttrpg-rail__history .ttrpg-icon-button {
@@ -355,7 +381,7 @@ html:has(.ttrpg) {
 }
 
 .ttrpg-rail__history .ttrpg-icon-button:hover:not(:disabled) {
-    background: rgb(255 255 255 / 0.06);
+    background: color-mix(in srgb, var(--ttrpg-ink) 6%, transparent);
 }
 
 .ttrpg-icon-button {
@@ -391,7 +417,7 @@ html:has(.ttrpg) {
 .ttrpg-segment[aria-selected='true'],
 .ttrpg-icon-button[aria-pressed='true'] {
     background: var(--ttrpg-accent);
-    color: var(--ttrpg-ink);
+    color: var(--ttrpg-on-accent);
 }
 
 .ttrpg-segment:disabled,
@@ -411,13 +437,14 @@ html:has(.ttrpg) {
 .ttrpg-segment--confirm,
 .ttrpg-button.ttrpg-button--confirm {
     border-color: color-mix(in srgb, var(--ttrpg-accent) 70%, transparent);
-    background: color-mix(in srgb, var(--ttrpg-accent) 35%, transparent);
+    background: var(--ttrpg-tint);
     color: var(--ttrpg-ink);
 }
 
 .ttrpg-segment--confirm:is(:hover, :focus-visible):not(:disabled),
 .ttrpg-button--confirm:is(:hover, :focus-visible):not(:disabled) {
     background: var(--ttrpg-accent);
+    color: var(--ttrpg-on-accent);
     filter: none;
 }
 
@@ -578,7 +605,7 @@ html:has(.ttrpg) {
     text-align: center;
 }
 
-.ttrpg-settings label,
+.ttrpg-settings label:not(.ttrpg-ring),
 .ttrpg-settings__group {
     display: grid;
     /* minmax(0, ...): a plain 1fr will not go below the field's own width and pushed it out. */
@@ -828,7 +855,7 @@ html:has(.ttrpg) {
 
 .ttrpg-library__item[aria-pressed='true'] {
     border-color: var(--ttrpg-accent);
-    background: color-mix(in srgb, var(--ttrpg-accent) 35%, transparent);
+    background: var(--ttrpg-tint);
 }
 
 .ttrpg-library li {
@@ -1418,7 +1445,7 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
 }
 
 .ttrpg-summon__state--on {
-    background: color-mix(in srgb, var(--ttrpg-accent) 35%, transparent);
+    background: var(--ttrpg-tint);
     color: var(--ttrpg-ink);
 }
 
@@ -1537,7 +1564,7 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
     border: 2px solid var(--ttrpg-bg);
     border-radius: 50%;
     background: var(--ttrpg-accent);
-    color: var(--ttrpg-ink);
+    color: var(--ttrpg-on-accent);
     font-size: 0.75rem;
 }
 
@@ -1545,7 +1572,7 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
     filter: brightness(1.2);
 }
 
-/* Ring colours to pick from, see RingPicker in CharacterList.tsx. */
+/* Ring colours to pick from, see RingPicker.tsx. */
 .ttrpg-rings {
     display: flex;
     flex-wrap: wrap;
@@ -1553,6 +1580,8 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
 }
 
 .ttrpg-ring {
+    /* Holds the hidden colour field, which would stretch the page sideways. */
+    position: relative;
     display: grid;
     place-items: center;
     width: 34px;
@@ -1640,7 +1669,7 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
 .ttrpg-segment--hit {
     border-color: transparent;
     background: #8c2f2b;
-    color: var(--ttrpg-ink);
+    color: var(--ttrpg-on-accent);
 }
 
 .ttrpg-segment--hit:is(:hover, :focus-visible):not(:disabled) {
@@ -1715,6 +1744,7 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
 .ttrpg-button--danger {
     border-color: transparent;
     background: #8c2f2b;
+    color: var(--ttrpg-on-accent);
 }
 
 /* Half faded rather than further, so a button that says Adding or Starting stays readable. */
@@ -1871,13 +1901,13 @@ details[open]::details-content {
 
 .ttrpg-scenarios__maps button:hover,
 .ttrpg-scenarios__maps button:focus-visible {
-    background: rgb(255 255 255 / 0.06);
+    background: color-mix(in srgb, var(--ttrpg-ink) 6%, transparent);
     color: var(--ttrpg-ink);
     outline: none;
 }
 
 .ttrpg-scenarios__maps button[aria-current='true'] {
-    background: color-mix(in srgb, var(--ttrpg-accent) 45%, transparent);
+    background: var(--ttrpg-tint);
     color: var(--ttrpg-ink);
 }
 
@@ -1940,13 +1970,13 @@ details[open]::details-content {
 
 .ttrpg select option:hover,
 .ttrpg select option:focus-visible {
-    background: rgb(255 255 255 / 0.06);
+    background: color-mix(in srgb, var(--ttrpg-ink) 6%, transparent);
     color: var(--ttrpg-ink);
     outline: none;
 }
 
 .ttrpg select option:checked {
-    background: color-mix(in srgb, var(--ttrpg-accent) 45%, transparent);
+    background: var(--ttrpg-tint);
     color: var(--ttrpg-ink);
 }
 
@@ -2416,6 +2446,7 @@ details[open]::details-content {
     border-radius: 50%;
     background: var(--ttrpg-accent);
     font-size: 1.25rem;
+    color: var(--ttrpg-on-accent);
 }
 
 .ttrpg-music__hint {
@@ -2645,7 +2676,7 @@ a.ttrpg-row__main:focus-visible,
 button.ttrpg-row__main:hover,
 button.ttrpg-row__main:focus-visible,
 button.ttrpg-row__main[aria-expanded='true'] {
-    background: rgb(255 255 255 / 0.05);
+    background: color-mix(in srgb, var(--ttrpg-ink) 5%, transparent);
 }
 
 /* A row that opens under itself, like a monster in the Monsters list. */
@@ -2670,7 +2701,7 @@ button.ttrpg-row__main {
    is clear where it ends and the next row starts. */
 .ttrpg-row--open {
     border-color: var(--ttrpg-edge);
-    background: rgb(255 255 255 / 0.04);
+    background: color-mix(in srgb, var(--ttrpg-ink) 4%, transparent);
 }
 
 .ttrpg-row--open > button.ttrpg-row__main {
@@ -2883,14 +2914,14 @@ button.ttrpg-row__main {
     flex: none;
     width: 12px;
     height: 12px;
-    border: 2px solid rgb(255 255 255 / 0.25);
+    border: 2px solid color-mix(in srgb, var(--ttrpg-ink) 25%, transparent);
     border-radius: 50%;
 }
 
 /* Whose turn it is in the initiative order, in the purple of their ring on the map. */
 .ttrpg-row--turn {
     border-radius: 10px;
-    background: color-mix(in srgb, var(--ttrpg-accent) 35%, transparent);
+    background: var(--ttrpg-tint);
 }
 
 /* A roll in the initiative order, before the name, wide enough for -99. */

@@ -13,8 +13,11 @@ import { useState, useSyncExternalStore, type ChangeEvent } from 'react';
 
 import type { Scenario } from '../types';
 
+import { defaultOutside, outsideColours } from '../map/colours';
 import { confirmAction } from '../services/confirm';
 import { fileSize } from '../services/images';
+
+import { RingPicker } from './RingPicker';
 
 interface ScenarioListProps
 {
@@ -34,6 +37,8 @@ interface ScenarioListProps
     onBackground: (file: File) => void;
     /** Takes the open map's picture away; the map keeps its size. */
     onRemoveBackground: () => void;
+    /** The colour around the open map, on every screen. */
+    onOutside: (colour: string) => void;
     /** The open map's picture's file size, for the tip of its button. Missing when unknown. */
     backgroundBytes?: number;
 }
@@ -92,6 +97,7 @@ export function ScenarioList({
     onPicture,
     onBackground,
     onRemoveBackground,
+    onOutside,
     backgroundBytes,
 }: ScenarioListProps)
 {
@@ -284,6 +290,9 @@ export function ScenarioList({
                             </button>
                         )}
                     </div>
+
+                    <h3 className="ttrpg-subhead">Around the map</h3>
+                    <RingPicker value={active.outside ?? defaultOutside} onChange={onOutside} label="Around the map" colours={outsideColours} />
 
                     <h3 className="ttrpg-subhead">New map</h3>
                     <div className="ttrpg-settings__choices">

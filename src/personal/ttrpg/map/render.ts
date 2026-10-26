@@ -4,15 +4,13 @@ import type { Cell, CreatureSize, Decal, Grid, HealthState, Point, Scenario, Tok
 import { conditionKind, type ConditionKind } from '../content/conditions.ts';
 
 import { toWorld, type Camera } from './camera.ts';
-import { accent, blood, bloodDark, danger, door as doorColour, faded, ground, heal, highlight, ink, steel, tempHp } from './colours.ts';
+import { accent, blood, bloodDark, danger, door as doorColour, faded, ground, heal, highlight, ink, defaultOutside, steel, tempHp } from './colours.ts';
 import { drawFog, type FogLayers, type FogLook } from './fog.ts';
 import { distance, type Area } from './geometry.ts';
 import { cellAt, cellCenter, cellCorners, hexRadius } from './grid.ts';
 import { healthState, stateOf } from './health.ts';
 import { cellsAcross, ridesOn } from './size.ts';
 
-/** Around the map, darker than any floor, so the edge of the map reads. */
-const outside = '#121113';
 /** The floor of a map without a picture, like the demo. */
 const floor = '#3a3530';
 
@@ -1111,7 +1109,7 @@ export function render(
     const { width, height, grid } = scenario;
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = outside;
+    ctx.fillStyle = scenario.outside ?? defaultOutside;
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
     const scale = viewport.dpr * camera.zoom;

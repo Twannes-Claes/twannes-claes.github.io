@@ -569,6 +569,8 @@ export interface Scenario
     height: number;
     /** Address of the background picture, or null for a plain floor, like the demo. */
     background: string | null;
+    /** The colour around the map on every screen, the default dark when missing. */
+    outside?: string;
     grid: Grid;
     /** Drawn in order, so the last one is on top. */
     props: Prop[];

@@ -55,8 +55,8 @@ on your portfolio.
   `--ttrpg-*` variables, not imported, so the portfolio's stylesheet stays out of the app.
 - **Fonts:** Onest for the UI, JetBrains Mono for numbers (feet, grid size), both already
   installed.
-- **Dark only.** It is used at a table, often in dim light, and the map is the bright thing on
-  screen. No light theme.
+- **Dark by default.** It is used at a table, often in dim light, and the map is the bright thing
+  on screen. Each screen can pick a light theme and its own accent, see 12, item 22.
 
 ### The map comes first
 
@@ -993,6 +993,16 @@ Built into play mode neatly, it should look and feel good.
 
 - A light theme next to the dark one.
 - A setting to change the accent colour, purple now.
+- **Built.** A Look section (`components/LookSettings.tsx`) on the home page and in the gear, on
+  the host's Editor tab and on the phone: Dark or Light, the ring colour swatches with any colour
+  from the last one for the accent. It is each person's own, kept in their browser by
+  `components/useLook.ts` and never sent anywhere. `components/Shell.tsx` puts it on the app's
+  root as `data-theme` and `--ttrpg-accent`. The light theme swaps the base colours in
+  `styles/ttrpg.css`, and every shade mixed from them follows. The map draws its paths, handles
+  and spawn point in the picked accent, lifted as before (`paintAccent` in `map/colours.ts`); the
+  map itself, the fog and the art stay as they are. The colour around a map is the map's own
+  (`outside` on the scenario), picked by the GM under its background in the map panel, greys and
+  creams or any colour, and every screen and phone draws it.
 
 ### 23. Abuse limits
 

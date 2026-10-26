@@ -1,4 +1,4 @@
-import { faArrowRightToBracket, faCamera, faEyeDropper, faPen, faPlus, faTrashCan } from '@fortawesome/free-solid-svg-icons';
+import { faArrowRightToBracket, faCamera, faPen, faPlus, faTrashCan } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useAuthToken } from '@convex-dev/auth/react';
 import { useMutation, useQuery } from 'convex/react';
@@ -14,42 +14,8 @@ import { confirmAction } from '../services/confirm';
 import { toAvatar } from '../services/images';
 
 import { Spinner } from './Feedback';
+import { RingPicker } from './RingPicker';
 import { SizePicker } from './SizePicker';
-
-interface RingPickerProps
-{
-    value: string;
-    onChange: (color: string) => void;
-    /** What it picks a colour for, for screen readers. */
-    label?: string;
-}
-
-/** A ring colour, or a pen's: one of ringColours, or any other from the last swatch. */
-export function RingPicker({ value, onChange, label = 'Ring colour' }: RingPickerProps)
-{
-    const custom = !ringColours.includes(value);
-
-    return (
-        <div className="ttrpg-rings" role="radiogroup" aria-label={label}>
-            {ringColours.map((color) => (
-                <button
-                    key={color}
-                    type="button"
-                    role="radio"
-                    aria-checked={value === color}
-                    aria-label={color}
-                    className="ttrpg-ring"
-                    style={{ background: color }}
-                    onClick={() => onChange(color)}
-                />
-            ))}
-            <label className={`ttrpg-ring ttrpg-ring--custom${custom ? ' ttrpg-ring--picked' : ''}`} title="Any colour" style={custom ? { background: value } : undefined}>
-                <FontAwesomeIcon icon={faEyeDropper} />
-                <input type="color" className="ttrpg-hidden-input" aria-label="Any colour" value={value} onChange={(event) => onChange(event.target.value)} />
-            </label>
-        </div>
-    );
-}
 
 interface PictureRingProps
 {
