@@ -759,6 +759,23 @@ Built into play mode neatly, it should look and feel good.
   in, then those in the order whose turn it is not; a player without a roll sits out. The roll pop-up is `components/RollSheet.tsx`, for group
   checks (17) too. Whose turn it is shows as a glowing ring on the map and in a toast; Up next is
   in the gear's Table tab. In the demo the GM types the test players' rolls.
+- **Built, rolling from the stats.** `initiativeBonus` in `map/presets.ts` reads what a token adds
+  to initiative: what a player filled in as their character's Initiative, in any system, as a feat
+  can have them roll another skill (on the character form when joining or on the account page,
+  and in the token's numbers, `tokens.initiative` and `characters.initiative`, optional); else
+  from its preset's stat block (`initiativeOf`), an Initiative line or else the DEX modifier, or
+  Perception in Pathfinder 2e, where a token's passive Perception works too. The GM's
+  panel splits the tokens not in yet into players and monsters, each with a button that throws its
+  bonus and one that opens the dice to roll by hand, and one that throws for each monster in turn,
+  its own d20 and bonus, each landing before the next (`dice.roll` now gives the dice too).
+  Closing the dice then rolls the rest in the GM's tab without the show, and the panel turns back
+  once the fight has them. A token in the order can be taken out again, back to no roll. Rows
+  glide to their new places as rolls come in, and the panel's height eases with them (`glide` in
+  `components/morph.ts`). The panel morphs into the
+  dice and back like the phone's pop-up (`components/morph.ts`), and the GM's throws start
+  hidden. A player's pop-up has a button that throws d20 and the
+  bonus in the dice, beside Roll dice. Without a bonus a button is greyed out, with a tip saying
+  so.
 
 ### 7. Monster presets
 
@@ -946,6 +963,12 @@ Built into play mode neatly, it should look and feel good.
   `sessions.check`. Each asked phone gets a `RollSheet` with that text and sends its number once (`play.rollCheck`); an initiative roll
   asked at the same time comes first. `play.status` gives the GM the whole check and a phone only
   the text and whether it rolled. Start and End session clear it.
+- **Built, rolling with the dice.** The `RollSheet` for initiative and checks has **Roll dice**,
+  which morphs into the dice (24), flat on one d20 with nothing added, without the log.
+  `dice.roll` gives the total, which fills the field to send, and once the roll shows its total in
+  the tray, flat or 3D, the sheet morphs back. The roll lands in the log like any other. On a
+  player's own phone their rolls show in their accent rather than their ring colour. The demo has
+  no phones, so no pop-up there.
 
 ### 18. Music
 
@@ -1030,12 +1053,14 @@ Built into play mode neatly, it should look and feel good.
 - A dice roller on the phones and in the GM view, for tables that do not roll at the table.
 - **Built.** A dice button on the phones, the table screen and the GM view's dock and Player view
   opens `components/DicePanel.tsx`: d4 to d100 as Material Design Icons dice (`content/diceIcons.ts`,
-  credited in the panel), how many, what to add, and in D&D 5e advantage or disadvantage on one
+  credited in its comment), how many, what to add, and in D&D 5e advantage or disadvantage on one
   d20. The server rolls (`dice.roll`, 30 a minute) and keeps the last 20 per session in the `rolls`
   table, which `dice.list` gives everyone at the table, newest first; the demo rolls in the tab.
   The newest is thrown into the tray as real 3D dice landing on those numbers
-  (`services/diceBox.ts`, three.js and physics, loaded only then), or flat icons with 3D off,
-  kept per screen. The GM can roll hidden, kept out of the players' list and off the table screen.
+  (`services/diceBox.ts`, three.js and physics, loaded only then, smaller the more dice), or with
+  3D off, kept per screen, flat icons that each tumble their own random way. The tray starts empty
+  on opening and on a switch of look. The GM can roll hidden, kept out of the players' list and off
+  the table screen.
   End session clears it.
 
 ### Build order

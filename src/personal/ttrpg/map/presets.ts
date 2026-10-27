@@ -1,5 +1,5 @@
-import type { Point, Preset, Scenario, Token } from '../types';
-import { statsOf } from '../content/statBlocks.ts';
+import type { GameSystem, Point, Preset, Scenario, Token } from '../types';
+import { initiativeOf, statsOf } from '../content/statBlocks.ts';
 
 import { cleanStats } from './health.ts';
 import { landingAt } from './size.ts';
@@ -36,4 +36,24 @@ export function monsterFrom(preset: Pick<Preset, 'name' | 'markdown' | 'color' |
         y: spot.y,
         ...numbers,
     };
+}
+
+/**
+ * What a token adds to its initiative roll: what its player filled in, in any system, as a feat
+ * can have them roll something else; from its preset's stat block, see initiativeOf; or in
+ * Pathfinder 2e from its passive Perception, as initiative there is a Perception check. Undefined
+ * when none says.
+ */
+export function initiativeBonus(token: Pick<Token, 'presetId' | 'perception' | 'initiative'>, presets: Pick<Preset, 'id' | 'markdown'>[], system: GameSystem): number | undefined
+{
+    if (token.initiative !== undefined)
+        return token.initiative;
+
+    const preset = presets.find((candidate) => candidate.id === token.presetId);
+    const written = preset ? initiativeOf(preset.markdown, system) : undefined;
+
+    if (written !== undefined)
+        return written;
+
+    return system === 'pf2e' && token.perception !== undefined ? token.perception - 10 : undefined;
 }

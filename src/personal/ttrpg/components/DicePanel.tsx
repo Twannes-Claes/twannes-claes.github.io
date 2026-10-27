@@ -1,6 +1,6 @@
 import { faDiceD20, faDiceD6, faEyeSlash } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
+import { useEffect, useEffectEvent, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import type DiceBox from '@3d-dice/dice-box-threejs';
 
 import type { DiceAsk, DiceRoll, GameSystem } from '../types';
@@ -20,13 +20,21 @@ interface DicePanelProps
     /** The session's last rolls, newest first. */
     rolls: DiceRoll[];
     /** Rolls on the server. Fails with the message to show. */
-    onRoll: (ask: DiceAsk) => Promise<void>;
+    onRoll: (ask: DiceAsk) => Promise<unknown>;
     /** Advantage and disadvantage are offered in D&D 5e only. */
     system: GameSystem;
     /** The GM, who can roll hidden. */
     host?: boolean;
     /** On a phone a press beside it closes it, like the settings. */
     phone?: boolean;
+    /** From the roll pop-up: the flat dice whatever this screen picked, and no log. */
+    quick?: boolean;
+    /** What the Add field starts at, like a bonus the roll pop-up throws with. */
+    modifier?: number;
+    /** The player's ring colour. Their own rolls show in this screen's accent instead. */
+    own?: string;
+    /** A roll in the tray has landed and shows its total. */
+    onLanded?: (roll: DiceRoll) => void;
     onClose: () => void;
 }
 
@@ -152,12 +160,21 @@ function throwOf(index: number)
  * The newest roll as flat dice tumbling into a tray, each landing on its number, then the total.
  * Keyed on the roll, so every new one on any phone plays it again.
  */
-function Tray({ roll, color, still }: { roll: DiceRoll; color: string; still: boolean })
+function Tray({ roll, color, still, onLanded }: { roll: DiceRoll; color: string; still: boolean; onLanded?: (roll: DiceRoll) => void })
 {
     const [throws] = useState(() => roll.dice.map((_, index) => throwOf(index)));
     // With an edge, the die not kept lands faded.
     const kept = roll.edge ? roll.dice.indexOf((roll.edge === 'advantage' ? Math.max : Math.min)(...roll.dice)) : -1;
     const done = Math.max(...throws.map(({ delay, ms }) => delay + ms));
+    const land = useEffectEvent(() => onLanded?.(roll));
+
+    // Once the total has popped in, see Total.
+    useEffect(() =>
+    {
+        const timer = setTimeout(land, still ? 0 : done + 260);
+
+        return () => clearTimeout(timer);
+    }, [done, still]);
 
     return (
         <div className={`ttrpg-dice__tray${still ? ' ttrpg-dice__tray--still' : ''}`} aria-live="polite" aria-label={`${roll.name} rolled ${diceName(roll)}: ${roll.total}`}>
@@ -200,11 +217,12 @@ function Tray({ roll, color, still }: { roll: DiceRoll; color: string; still: bo
  * size, by how many there are, takes a new scene to change, see where it is keyed. A new colour,
  * like the GM picking another accent, is for the next throw.
  */
-function Tray3D({ roll, color, scale }: { roll: DiceRoll; color: string; scale: number })
+function Tray3D({ roll, color, scale, onLanded }: { roll: DiceRoll; color: string; scale: number; onLanded?: (roll: DiceRoll) => void })
 {
     const [box, setBox] = useState<DiceBox | null>(null);
     const [landed, setLanded] = useState('');
     const [failed, setFailed] = useState(false);
+    const land = useEffectEvent(() => onLanded?.(roll));
     // The library takes one thing at a time, so a colour and a throw wait their turn.
     const queue = useRef(Promise.resolve());
     const notation = notationOf(roll);
@@ -258,11 +276,18 @@ function Tray3D({ roll, color, scale }: { roll: DiceRoll; color: string; scale: 
 
         queue.current = queue.current
             .then(() => box.roll(notation))
-            .then(() => setLanded(roll.id), () => setFailed(true));
+            .then(
+                () =>
+                {
+                    setLanded(roll.id);
+                    land();
+                },
+                () => setFailed(true),
+            );
     }, [box, notation, roll.id]);
 
     if (failed)
-        return <Tray roll={roll} color={color} still={false} />;
+        return <Tray roll={roll} color={color} still={false} onLanded={onLanded} />;
 
     return (
         <div className="ttrpg-dice__tray ttrpg-dice__tray--3d" aria-live="polite" aria-label={`${roll.name} rolled ${diceName(roll)}: ${roll.total}`}>
@@ -276,24 +301,27 @@ function Tray3D({ roll, color, scale }: { roll: DiceRoll; color: string; scale: 
  * The dice roller above the dock or the phone's buttons: pick a die, how many and what to add,
  * roll, and everyone at the table sees it in the log. The server rolls, see convex/dice.ts.
  */
-export function DicePanel({ rolls, onRoll, system, host = false, phone = false, onClose }: DicePanelProps)
+export function DicePanel({ rolls, onRoll, system, host = false, phone = false, quick = false, modifier: start = 0, own, onLanded, onClose }: DicePanelProps)
 {
     const [sides, setSides] = useState(20);
     const [count, setCount] = useState(1);
-    const [modifier, setModifier] = useState(0);
+    const [modifier, setModifier] = useState(start);
     const [edge, setEdge] = useState<DiceAsk['edge']>();
-    const [hidden, setHidden] = useState(false);
+    // The GM's rolls from their initiative start hidden, as monsters' are.
+    const [hidden, setHidden] = useState(quick);
     const [failure, setFailure] = useState('');
     const [busy, setBusy] = useState(false);
-    const [threeD, setThreeD] = useState(readThreeD);
+    const [threeD, setThreeD] = useState(() => !quick && readThreeD());
     // Without motion the flat tray, which then shows the dice as they landed.
     const calm = useMediaQuery('(prefers-reduced-motion: reduce)');
     // The last roll when the tray emptied, on opening or a switch of look. It shows only later ones.
     const [seen, setSeen] = useState<string | undefined>(rolls[0]?.id);
     const fresh = rolls[0] && rolls[0].id !== seen ? rolls[0] : undefined;
     const thrown = threeD && !calm;
-    // The GM's dice in the accent lifted, like their marks on the map, following a new pick.
-    const gm = lift(useLook().accent);
+    // The GM's dice, and a player's own on their phone, in the accent lifted, like the GM's marks on
+    // the map, following a new pick.
+    const accent = lift(useLook().accent);
+    const colourOf = (entry: DiceRoll) => (entry.color && entry.color !== own ? entry.color : accent);
     const edges = system === '5e' && sides === 20 && count === 1;
     const ask: DiceAsk = { sides, count, modifier, edge: edges ? edge : undefined, hidden: host && hidden };
 
@@ -323,7 +351,7 @@ export function DicePanel({ rolls, onRoll, system, host = false, phone = false, 
     };
 
     return (
-        <Popover title="Dice" className="ttrpg-dock-panel" dismissOnOutside={phone} onClose={onClose}>
+        <Popover title="Dice" className={`ttrpg-dock-panel${quick ? ' ttrpg-roll-swap ttrpg-roll-swap--still' : ''}`} dismissOnOutside={phone} onClose={onClose}>
             <form className="ttrpg-popover__body ttrpg-check-form" onSubmit={roll}>
                 <div className="ttrpg-dice__pick" role="group" aria-label="Die">
                     {diceSides.map((die) => (
@@ -380,36 +408,38 @@ export function DicePanel({ rolls, onRoll, system, host = false, phone = false, 
             {!fresh ? (
                 <div className={`ttrpg-dice__tray${thrown ? ' ttrpg-dice__tray--3d' : ''}`} />
             ) : thrown ? (
-                <Tray3D key={scaleOf(fresh)} roll={fresh} color={fresh.color ?? gm} scale={scaleOf(fresh)} />
+                <Tray3D key={scaleOf(fresh)} roll={fresh} color={colourOf(fresh)} scale={scaleOf(fresh)} onLanded={onLanded} />
             ) : (
-                <Tray key={fresh.id} roll={fresh} color={fresh.color ?? gm} still={calm} />
+                <Tray key={fresh.id} roll={fresh} color={colourOf(fresh)} still={calm} onLanded={onLanded} />
             )}
 
-            <div className="ttrpg-popover__scroll ttrpg-dice__log">
-                {rolls.length === 0 && <p className="ttrpg-empty">No rolls yet.</p>}
-                <ul className="ttrpg-rows">
-                    {rolls.map((entry) => (
-                        <li key={entry.id} className="ttrpg-row ttrpg-dice__roll">
-                            <span className="ttrpg-row__main ttrpg-row__main--swatch">
-                                <span className="ttrpg-swatch" style={{ background: entry.color ?? gm }} />
-                                <span className="ttrpg-row__text">
-                                    <span className="ttrpg-row__name">
-                                        {entry.name}
-                                        {entry.hidden && ', hidden'}
-                                    </span>
-                                    <span className="ttrpg-row__detail ttrpg-dice__detail">
-                                        <DieIcon sides={entry.sides} />
-                                        <span className="ttrpg-dice__name">{`${entry.count > 1 ? entry.count : ''}d${entry.sides}`}</span>
-                                        {entry.modifier !== 0 && <Extra modifier={entry.modifier} />}
-                                        {entry.edge && <span className="ttrpg-chip">{entry.edge}</span>}
+            {!quick && (
+                <div className="ttrpg-popover__scroll ttrpg-dice__log">
+                    {rolls.length === 0 && <p className="ttrpg-empty">No rolls yet.</p>}
+                    <ul className="ttrpg-rows">
+                        {rolls.map((entry) => (
+                            <li key={entry.id} className="ttrpg-row ttrpg-dice__roll">
+                                <span className="ttrpg-row__main ttrpg-row__main--swatch">
+                                    <span className="ttrpg-swatch" style={{ background: colourOf(entry) }} />
+                                    <span className="ttrpg-row__text">
+                                        <span className="ttrpg-row__name">
+                                            {entry.name}
+                                            {entry.hidden && ', hidden'}
+                                        </span>
+                                        <span className="ttrpg-row__detail ttrpg-dice__detail">
+                                            <DieIcon sides={entry.sides} />
+                                            <span className="ttrpg-dice__name">{`${entry.count > 1 ? entry.count : ''}d${entry.sides}`}</span>
+                                            {entry.modifier !== 0 && <Extra modifier={entry.modifier} />}
+                                            {entry.edge && <span className="ttrpg-chip">{entry.edge}</span>}
+                                        </span>
                                     </span>
                                 </span>
-                            </span>
-                            <strong>{entry.total}</strong>
-                        </li>
-                    ))}
-                </ul>
-            </div>
+                                <strong>{entry.total}</strong>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
         </Popover>
     );
 }

@@ -137,6 +137,8 @@ export interface Token
     ac?: number;
     /** Passive Perception, for the game master's secret checks. */
     perception?: number;
+    /** What a player adds to their initiative roll, as they filled it in, see initiativeBonus. */
+    initiative?: number;
     /** What a screen without the numbers sees instead, see HealthState. */
     state?: HealthState;
     /** What it suffers from, for everyone to see, see Condition. */
@@ -268,6 +270,8 @@ export interface Stats
     tempHp: number;
     ac: number;
     perception: number;
+    /** A player's initiative bonus, which they may leave out. */
+    initiative?: number;
 }
 
 /** A stored picture: where it loads from, and its size in pixels. */
@@ -411,7 +415,8 @@ export interface Live
     setCheck: (check: { text: string; asked: string[] } | null) => Promise<void>;
     /** The session's last dice rolls, newest first, the hidden ones too. */
     rolls: DiceRoll[];
-    roll: (ask: DiceAsk) => Promise<void>;
+    /** Gives the dice and the total, like convex/dice.ts. */
+    roll: (ask: DiceAsk) => Promise<Pick<DiceRoll, 'dice' | 'total'>>;
     /** Whoever comes after the current turn hears so. */
     upNext: boolean;
     setUpNext: (on: boolean) => Promise<void>;

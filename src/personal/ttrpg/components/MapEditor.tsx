@@ -468,7 +468,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
     // The test players off a live map, changed here in the tab.
     const testPlayers: Pick<Live, 'setStats' | 'setConditions' | 'setSize'> = {
-        setStats: (id, stats) => changeToken(id, (token) => ({ ...token, ...cleanStats(stats), conditions: conditionsAt(token.conditions, cleanStats(stats).hp) })),
+        setStats: (id, stats) => changeToken(id, (token) => ({ ...token, ...cleanStats(stats), initiative: cleanStats(stats).initiative, conditions: conditionsAt(token.conditions, cleanStats(stats).hp) })),
         setConditions: (id, conditions) => changeToken(id, (token) => ({ ...token, conditions })),
         setSize: (id, size) => changeToken(id, (token) => ({ ...token, size, ...resizedAt(active.grid, token, size) })),
     };
@@ -691,9 +691,17 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     // Off a live map the GM rolls in this tab, to try the dice.
     const rolls = liveMap ? liveMap.rolls : localRolls;
     const roll = (ask: DiceAsk) =>
-        liveMap
-            ? liveMap.roll(ask)
-            : Promise.resolve(setLocalRolls((current) => [{ id: crypto.randomUUID(), name: 'GM', ...ask, ...rollDice(ask, Math.random) }, ...current].slice(0, 20)));
+    {
+        if (liveMap)
+            return liveMap.roll(ask);
+
+        const rolled = rollDice(ask, Math.random);
+
+        setLocalRolls((current) => [{ id: crypto.randomUUID(), name: 'GM', ...ask, ...rolled }, ...current].slice(0, 20));
+
+        return Promise.resolve(rolled);
+    };
+
     const upNext = live ? live.upNext : demoUpNext;
     const setUpNext = (on: boolean) => (live ? fail(live.setUpNext(on)) : setDemoUpNext(on));
 
@@ -1408,7 +1416,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
             )}
 
             {mode === 'gm' && !pending && !idle && panel === 'initiative' && (
-                <InitiativePanel fight={fight} tokens={shown} system={system} onChange={setFight} onClose={() => setPanel(null)} />
+                <InitiativePanel fight={fight} tokens={shown} system={system} presets={monsterControls.presets} rolls={rolls} onRoll={roll} onError={message.error} onChange={setFight} onClose={() => setPanel(null)} />
             )}
 
             {/* In the Player view, as on the table screen, without the hidden rolls. */}

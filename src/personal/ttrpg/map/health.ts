@@ -85,7 +85,7 @@ export function downPlayer(token: Pick<Token, 'kind' | 'summonOf' | 'hp' | 'maxH
  */
 export function withoutNumbers<T extends Token>(token: T): T
 {
-    const hidden = { hp: undefined, maxHp: undefined, tempHp: undefined, ac: undefined, perception: undefined, downs: undefined };
+    const hidden = { hp: undefined, maxHp: undefined, tempHp: undefined, ac: undefined, perception: undefined, initiative: undefined, downs: undefined };
 
     return { ...token, ...hidden, state: stateOf(token) };
 }
@@ -112,5 +112,7 @@ export function cleanStats(stats: Stats): Stats
         tempHp: clean(stats.tempHp, statLimits.tempHp),
         ac: clean(stats.ac, statLimits.ac),
         perception: clean(stats.perception, statLimits.perception),
+        // Optional, left out when not given, and below zero too for a clumsy character.
+        ...(stats.initiative === undefined || !Number.isFinite(stats.initiative) ? {} : { initiative: clean(stats.initiative, 30, -20) }),
     };
 }

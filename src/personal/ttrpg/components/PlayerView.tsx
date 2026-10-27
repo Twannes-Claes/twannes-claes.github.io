@@ -23,6 +23,7 @@ import { highlight } from '../map/colours';
 import { penWidths } from '../map/drawings';
 import { defaultFogSettings } from '../map/fog';
 import { defaultBlood, downPlayer } from '../map/health';
+import { initiativeBonus } from '../map/presets';
 import type { FrameStats, PendingMove } from '../map/view';
 import { confirmAction } from '../services/confirm';
 import { buzz } from '../services/haptics';
@@ -223,8 +224,8 @@ function JoinForm({ sessionId, name }: JoinFormProps)
     };
 
     // A saved character joins as it is, picture and companions with it, see join in convex/play.ts.
-    const joinAs = ({ id, name, color, size, maxHp, ac, perception }: NonNullable<typeof saved>[number]) =>
-        join({ sessionId, password: password ?? '', name, color, size, maxHp, ac, perception, characterId: id }).then(joined);
+    const joinAs = ({ id, name, color, size, maxHp, ac, perception, initiative }: NonNullable<typeof saved>[number]) =>
+        join({ sessionId, password: password ?? '', name, color, size, maxHp, ac, perception, initiative, characterId: id }).then(joined);
 
     // Once it is back the page follows the token to the map, see Player.
     const takeBack = (id: Id<'tokens'>) =>
@@ -479,6 +480,11 @@ function Table({ sessionId, mine, frozen, fogLook, blood, secretSaves, system, f
     // A group check waits behind an initiative roll, so only one sheet shows at a time.
     const checking = !onTable && !rolling && check !== null && !check.rolled;
     const turnName = fight?.turn === 'enemy' ? 'Enemy' : tokens.find((candidate) => candidate.id === fight?.turn)?.name;
+    const ownToken = mine ? tokens.find((candidate) => candidate.id === mine) : undefined;
+    // The ring colour the server puts on this phone's rolls, which the dice show in its accent.
+    const ownColour = ownToken?.color;
+    // What the player filled in for their character, or in Pathfinder their Perception, see initiativeBonus.
+    const ownBonus = ownToken ? (initiativeBonus(ownToken, [], system) ?? null) : null;
 
     const sendRoll = (roll: number) =>
         rollInitiative({ sessionId, roll }).then(
@@ -490,13 +496,10 @@ function Table({ sessionId, mine, frozen, fogLook, blood, secretSaves, system, f
         );
 
     const sendDice = (ask: DiceAsk) =>
-        rollDice({ sessionId, ...ask }).then(
-            () => undefined,
-            (reason: unknown) =>
-            {
-                throw new Error(explain(reason, 'That roll did not go through. Try again.'));
-            },
-        );
+        rollDice({ sessionId, ...ask }).catch((reason: unknown) =>
+        {
+            throw new Error(explain(reason, 'That roll did not go through. Try again.'));
+        });
 
     const sendCheck = (roll: number) =>
         rollCheck({ sessionId, roll }).then(
@@ -640,15 +643,15 @@ function Table({ sessionId, mine, frozen, fogLook, blood, secretSaves, system, f
             )}
 
             {rolling && !pending && !targets && (
-                <RollSheet title="Roll initiative" note={system === 'pf2e' ? 'Usually your Perception' : undefined} onSend={sendRoll} />
+                <RollSheet title="Roll initiative" note={system === 'pf2e' ? 'Usually your Perception' : undefined} rolls={rolls ?? []} system={system} own={ownColour} bonus={ownBonus} onDice={sendDice} onSend={sendRoll} />
             )}
 
             {diceOpen && !pending && !targets && !rolling && !checking && (
-                <DicePanel rolls={rolls ?? []} onRoll={sendDice} system={system} phone onClose={() => setDiceOpen(false)} />
+                <DicePanel rolls={rolls ?? []} onRoll={sendDice} system={system} phone own={ownColour} onClose={() => setDiceOpen(false)} />
             )}
 
             {/* Keyed on the text, so a new check starts with an empty field. */}
-            {check && checking && !pending && !targets && <RollSheet key={check.text} title={check.text} onSend={sendCheck} />}
+            {check && checking && !pending && !targets && <RollSheet key={check.text} title={check.text} rolls={rolls ?? []} system={system} own={ownColour} onDice={sendDice} onSend={sendCheck} />}
 
             {!onTable && !pending && !targets && (
                 <div className="ttrpg-panel ttrpg-corner">
@@ -775,7 +778,7 @@ function Table({ sessionId, mine, frozen, fogLook, blood, secretSaves, system, f
                         Movement paused by the GM
                     </Toast>
                 )}
-                {fight && !fight.begun && (onTable || fight.rolled) && (
+                {fight && !fight.begun && (
                     <Toast kind="info" icon={faDiceD20}>
                         Rolling for initiative
                     </Toast>

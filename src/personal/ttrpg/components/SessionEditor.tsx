@@ -227,7 +227,11 @@ function Session({ sessionId, debug }: SessionEditorProps)
             check: status.check,
             setCheck: (check) => friendly(setCheck({ sessionId: id, check })),
             rolls: rolls ?? noRolls,
-            roll: (ask) => friendly(roll({ sessionId: id, ...ask })),
+            roll: (ask) =>
+                roll({ sessionId: id, ...ask }).catch((reason: unknown) =>
+                {
+                    throw new Error(explain(reason, 'That did not work. Check the connection and try again.'));
+                }),
             upNext: status.upNext,
             setUpNext: (on) => friendly(setUpNext({ sessionId: id, upNext: on })),
             presets: presets ?? noPresets,

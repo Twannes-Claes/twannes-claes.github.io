@@ -60,7 +60,7 @@ export const list = query({
     },
 });
 
-/** The host or a player at the table rolls. Only the host rolls hidden. */
+/** The host or a player rolls, giving the dice and the total. Only the host rolls hidden. */
 export const roll = mutation({
     args: {
         sessionId: v.id('sessions'),
@@ -86,13 +86,14 @@ export const roll = mutation({
         await limit(ctx, userId, 'roll');
 
         const ask = { sides, count, modifier: cleanRoll(modifier) ?? 0, edge: sides === 20 && count === 1 ? edge : undefined };
+        const rolled = rollDice(ask, Math.random);
 
         await ctx.db.insert('rolls', {
             sessionId,
             name: mine ? mine.name : 'GM',
             color: mine?.color,
             ...ask,
-            ...rollDice(ask, Math.random),
+            ...rolled,
             hidden: host && hidden ? true : undefined,
         });
 
@@ -105,6 +106,6 @@ export const roll = mutation({
         for (const doc of old.slice(maxRolls))
             await ctx.db.delete('rolls', doc._id);
 
-        return null;
+        return rolled;
     },
 });

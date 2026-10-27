@@ -52,8 +52,7 @@ html:has(.ttrpg[data-theme='light']) {
 }
 
 /* Pale colours picked to read on the dark theme, darkened to read on the light one. */
-.ttrpg[data-theme='light']
-    :is([class*='ttrpg-chip--'], .ttrpg-toast--info > svg, .ttrpg-error, .ttrpg-sheet__warning) {
+.ttrpg[data-theme='light'] :is([class*='ttrpg-chip--'], .ttrpg-error, .ttrpg-sheet__warning) {
     filter: brightness(0.55);
 }
 
@@ -276,7 +275,7 @@ html:has(.ttrpg[data-theme='light']) {
 }
 
 .ttrpg-toast--info > svg {
-    color: #9cc8f0;
+    color: var(--ttrpg-accent);
 }
 
 @keyframes ttrpg-drop {
@@ -420,8 +419,9 @@ html:has(.ttrpg[data-theme='light']) {
     color: var(--ttrpg-on-accent);
 }
 
-.ttrpg-segment:disabled,
-.ttrpg-icon-button:disabled {
+/* aria-disabled for one that still shows its tip, which disabled would keep the pointer off. */
+.ttrpg-segment:is(:disabled, [aria-disabled='true']),
+.ttrpg-icon-button:is(:disabled, [aria-disabled='true']) {
     opacity: 0.4;
     cursor: not-allowed;
 }
@@ -1160,7 +1160,8 @@ html:has(.ttrpg[data-theme='light']) {
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    min-height: 4.5rem;
+    /* Room for a total with its sum over it, so the tray does not grow as a roll lands. */
+    min-height: 5.5rem;
     padding: 0.625rem 0.875rem;
     overflow: hidden;
     border: 6px solid color-mix(in srgb, var(--ttrpg-accent) 30%, #1a1612);
@@ -1645,6 +1646,39 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
     padding: 1rem;
     translate: -50% 0;
     animation: ttrpg-rise 150ms var(--ttrpg-ease);
+}
+
+/* Room for the initiative bonus beside the dice and Send. */
+.ttrpg-sheet .ttrpg-popover__foot:has(> :nth-child(3)) {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+/* The roll sheet or the GM's initiative and the dice morph into each other, one box growing into
+   the next, see components/morph.ts. A box that came in by morphing has no rise of its own on
+   top. While it morphs its content keeps its full size and is cut off at the edge, so the dice's
+   scrolling parts do not shrink into scrollbars. */
+.ttrpg-roll-swap.ttrpg-roll-swap--still {
+    animation: none;
+}
+
+.ttrpg-roll-swap--morphing {
+    overflow: hidden;
+}
+
+.ttrpg-roll-swap--morphing > * {
+    flex-shrink: 0;
+}
+
+/* While its height eases after a change, its content keeps its size and sits on the bottom, where
+   the box stays put, so the rows glide into places that are already theirs, see glide in
+   components/morph.ts. */
+.ttrpg-roll-swap--gliding {
+    justify-content: flex-end;
+    overflow: hidden;
+}
+
+.ttrpg-roll-swap--gliding > * {
+    flex-shrink: 0;
 }
 
 .ttrpg-sheet__head {

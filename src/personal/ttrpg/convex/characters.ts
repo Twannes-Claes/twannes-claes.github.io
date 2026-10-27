@@ -33,6 +33,7 @@ interface CharacterFields
     maxHp: number;
     ac: number;
     perception: number;
+    initiative?: number;
 }
 
 /** The signed-in player's characters, by name. Null for an anonymous player, who keeps none. */
@@ -51,14 +52,14 @@ export const mine = query({
             .take(maxCharacters);
 
         const withCompanions = await Promise.all(
-            characters.map(async ({ _id, name, color, size, maxHp, ac, perception, avatar }) =>
+            characters.map(async ({ _id, name, color, size, maxHp, ac, perception, initiative, avatar }) =>
             {
                 const companions = await ctx.db
                     .query('companions')
                     .withIndex('by_characterId', (q) => q.eq('characterId', _id))
                     .take(10);
 
-                return { id: _id, name, color, size, maxHp, ac, perception, avatar, companions: companions.map((c) => ({ id: c._id, name: c.name, size: c.size, maxHp: c.maxHp, ac: c.ac, avatar: c.avatar })) };
+                return { id: _id, name, color, size, maxHp, ac, perception, initiative, avatar, companions: companions.map((c) => ({ id: c._id, name: c.name, size: c.size, maxHp: c.maxHp, ac: c.ac, avatar: c.avatar })) };
             }),
         );
 
@@ -177,11 +178,12 @@ export const save = mutation({
         maxHp: v.number(),
         ac: v.number(),
         perception: v.number(),
+        initiative: v.optional(v.number()),
     },
-    handler: async (ctx, { characterId, name, color, size, maxHp, ac, perception }) =>
+    handler: async (ctx, { characterId, name, color, size, maxHp, ac, perception, initiative }) =>
     {
         const userId = await requireAccount(ctx);
-        const stats = cleanStats({ hp: maxHp, maxHp, tempHp: 0, ac, perception });
+        const stats = cleanStats({ hp: maxHp, maxHp, tempHp: 0, ac, perception, initiative });
 
         if (!colourPattern.test(color))
             throw new ConvexError('Pick a ring colour.');
@@ -191,7 +193,7 @@ export const save = mutation({
         if (characterId)
             await ownCharacter(ctx, userId, characterId);
 
-        const saved = await saveCharacter(ctx, userId, characterId, { name: cleanName(name), color, size, maxHp: stats.maxHp, ac: stats.ac, perception: stats.perception });
+        const saved = await saveCharacter(ctx, userId, characterId, { name: cleanName(name), color, size, maxHp: stats.maxHp, ac: stats.ac, perception: stats.perception, initiative: stats.initiative });
 
         if (!saved)
             throw new ConvexError(`You can keep ${maxCharacters} characters at most.`);

@@ -58,6 +58,7 @@ interface Piece
     maxHp?: number;
     ac?: number;
     perception?: number;
+    initiative?: number;
     avatar?: string;
 }
 
@@ -69,6 +70,8 @@ interface Fields
     maxHp: number;
     ac: number;
     perception: number;
+    /** Only a character's, left out when not filled in. */
+    initiative?: number;
 }
 
 interface PieceFormProps
@@ -101,6 +104,7 @@ export function PieceForm({ title, start, character, ring, onSave, onDone, joini
     {
         const picture = form.get('picture');
         const avatar = picture instanceof File && picture.size > 0 ? toAvatar(picture) : Promise.resolve(null);
+        const initiative = String(form.get('initiative') ?? '').trim();
         const fields = {
             name: String(form.get('name')),
             color,
@@ -108,6 +112,7 @@ export function PieceForm({ title, start, character, ring, onSave, onDone, joini
             maxHp: Number(form.get('maxHp')),
             ac: Number(form.get('ac')),
             perception: Number(form.get('perception') ?? 10),
+            ...(initiative === '' ? {} : { initiative: Number(initiative) }),
         };
 
         return avatar.then(
@@ -160,6 +165,12 @@ export function PieceForm({ title, start, character, ring, onSave, onDone, joini
                     <label title="Passive Perception">
                         Perception
                         <input name="perception" type="number" inputMode="numeric" min={0} max={50} required defaultValue={start.perception} />
+                    </label>
+                )}
+                {character && (
+                    <label title="Your initiative modifier in your system, or the one a feat gives you">
+                        Initiative
+                        <input name="initiative" type="number" inputMode="numeric" min={-20} max={30} placeholder="+0" defaultValue={start.initiative} />
                     </label>
                 )}
             </div>

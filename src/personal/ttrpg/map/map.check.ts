@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import type { Cell, Drawing, GameSystem, Grid, Mark, Point, Scenario, Token, Wall } from '../types';
 import { cleanConditions } from '../content/conditions.ts';
-import { blocksOf, demoOgreStatBlock, spansOf, statBlockTemplates, statsOf } from '../content/statBlocks.ts';
+import { blocksOf, demoOgreStatBlock, initiativeOf, spansOf, statBlockTemplates, statsOf } from '../content/statBlocks.ts';
 
 import { toScreen, toWorld, zoomAt } from './camera.ts';
 import { createExplored, markSeen, packedFlag, packSeen, wasSeen } from './fog.ts';
@@ -23,6 +23,7 @@ import {
 import { applyHit, cleanStats, healthState, hitOn, withoutNumbers } from './health.ts';
 import { begun, cleanRoll, newFight, nextTurn, swapped, upNext, withoutRoll, withRoll } from './initiative.ts';
 import { extendPath, pathBlocked, pathFeet } from './path.ts';
+import { initiativeBonus } from './presets.ts';
 import { placedSize, propAt, snapCenter, snapSize } from './props.ts';
 import { anchorAt, footprint, footprintCenter, footprintKeys, landingAt, ridesOn } from './size.ts';
 import { spawnCells } from './spawn.ts';
@@ -761,6 +762,19 @@ assert.deepEqual(hitOn({ kind: 'npc', hp: 5, maxHp: 30, downs: true }, 'attack',
 
 // The example session's ogre preset gives the numbers its token starts with.
 assert.deepEqual(statsOf(demoOgreStatBlock), { name: 'Ogre', size: 'large', ac: 11, maxHp: 59, speed: 40, perception: 8 });
+
+// Initiative: the DEX modifier in 5e, an Initiative line over it, a bare DEX score worked out,
+// Perception in Pathfinder 2e, then a Pathfinder token's passive Perception without a preset.
+assert.equal(initiativeOf(demoOgreStatBlock, '5e'), -1);
+assert.equal(initiativeOf(statBlockTemplates['5e'], '5e'), 1);
+assert.equal(initiativeOf('**Initiative** +4 (14)\n**DEX** 18', '5e'), 4);
+assert.equal(initiativeOf('**DEX** 15', 'other'), 2);
+assert.equal(initiativeOf(statBlockTemplates.pf2e, 'pf2e'), 6);
+assert.equal(initiativeOf('# Rat', '5e'), undefined);
+assert.equal(initiativeBonus({ perception: 14 }, [], 'pf2e'), 4);
+assert.equal(initiativeBonus({ perception: 14 }, [], '5e'), undefined);
+assert.equal(initiativeBonus({ perception: 14, initiative: 5 }, [], '5e'), 5);
+assert.deepEqual(cleanStats({ hp: 5, maxHp: 5, tempHp: 0, ac: 10, perception: 10, initiative: -40 }).initiative, -20);
 
 // A companion shares its player's space: the smaller rides, the player at the same size, and
 // only while it stands on the other.

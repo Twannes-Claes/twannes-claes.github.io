@@ -250,3 +250,40 @@ export function statsOf(markdown: string): StatBlockStats
         perception: passive ? Number(passive[1]) : modifier === undefined ? undefined : 10 + modifier,
     };
 }
+
+/** A number as stat blocks print it, with the SRD's minus sign too. */
+const signed = (text: string) => Number(text.replace('−', '-'));
+
+/**
+ * The Dexterity modifier: under DEX in the ability table, like 12 (+1), or worked out from the
+ * score, also from a DEX line outside a table.
+ */
+function dexterityOf(lines: string[]): number | undefined
+{
+    const cellsOf = (line: string) => line.replace(/^\||\|$/g, '').split('|').map((cell) => plain(cell).trim());
+    const head = lines.findIndex((line) => line.startsWith('|') && cellsOf(line).some((cell) => /^dex$/i.test(cell)));
+    const row = head === -1 ? undefined : lines.slice(head + 1).find((line) => line.startsWith('|') && !/^[|\s:-]+$/.test(line));
+    const cell = row && cellsOf(row)[cellsOf(lines[head]).findIndex((name) => /^dex$/i.test(name))];
+    const found = cell ? /^(\d+)\s*(?:\(\s*([+−-]?\d+)\s*\))?/.exec(cell) : null;
+    const score = found ? Number(found[1]) : labelled(lines.join('\n'), 'DEX|Dexterity');
+
+    if (found?.[2] !== undefined)
+        return signed(found[2]);
+
+    return score === undefined ? undefined : Math.floor((score - 10) / 2);
+}
+
+/**
+ * What a creature adds to its initiative roll, by the system's rules: Perception in Pathfinder
+ * 2e, otherwise an Initiative line where the stat block has one, else the Dexterity modifier.
+ */
+export function initiativeOf(markdown: string, system: GameSystem): number | undefined
+{
+    const lines = linesOf(markdown);
+    const text = lines.join('\n');
+
+    if (system === 'pf2e')
+        return labelled(text, 'Perception');
+
+    return labelled(text, 'Initiative') ?? dexterityOf(lines);
+}

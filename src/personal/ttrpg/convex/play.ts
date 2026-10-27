@@ -311,7 +311,7 @@ export const tokens = query({
 export function tokenOf(doc: Doc<'tokens'>): Token
 {
     const { kind, name, color, size, speed, avatar, x, y, path, movedAt, hidden, tray, conditions } = doc;
-    const { hp, maxHp, tempHp, ac, perception, downs, presetId } = doc;
+    const { hp, maxHp, tempHp, ac, perception, initiative, downs, presetId } = doc;
 
     return {
         id: doc._id,
@@ -332,6 +332,7 @@ export function tokenOf(doc: Doc<'tokens'>): Token
         tempHp,
         ac,
         perception,
+        initiative,
         conditions,
         downs,
         presetId,
@@ -367,6 +368,7 @@ export const setStats = mutation({
         tempHp: v.number(),
         ac: v.number(),
         perception: v.number(),
+        initiative: v.optional(v.number()),
     },
     handler: async (ctx, { tokenId, ...stats }) =>
     {
@@ -383,7 +385,8 @@ export const setStats = mutation({
 
         const clean = cleanStats(stats);
 
-        await ctx.db.patch('tokens', tokenId, { ...clean, conditions: conditionsAt(token.conditions, clean.hp) });
+        // An initiative bonus left out is cleared, as the player emptied the field.
+        await ctx.db.patch('tokens', tokenId, { ...clean, initiative: clean.initiative, conditions: conditionsAt(token.conditions, clean.hp) });
 
         return null;
     },
@@ -567,15 +570,16 @@ export const join = mutation({
         maxHp: v.number(),
         ac: v.number(),
         perception: v.number(),
+        initiative: v.optional(v.number()),
         size: sizeValidator,
         /** A saved character the player picked, which this join changes, see characters.ts. */
         characterId: v.optional(v.id('characters')),
     },
-    handler: async (ctx, { sessionId, password, name, color, maxHp, ac, perception, size, characterId }) =>
+    handler: async (ctx, { sessionId, password, name, color, maxHp, ac, perception, initiative, size, characterId }) =>
     {
         const userId = await requireUser(ctx);
         // Joining at full health, with no temp HP yet.
-        const stats = cleanStats({ hp: maxHp, maxHp, tempHp: 0, ac, perception });
+        const stats = cleanStats({ hp: maxHp, maxHp, tempHp: 0, ac, perception, initiative });
         const session = await sessionOf(ctx, sessionId);
         const character = name.trim().slice(0, 30);
 
@@ -597,7 +601,7 @@ export const join = mutation({
             throw new ConvexError('Pick a ring colour.');
 
         // Signed in with Discord, the character is kept for next time, picture and all.
-        const saved = await saveCharacter(ctx, userId, characterId, { name: character, color, size, maxHp: stats.maxHp, ac: stats.ac, perception: stats.perception });
+        const saved = await saveCharacter(ctx, userId, characterId, { name: character, color, size, maxHp: stats.maxHp, ac: stats.ac, perception: stats.perception, initiative: stats.initiative });
         const kept = saved ? { characterId: saved._id, ...(saved.avatar ? { avatar: saved.avatar } : {}) } : {};
         const existing = await ownToken(ctx, sessionId, userId);
 
@@ -606,7 +610,7 @@ export const join = mutation({
             const stood = await scenarioOf(ctx, sessionId, existing.scenarioId);
             const at = stood ? resizedAt(stood.grid, existing, size) : existing;
 
-            await ctx.db.patch('tokens', existing._id, { name: character, color, size, x: at.x, y: at.y, ...stats, ...kept });
+            await ctx.db.patch('tokens', existing._id, { name: character, color, size, x: at.x, y: at.y, ...stats, initiative: stats.initiative, ...kept });
 
             return existing._id;
         }

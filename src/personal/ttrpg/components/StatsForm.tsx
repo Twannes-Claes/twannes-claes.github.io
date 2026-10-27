@@ -56,6 +56,7 @@ export function StatsForm({ token, onSave }: StatsFormProps)
     {
         const number = (field: string) => Number(form.get(field));
         const maxHp = number('maxHp');
+        const initiative = String(form.get('initiative') ?? '').trim();
 
         return unhurried(onSave({
             // An empty HP field means full health, the usual reason to leave it.
@@ -64,6 +65,8 @@ export function StatsForm({ token, onSave }: StatsFormProps)
             tempHp: number('tempHp'),
             ac: number('ac'),
             perception: number('perception'),
+            // Empty leaves it out, as a monster's comes from its stat block.
+            ...(initiative === '' ? {} : { initiative: Number(initiative) }),
         }))
             .then(() => '')
             .catch((reason: Error) => reason.message);
@@ -72,7 +75,7 @@ export function StatsForm({ token, onSave }: StatsFormProps)
     return (
         // Keyed on the numbers, so a change from elsewhere, like a hit, fills the fields anew.
         <form
-            key={[token.hp, token.maxHp, token.tempHp, token.ac, token.perception].join()}
+            key={[token.hp, token.maxHp, token.tempHp, token.ac, token.perception, token.initiative].join()}
             action={save}
             className="ttrpg-stats-form ttrpg-settings"
         >
@@ -96,6 +99,12 @@ export function StatsForm({ token, onSave }: StatsFormProps)
                 Perception
                 <input name="perception" type="number" inputMode="numeric" min={0} max={50} defaultValue={token.perception ?? 10} />
             </label>
+            {token.kind === 'player' && (
+                <label title="What this character adds to an initiative roll">
+                    Initiative
+                    <input name="initiative" type="number" inputMode="numeric" min={-20} max={30} placeholder="+0" defaultValue={token.initiative} />
+                </label>
+            )}
             {failure && (
                 <p className="ttrpg-error" role="alert">
                     {failure}

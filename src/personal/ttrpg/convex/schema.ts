@@ -184,6 +184,8 @@ export default defineSchema({
         ac: v.optional(v.number()),
         /** Passive Perception. */
         perception: v.optional(v.number()),
+        /** A player's initiative bonus, as they filled it in. */
+        initiative: v.optional(v.number()),
         /** For everyone to see, kept to the session's list, see cleanConditions. */
         conditions: v.optional(v.array(conditionValidator)),
         /** A monster that goes down at 0 HP instead of dying. For the host, like the numbers. */
@@ -402,6 +404,7 @@ export default defineSchema({
         maxHp: v.number(),
         ac: v.number(),
         perception: v.number(),
+        initiative: v.optional(v.number()),
         /** A 256 px picture in Convex storage, which every token joined as it shows. */
         avatar: v.optional(v.string()),
         avatarId: v.optional(v.id('_storage')),
