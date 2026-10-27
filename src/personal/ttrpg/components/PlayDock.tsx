@@ -2,6 +2,7 @@ import {
     faBroom,
     faCloud,
     faCompress,
+    faDice,
     faDiceD20,
     faDragon,
     faDrawPolygon,
@@ -74,6 +75,9 @@ interface PlayDockProps
     /** Opens or closes the music, see MusicPanel.tsx. */
     onMusic: () => void;
     musicOpen: boolean;
+    /** Opens or closes the dice, see DicePanel.tsx. */
+    onDice?: () => void;
+    diceOpen?: boolean;
 }
 
 /**
@@ -107,6 +111,8 @@ export function PlayDock({
     checkOpen,
     onMusic,
     musicOpen,
+    onDice,
+    diceOpen = false,
 }: PlayDockProps)
 {
     const { fullscreen, toggle } = useFullscreen();
@@ -236,6 +242,11 @@ export function PlayDock({
                     <FontAwesomeIcon icon={faListCheck} />
                     Check
                 </button>
+                {onDice && (
+                    <button type="button" className="ttrpg-segment" aria-pressed={diceOpen} aria-expanded={diceOpen} aria-label="Dice" title="Roll dice" onClick={onDice}>
+                        <FontAwesomeIcon icon={faDice} />
+                    </button>
+                )}
             </div>
             {onMonsters && (
                 <div className="ttrpg-dock__group">

@@ -4,7 +4,7 @@ import { ConvexError } from 'convex/values';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import type { Decal, Draft, Drawing, Live, PictureBytes, Preset, PropPicture, Scenario, SharedMark, Token, Track } from '../types';
+import type { Decal, DiceRoll, Draft, Drawing, Live, PictureBytes, Preset, PropPicture, Scenario, SharedMark, Token, Track } from '../types';
 
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
@@ -61,6 +61,7 @@ const noDrafts: Draft[] = [];
 const noMarks: SharedMark[] = [];
 const noDrawings: Drawing[] = [];
 const noDecals: Decal[] = [];
+const noRolls: DiceRoll[] = [];
 const noPresets: Preset[] = [];
 const noTracks: Track[] = [];
 const noMonsters: Live['monsters'] = [];
@@ -120,6 +121,8 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const setInitiative = useMutation(api.play.setInitiative);
     const setUpNext = useMutation(api.play.setUpNext);
     const setCheck = useMutation(api.play.setCheck);
+    const rolls = useQuery(api.dice.list, following ? { sessionId: id } : 'skip');
+    const roll = useMutation(api.dice.roll);
     const startSession = useMutation(api.play.start);
     const endSession = useMutation(api.play.end);
     const freezeSession = useMutation(api.play.freeze);
@@ -223,6 +226,8 @@ function Session({ sessionId, debug }: SessionEditorProps)
             setInitiative: (fight) => friendly(setInitiative({ sessionId: id, initiative: fight })),
             check: status.check,
             setCheck: (check) => friendly(setCheck({ sessionId: id, check })),
+            rolls: rolls ?? noRolls,
+            roll: (ask) => friendly(roll({ sessionId: id, ...ask })),
             upNext: status.upNext,
             setUpNext: (on) => friendly(setUpNext({ sessionId: id, upNext: on })),
             presets: presets ?? noPresets,

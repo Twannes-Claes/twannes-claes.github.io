@@ -409,6 +409,9 @@ export interface Live
     check: GroupCheck | null;
     /** Sends a new check to the asked players' phones, or with null closes it. */
     setCheck: (check: { text: string; asked: string[] } | null) => Promise<void>;
+    /** The session's last dice rolls, newest first, the hidden ones too. */
+    rolls: DiceRoll[];
+    roll: (ask: DiceAsk) => Promise<void>;
     /** Whoever comes after the current turn hears so. */
     upNext: boolean;
     setUpNext: (on: boolean) => Promise<void>;
@@ -476,6 +479,30 @@ export interface GroupCheck
     /** The players' tokens the GM sent it to. */
     asked: string[];
     rolls: { tokenId: string; roll: number }[];
+}
+
+/** What someone asks the dice roller for, see components/DicePanel.tsx. */
+export interface DiceAsk
+{
+    sides: number;
+    count: number;
+    modifier: number;
+    /** Two d20s, keeping the higher or the lower. Only on one d20. */
+    edge?: 'advantage' | 'disadvantage';
+    /** Only the GM sees it. Only the GM can roll one. */
+    hidden?: boolean;
+}
+
+/** A roll in the session's log, which everyone at the table sees, see convex/dice.ts. */
+export interface DiceRoll extends DiceAsk
+{
+    id: string;
+    /** The player's token, or GM. */
+    name: string;
+    /** The player's ring colour. Missing for the GM. */
+    color?: string;
+    dice: number[];
+    total: number;
 }
 
 /** A group check as a phone hears of it: what to roll, and whether it has. */

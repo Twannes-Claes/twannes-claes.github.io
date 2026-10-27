@@ -6,6 +6,7 @@ import { demoOgreStatBlock } from '../content/statBlocks';
 import type { Id } from './_generated/dataModel';
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireHost, requireSession } from './access';
+import { clearRolls } from './dice';
 import { scenarioValidator, systemValidator } from './schema';
 import { refreshSight, tokensOf } from './sight';
 import { dropFile, totalBytes } from './usage';
@@ -228,6 +229,7 @@ export const remove = mutation({
         for (const decal of decals)
             await ctx.db.delete('decals', decal._id);
 
+        await clearRolls(ctx, sessionId);
         await ctx.db.delete('sessions', sessionId);
 
         return null;

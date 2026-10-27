@@ -18,6 +18,7 @@ import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireSession, requireUser } from './access';
 import { saveCharacter } from './characters';
+import { clearRolls } from './dice';
 import { limit, spend } from './limits';
 import { bloodSettingsValidator, conditionValidator, fogSettingsValidator, initiativeValidator, sizeValidator } from './schema';
 import { refreshSight, tokensOf, tokensOn } from './sight';
@@ -1407,6 +1408,7 @@ export const end = mutation({
             await refreshSight(ctx, sessionId, scenario);
 
         await clearDrawings(ctx, sessionId);
+        await clearRolls(ctx, sessionId);
 
         return null;
     },

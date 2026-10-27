@@ -322,6 +322,19 @@ export default defineSchema({
         /** When the current minute of counting began. */
         since: v.number(),
     }).index('by_sessionId', ['sessionId']),
+    /** The last dice rolls of a session, at most maxRolls, see DiceRoll in types.ts and dice.ts. */
+    rolls: defineTable({
+        sessionId: v.id('sessions'),
+        name: v.string(),
+        color: v.optional(v.string()),
+        sides: v.number(),
+        count: v.number(),
+        modifier: v.number(),
+        edge: v.optional(v.union(v.literal('advantage'), v.literal('disadvantage'))),
+        hidden: v.optional(v.boolean()),
+        dice: v.array(v.number()),
+        total: v.number(),
+    }).index('by_sessionId', ['sessionId']),
     /** How often each player did something lately, so a script cannot spam it, see limits.ts. */
     limits: defineTable({
         userId: v.id('users'),

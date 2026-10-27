@@ -1025,6 +1025,19 @@ Built into play mode neatly, it should look and feel good.
   "Too many tries". Pings and wrong passwords keep their own. Someone signing in anonymously again
   starts over, as a mutation cannot see who is behind an account.
 
+### 24. Dice
+
+- A dice roller on the phones and in the GM view, for tables that do not roll at the table.
+- **Built.** A dice button on the phones, the table screen and the GM view's dock and Player view
+  opens `components/DicePanel.tsx`: d4 to d100 as Material Design Icons dice (`content/diceIcons.ts`,
+  credited in the panel), how many, what to add, and in D&D 5e advantage or disadvantage on one
+  d20. The server rolls (`dice.roll`, 30 a minute) and keeps the last 20 per session in the `rolls`
+  table, which `dice.list` gives everyone at the table, newest first; the demo rolls in the tab.
+  The newest is thrown into the tray as real 3D dice landing on those numbers
+  (`services/diceBox.ts`, three.js and physics, loaded only then), or flat icons with 3D off,
+  kept per screen. The GM can roll hidden, kept out of the players' list and off the table screen.
+  End session clears it.
+
 ### Build order
 
 1 first, since it splits what the GM sees from what the players see, which everything after it
@@ -1042,7 +1055,6 @@ on their own.
 | Better decals    | Blood, bodies and loot from art the GM uploads, instead of drawn in code                  |
 | Lights           | The `.dd2vtt` light sources, for dark dungeons                                            |
 | Smaller pictures | Shrink map and prop uploads further, to cut file egress (the bulk of it, not the queries) |
-| Dice             | A dice roller on the phones, for tables that do not roll at the table                     |
 | Spell effects    | After a ruler area is drawn, pick an element and it plays there on every screen, in code  |
 
 ### Dropped

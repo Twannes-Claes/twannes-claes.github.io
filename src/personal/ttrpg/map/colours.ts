@@ -11,7 +11,7 @@ export const ground = '#1e1d1f';
 export const defaultAccent = '#683c9b';
 
 /** The accent made light and a little more vivid, as six-digit hex. */
-function lift(colour: string): string
+export function lift(colour: string): string
 {
     const [r, g, b] = [1, 3, 5].map((at) => parseInt(colour.slice(at, at + 2), 16) / 255);
     const max = Math.max(r, g, b);

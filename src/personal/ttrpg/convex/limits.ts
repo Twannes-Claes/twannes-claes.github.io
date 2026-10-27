@@ -16,6 +16,8 @@ const rates = {
     upload: { max: 60, window: 10 * minute },
     move: { max: 60, window: minute },
     hit: { max: 60, window: minute },
+    /** Dice rolls, see dice.ts. */
+    roll: { max: 30, window: minute },
     /** Paths, rulers and lines, sent every 150 ms while dragging, see view.ts. */
     drag: { max: 600, window: minute },
 };

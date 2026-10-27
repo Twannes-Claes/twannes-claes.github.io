@@ -1,8 +1,8 @@
-import { faCheck, faDiceD20, faHatWizard, faPen, faSnowflake, faTriangleExclamation, faTv } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faDice, faDiceD20, faHatWizard, faPen, faSnowflake, faTriangleExclamation, faTv } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useEffectEvent, useRef, useState, type DragEvent, type MouseEvent } from 'react';
 
-import type { BloodSettings, Decal, Drawing, FogSettings, GameSystem, GroupCheck, HitKind, Initiative, Live, MonsterControls, MusicControls, PictureBytes, Pen, Ping, Point, Preset, PropPicture, Scenario, SharedHit, Store, Token, Track } from '../types';
+import type { BloodSettings, Decal, DiceAsk, DiceRoll, Drawing, FogSettings, GameSystem, GroupCheck, HitKind, Initiative, Live, MonsterControls, MusicControls, PictureBytes, Pen, Ping, Point, Preset, PropPicture, Scenario, SharedHit, Store, Token, Track } from '../types';
 
 import { cleanConditions } from '../content/conditions';
 import { blankScenario, demoTokens } from '../content/scenarios';
@@ -11,6 +11,7 @@ import { demoOgrePreset } from '../content/statBlocks';
 import { gameSystems } from '../content/systems';
 import { highlight, ringColours } from '../map/colours';
 import { penWidths } from '../map/drawings';
+import { rollDice } from '../map/dice';
 import { defaultFogSettings } from '../map/fog';
 import { cleanStats, conditionsAt, defaultBlood, downedPool, hitOn, withoutNumbers, withoutSaves } from '../map/health';
 import { nextTurn } from '../map/initiative';
@@ -30,6 +31,7 @@ import { FogPanel } from './FogPanel';
 import { AttackButton, HitSheet } from './HitSheet';
 import { GridPanel } from './GridPanel';
 import { CheckPanel } from './CheckPanel';
+import { DicePanel } from './DicePanel';
 import { InitiativePanel } from './InitiativePanel';
 import { LiveControls, Players } from './LiveControls';
 import { MapCanvas } from './MapCanvas';
@@ -168,7 +170,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const [frozen, setFrozen] = useState(false);
     const [playTool, setPlayTool] = useState<PlayTool>('open-doors');
     // The one panel open above the play dock.
-    const [panel, setPanel] = useState<'monsters' | 'fog' | 'initiative' | 'check' | 'music' | null>(null);
+    const [panel, setPanel] = useState<'monsters' | 'fog' | 'initiative' | 'check' | 'music' | 'dice' | null>(null);
     // The music panel stays once opened, so it plays on in Edit and while closed.
     const [musicOpened, setMusicOpened] = useState(false);
     // The demo's music, kept in this tab.
@@ -189,6 +191,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     // The fight off a live map, with the test players, and whether Up next is on in the demo.
     const [localFight, setLocalFight] = useState<Initiative | null>(null);
     const [localCheck, setLocalCheck] = useState<GroupCheck | null>(null);
+    const [localRolls, setLocalRolls] = useState<DiceRoll[]>([]);
     const [demoUpNext, setDemoUpNext] = useState(false);
     // The lines drawn off a live map, in this tab, each on the map it was drawn on.
     const [pen, setPen] = useState<Pen>({ width: penWidths.start });
@@ -685,6 +688,12 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     // Off a live map nobody can answer it, but the GM can still try the panel.
     const check = liveMap ? liveMap.check : localCheck;
     const setCheck = (next: { text: string; asked: string[] } | null) => (liveMap ? fail(liveMap.setCheck(next)) : setLocalCheck(next && { ...next, rolls: [] }));
+    // Off a live map the GM rolls in this tab, to try the dice.
+    const rolls = liveMap ? liveMap.rolls : localRolls;
+    const roll = (ask: DiceAsk) =>
+        liveMap
+            ? liveMap.roll(ask)
+            : Promise.resolve(setLocalRolls((current) => [{ id: crypto.randomUUID(), name: 'GM', ...ask, ...rollDice(ask, Math.random) }, ...current].slice(0, 20)));
     const upNext = live ? live.upNext : demoUpNext;
     const setUpNext = (on: boolean) => (live ? fail(live.setUpNext(on)) : setDemoUpNext(on));
 
@@ -758,7 +767,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 ? () => kickPlayer(liveMap, menuToken.id, menuToken.name, message.done, message.error)
                 : () => removeTestPlayer(menuToken.id);
 
-    const togglePanel = (next: 'monsters' | 'fog' | 'initiative' | 'check' | 'music') => setPanel((open) => (open === next ? null : next));
+    const togglePanel = (next: 'monsters' | 'fog' | 'initiative' | 'check' | 'music' | 'dice') => setPanel((open) => (open === next ? null : next));
 
     const fogSettings = fogDraft ?? (live ? (live.fogLook ?? defaultFogSettings) : demoFog);
 
@@ -1352,6 +1361,8 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                         onNextTurn={fight?.begun ? () => setFight(nextTurn(fight, (id) => shown.some((token) => token.id === id))) : undefined}
                         onCheck={() => togglePanel('check')}
                         checkOpen={panel === 'check'}
+                        onDice={() => togglePanel('dice')}
+                        diceOpen={panel === 'dice'}
                         onMusic={() =>
                         {
                             setMusicOpened(true);
@@ -1379,6 +1390,9 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                         start
                     />
                     <AttackButton onClick={startTargets} />
+                    <button type="button" className="ttrpg-segment" aria-pressed={panel === 'dice'} aria-expanded={panel === 'dice'} aria-label="Dice" title="Roll dice" onClick={() => togglePanel('dice')}>
+                        <FontAwesomeIcon icon={faDice} />
+                    </button>
                 </div>
             )}
 
@@ -1395,6 +1409,17 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
             {mode === 'gm' && !pending && !idle && panel === 'initiative' && (
                 <InitiativePanel fight={fight} tokens={shown} system={system} onChange={setFight} onClose={() => setPanel(null)} />
+            )}
+
+            {/* In the Player view, as on the table screen, without the hidden rolls. */}
+            {mode !== 'edit' && !pending && !idle && panel === 'dice' && (
+                <DicePanel
+                    rolls={mode === 'gm' ? rolls : rolls.filter((entry) => !entry.hidden)}
+                    onRoll={roll}
+                    system={system}
+                    host={mode === 'gm'}
+                    onClose={() => setPanel(null)}
+                />
             )}
 
             {mode === 'gm' && !pending && !idle && panel === 'check' && (

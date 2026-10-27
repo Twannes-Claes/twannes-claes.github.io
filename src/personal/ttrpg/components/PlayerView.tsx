@@ -1,5 +1,6 @@
 import {
     faCompress,
+    faDice,
     faDiceD20,
     faExpand,
     faForwardStep,
@@ -14,7 +15,7 @@ import { useConvex, useMutation, useQuery } from 'convex/react';
 import { ConvexError } from 'convex/values';
 import { useActionState, useEffect, useState, type ReactNode } from 'react';
 
-import type { BloodSettings, FogSettings, GameSystem, HitKind, Pen, PlayerCheck, PlayerFight, Scenario } from '../types';
+import type { BloodSettings, DiceAsk, FogSettings, GameSystem, HitKind, Pen, PlayerCheck, PlayerFight, Scenario } from '../types';
 
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
@@ -32,6 +33,7 @@ import { sendDoor } from '../services/tableChannel';
 import { Backend } from './Backend';
 import { CharacterList, PieceForm } from './CharacterList';
 import { ConditionPicker } from './ConditionPicker';
+import { DicePanel } from './DicePanel';
 import { DrawPicker, type Sketch } from './DrawPicker';
 import { Loading, Spinner, Toast, Toasts } from './Feedback';
 import { MapCanvas } from './MapCanvas';
@@ -395,6 +397,9 @@ function Table({ sessionId, mine, frozen, fogLook, blood, secretSaves, system, f
     const saveConditions = useMutation(api.play.setConditions);
     const rollInitiative = useMutation(api.play.rollInitiative);
     const rollCheck = useMutation(api.play.rollCheck);
+    const rolls = useQuery(api.dice.list, { sessionId, asPlayer: onTable });
+    const rollDice = useMutation(api.dice.roll);
+    const [diceOpen, setDiceOpen] = useState(false);
     const endTurn = useMutation(api.play.endTurn);
     const authToken = useAuthToken();
     const [pending, setPending] = useState<PendingMove | null>(null);
@@ -477,6 +482,15 @@ function Table({ sessionId, mine, frozen, fogLook, blood, secretSaves, system, f
 
     const sendRoll = (roll: number) =>
         rollInitiative({ sessionId, roll }).then(
+            () => undefined,
+            (reason: unknown) =>
+            {
+                throw new Error(explain(reason, 'That roll did not go through. Try again.'));
+            },
+        );
+
+    const sendDice = (ask: DiceAsk) =>
+        rollDice({ sessionId, ...ask }).then(
             () => undefined,
             (reason: unknown) =>
             {
@@ -609,6 +623,9 @@ function Table({ sessionId, mine, frozen, fogLook, blood, secretSaves, system, f
                     />
                     {/* Frozen, or waiting for their turn, players cannot attack, see play.hit. */}
                     <AttackButton onClick={startTargets} disabled={held && !onTable} />
+                    <button type="button" className="ttrpg-segment" aria-pressed={diceOpen} aria-expanded={diceOpen} aria-label="Dice" title="Roll dice" onClick={() => setDiceOpen(!diceOpen)}>
+                        <FontAwesomeIcon icon={faDice} />
+                    </button>
                     {myTurn && (
                         <button
                             type="button"
@@ -624,6 +641,10 @@ function Table({ sessionId, mine, frozen, fogLook, blood, secretSaves, system, f
 
             {rolling && !pending && !targets && (
                 <RollSheet title="Roll initiative" note={system === 'pf2e' ? 'Usually your Perception' : undefined} onSend={sendRoll} />
+            )}
+
+            {diceOpen && !pending && !targets && !rolling && !checking && (
+                <DicePanel rolls={rolls ?? []} onRoll={sendDice} system={system} phone onClose={() => setDiceOpen(false)} />
             )}
 
             {/* Keyed on the text, so a new check starts with an empty field. */}
