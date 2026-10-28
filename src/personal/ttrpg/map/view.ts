@@ -1,4 +1,4 @@
-import type { BloodSettings, Cell, CreatureSize, Decal, Draft, Drawing, FogSettings, GameSystem, Mark, Pen, Point, PropPicture, Scenario, SharedFog, SharedHit, SharedMark, Token } from '../types';
+import type { BloodSettings, Cell, CreatureSize, Decal, Draft, Drawing, FogSettings, GameSystem, Mark, Pen, Point, Prop, PropPicture, Scenario, SharedFog, SharedHit, SharedMark, Token } from '../types';
 
 import { buzz } from '../services/haptics.ts';
 
@@ -48,7 +48,7 @@ import {
 import { propAt } from './props.ts';
 import { anchorAt, footprint, footprintCenter, footprintKeys, landingAt, partners } from './size.ts';
 import { drawLine, penWidths } from './drawings.ts';
-import { createTool, drawBox, drawMark, fingerGap, type MapTool, type ToolId, type ToolPointer } from './tools.ts';
+import { createTool, drawBox, drawMark, drawPropGhost, fingerGap, type MapTool, type ToolId, type ToolPointer } from './tools.ts';
 import { insidePolygon, sightSegments, visibilityPolygon, type Segment } from './visibility.ts';
 import { startWalk, walkAt, type Walk } from './walk.ts';
 
@@ -197,6 +197,8 @@ export interface MapView
      * the map or lands.
      */
     setGhost: (ghost: { monster: Pick<Token, 'name' | 'color' | 'avatar' | 'size'>; at: Point; stack: boolean } | null) => void;
+    /** A prop dragged from the library, drawn where it would land. Null once it leaves or lands. */
+    setPropGhost: (prop: Prop | null) => void;
     /** What killed monsters left on the map, see Decal. */
     setDecals: (decals: Decal[]) => void;
     /** Which blood shows, see BloodSettings. */
@@ -300,6 +302,8 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     let selection: string[] | null = null;
     /** A monster dragged from the presets or the tray over the map, see setGhost. */
     let ghost: { monster: Pick<Token, 'name' | 'color' | 'avatar' | 'size'>; at: Point; stack: boolean } | null = null;
+    /** A prop dragged from the library over the map, see setPropGhost. */
+    let propGhost: Prop | null = null;
     /** A box being dragged on empty ground with the Select tool, in world pixels. */
     let boxing: { pointerId: number; start: Point; end: Point; add: boolean } | null = null;
     let route: Route | null = null;
@@ -1072,6 +1076,10 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             drawMark(context, mark, camera.zoom, scenario, mark.color ?? highlight, system);
 
         tool?.draw(context, camera.zoom, scenario);
+
+        if (propGhost)
+            drawPropGhost(context, propGhost, loaded(propGhost.src), camera.zoom);
+
 
         for (const ping of pings)
             drawPing(context, ping, (time - ping.start) / pingLife, camera.zoom, !calm.matches);
@@ -2033,6 +2041,11 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         setGhost: (next) =>
         {
             ghost = next;
+            redraw();
+        },
+        setPropGhost: (next) =>
+        {
+            propGhost = next;
             redraw();
         },
         setSelection: (ids) =>

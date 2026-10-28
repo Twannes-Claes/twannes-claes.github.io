@@ -30,14 +30,14 @@ export default function Join()
     if (session && loaded)
     {
         return (
-            <Shell title={title} home="/">
+            <Shell title={title}>
                 <loaded.PlayerView key={session} sessionId={session} table={table} />
             </Shell>
         );
     }
 
     return (
-        <Shell title={title} home="/">
+        <Shell title={title}>
             <main className="ttrpg-placeholder">
                 <h1>Join a session</h1>
                 {session ? <Loading>Connecting</Loading> : <p>Scan the QR code on the table to join.</p>}

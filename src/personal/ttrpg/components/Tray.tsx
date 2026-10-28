@@ -1,3 +1,5 @@
+import { faChevronDown } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, type DragEvent } from 'react';
 
 import type { Point, Token } from '../types';
@@ -69,43 +71,50 @@ export function Tray({ monsters, onPresetDrop, onMenu }: TrayProps)
                 onPresetDrop(presetId);
             }}
         >
-            <h2 className="ttrpg-subhead">{monsters.length > 0 ? `Tray · ${monsters.length}` : 'Tray'}</h2>
-
-            {monsters.length === 0 ? (
-                <p className="ttrpg-tray__empty">
-                    {onPresetDrop ? 'Drop a preset or a monster here to keep it off the map.' : 'Drag a monster here to keep it off the map.'}
-                </p>
-            ) : (
-                <ul className="ttrpg-tray__list">
-                    {monsters.map((monster) => (
-                        <li key={monster.id}>
-                            <button
-                                type="button"
-                                className="ttrpg-library__item ttrpg-preset-tile"
-                                title={`${monster.name}: drag onto the map, or click for more`}
-                                draggable
-                                onPointerEnter={readyCarry}
-                                onDragStart={(event) =>
-                                {
-                                    event.dataTransfer.setData(trayDragType, monster.id);
-                                    event.dataTransfer.effectAllowed = 'move';
-                                    carry(event, monster);
-                                }}
-                                onDragEnd={() => carry(null, null)}
-                                onClick={(event) => open(monster.id, event.currentTarget)}
-                                onContextMenu={(event) =>
-                                {
-                                    event.preventDefault();
-                                    open(monster.id, event.currentTarget);
-                                }}
-                            >
-                                <PresetFace preset={monster} />
-                                <span className="ttrpg-preset-tile__name">{monster.name}</span>
-                            </button>
-                        </li>
-                    ))}
-                </ul>
-            )}
+            {/* Folds to its title, to give the map more room, as the map panel does. */}
+            <details open>
+                <summary>
+                    <h2 className="ttrpg-subhead">{monsters.length > 0 ? `Tray · ${monsters.length}` : 'Tray'}</h2>
+                    <FontAwesomeIcon icon={faChevronDown} className="ttrpg-usage__chevron" />
+                </summary>
+                <div className="ttrpg-tray__body">
+                    {monsters.length === 0 ? (
+                        <p className="ttrpg-tray__empty">
+                            {onPresetDrop ? 'Drop a preset or a monster here to keep it off the map.' : 'Drag a monster here to keep it off the map.'}
+                        </p>
+                    ) : (
+                        <ul className="ttrpg-tray__list">
+                            {monsters.map((monster) => (
+                                <li key={monster.id}>
+                                    <button
+                                        type="button"
+                                        className="ttrpg-library__item ttrpg-preset-tile"
+                                        title={`${monster.name}: drag onto the map, or click for more`}
+                                        draggable
+                                        onPointerEnter={readyCarry}
+                                        onDragStart={(event) =>
+                                        {
+                                            event.dataTransfer.setData(trayDragType, monster.id);
+                                            event.dataTransfer.effectAllowed = 'move';
+                                            carry(event, monster);
+                                        }}
+                                        onDragEnd={() => carry(null, null)}
+                                        onClick={(event) => open(monster.id, event.currentTarget)}
+                                        onContextMenu={(event) =>
+                                        {
+                                            event.preventDefault();
+                                            open(monster.id, event.currentTarget);
+                                        }}
+                                    >
+                                        <PresetFace preset={monster} />
+                                        <span className="ttrpg-preset-tile__name">{monster.name}</span>
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            </details>
         </section>
     );
 }

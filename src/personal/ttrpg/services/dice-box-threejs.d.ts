@@ -10,5 +10,17 @@ declare module '@3d-dice/dice-box-threejs'
         roll(notation: string): Promise<unknown>;
         updateConfig(config: object): Promise<void>;
         renderer: { dispose(): void; forceContextLoss(): void; setPixelRatio(ratio: number): void };
+        /** Half the scene's size, the walls the dice stay within. */
+        display: { containerWidth: number; containerHeight: number };
+        /** Works out each die's throw, which roll then plays, see spreadThrows. */
+        startClickThrow(notation: string): { vectors: DieThrow[] } | undefined;
+    }
+
+    /** Where a die starts, how fast it flies and how it spins. */
+    export interface DieThrow
+    {
+        pos: { x: number; y: number };
+        velocity: { x: number; y: number };
+        angle: { x: number; y: number };
     }
 }

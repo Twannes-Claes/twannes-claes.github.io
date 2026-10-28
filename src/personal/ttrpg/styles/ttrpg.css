@@ -952,8 +952,6 @@ html:has(.ttrpg[data-theme='light']) {
     right: 16px;
     bottom: max(16px, env(safe-area-inset-bottom));
     z-index: 10;
-    display: grid;
-    gap: 0.5rem;
     width: 17rem;
     padding: 0.75rem;
     transition:
@@ -963,8 +961,15 @@ html:has(.ttrpg[data-theme='light']) {
 }
 
 .ttrpg-tray .ttrpg-subhead {
+    flex: 1;
     padding-top: 0;
     border-top: 0;
+}
+
+.ttrpg-tray__body {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
 }
 
 /* A preset held over it. */
@@ -1454,7 +1459,8 @@ html:has(.ttrpg[data-theme='light']) {
 }
 
 /* The dashboard's storage and plan limits, folded to a line until opened. */
-.ttrpg-usage summary {
+.ttrpg-usage summary,
+.ttrpg-tray summary {
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -1462,11 +1468,13 @@ html:has(.ttrpg[data-theme='light']) {
     list-style: none;
 }
 
-.ttrpg-usage summary::-webkit-details-marker {
+.ttrpg-usage summary::-webkit-details-marker,
+.ttrpg-tray summary::-webkit-details-marker {
     display: none;
 }
 
-.ttrpg-usage summary h2 {
+.ttrpg-usage summary h2,
+.ttrpg-tray summary h2 {
     margin: 0;
 }
 
@@ -1483,11 +1491,13 @@ html:has(.ttrpg[data-theme='light']) {
     transition: rotate 150ms var(--ttrpg-ease);
 }
 
-.ttrpg-usage summary:hover .ttrpg-usage__chevron {
+.ttrpg-usage summary:hover .ttrpg-usage__chevron,
+.ttrpg-tray summary:hover .ttrpg-usage__chevron {
     color: var(--ttrpg-ink);
 }
 
-.ttrpg-usage details[open] .ttrpg-usage__chevron {
+.ttrpg-usage details[open] .ttrpg-usage__chevron,
+.ttrpg-tray details[open] .ttrpg-usage__chevron {
     rotate: 180deg;
 }
 
@@ -2111,9 +2121,11 @@ main:has(.ttrpg-corner--left .ttrpg-pop__menu) .ttrpg-credit {
 }
 
 /* A folding section opens and closes rather than jumping, see ttrpg-row-edit for the height. */
+/* Paint containment rather than overflow: clip, which still let what is folded away scroll the
+   panel and let a top margin slip out, to vanish only at the end. */
 details::details-content {
     height: 0;
-    overflow: clip;
+    contain: paint;
     transition:
         height 150ms var(--ttrpg-ease),
         content-visibility 150ms allow-discrete;
@@ -2913,6 +2925,11 @@ details[open]::details-content {
     background: var(--ttrpg-accent);
     font-size: 1.25rem;
     color: var(--ttrpg-on-accent);
+}
+
+/* The well is see-through, so the player is hidden under it rather than showing through. */
+.ttrpg-music__stage:has(.ttrpg-music__idle:not(.ttrpg-leaving)) .ttrpg-music__screen {
+    visibility: hidden;
 }
 
 .ttrpg-music__hint {

@@ -6,6 +6,7 @@ import { demoCredit, demoScenario } from '../content/scenarios';
 import { penWidths } from '../map/drawings';
 import { defaultFogSettings } from '../map/fog';
 import { defaultBlood } from '../map/health';
+import { newProp } from '../map/props';
 import type { ToolId } from '../map/tools';
 import { createMapView, type FrameStats, type MapView, type PendingMove } from '../map/view';
 
@@ -415,7 +416,7 @@ export function MapCanvas({
                 onDragOver={(event) =>
                 {
                     const { types } = event.dataTransfer;
-                    const monster = carrying();
+                    const carried = carrying();
 
                     const takes = (onPresetDrop && types.includes(presetDragType)) || (onTrayDrop && types.includes(trayDragType)) || (onPropDrop && types.includes(propDragType));
 
@@ -424,15 +425,27 @@ export function MapCanvas({
 
                     event.preventDefault();
 
-                    // The monster as it would land, under the pointer, see setGhost in map/view.ts.
-                    if (monster && view.current)
-                        view.current.setGhost({ monster, at: view.current.worldAt({ x: event.clientX, y: event.clientY }), stack: event.altKey });
+                    if (!carried || !view.current)
+                        return;
+
+                    const at = view.current.worldAt({ x: event.clientX, y: event.clientY });
+
+                    // What it carries as it would land, under the pointer, see map/view.ts.
+                    if ('src' in carried)
+                        view.current.setPropGhost(newProp(carried, scenario.grid, at, event.altKey));
+                    else
+                        view.current.setGhost({ monster: carried, at, stack: event.altKey });
 
                 }}
-                onDragLeave={() => view.current?.setGhost(null)}
+                onDragLeave={() =>
+                {
+                    view.current?.setGhost(null);
+                    view.current?.setPropGhost(null);
+                }}
                 onDrop={(event) =>
                 {
                     view.current?.setGhost(null);
+                    view.current?.setPropGhost(null);
 
                     const presetId = event.dataTransfer.getData(presetDragType);
                     const tokenId = event.dataTransfer.getData(trayDragType);

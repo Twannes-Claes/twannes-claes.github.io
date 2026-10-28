@@ -8,7 +8,7 @@ import type { DiceAsk, DiceRoll, GameSystem } from '../types';
 import { diceIcons } from '../content/diceIcons';
 import { diceName, diceSides, maxDice } from '../map/dice';
 import { lift } from '../map/colours';
-import { colourSet, loadDiceBox, notationOf, scaleOf } from '../services/diceBox';
+import { colourSet, loadDiceBox, notationOf, scaleOf, spreadThrows } from '../services/diceBox';
 import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
 
 import { Spinner } from './Feedback';
@@ -242,6 +242,7 @@ function Tray3D({ roll, color, scale, onLanded }: { roll: DiceRoll; color: strin
                 // ends up leaning on the tray's wall.
                 made = new Box('#ttrpg-dice-box', { sounds: false, shadows: true, framerate: 1 / 120, strength: 0.7, light_intensity: 0.9, baseScale: scale, gravity_multiplier: 500 });
                 await made.initialize();
+                spreadThrows(made);
                 // The library draws at the page's size, blurry on a sharp screen without this.
                 made.renderer.setPixelRatio(window.devicePixelRatio);
 
@@ -317,6 +318,9 @@ export function DicePanel({ rolls, onRoll, system, host = false, phone = false, 
     // The last roll when the tray emptied, on opening or a switch of look. It shows only later ones.
     const [seen, setSeen] = useState<string | undefined>(rolls[0]?.id);
     const fresh = rolls[0] && rolls[0].id !== seen ? rolls[0] : undefined;
+    // The last roll whose dice came to rest. Another waits for them, or the throws would pile up.
+    const [landed, setLanded] = useState<string>();
+    const rolling = fresh !== undefined && fresh.id !== landed;
     const thrown = threeD && !calm;
     // The GM's dice, and a player's own on their phone, in the accent lifted, like the GM's marks on
     // the map, following a new pick.
@@ -324,6 +328,14 @@ export function DicePanel({ rolls, onRoll, system, host = false, phone = false, 
     const colourOf = (entry: DiceRoll) => (entry.color && entry.color !== own ? entry.color : accent);
     const edges = system === '5e' && sides === 20 && count === 1;
     const ask: DiceAsk = { sides, count, modifier, edge: edges ? edge : undefined, hidden: host && hidden };
+
+    // Fetched while the panel is open, so the first roll does not wait on three.js and the physics.
+    useEffect(() =>
+    {
+        if (thrown)
+            loadDiceBox().catch(() => undefined);
+
+    }, [thrown]);
 
     const roll = (event: FormEvent) =>
     {
@@ -333,6 +345,12 @@ export function DicePanel({ rolls, onRoll, system, host = false, phone = false, 
         onRoll(ask)
             .catch((reason: Error) => setFailure(reason.message))
             .finally(() => setBusy(false));
+    };
+
+    const land = (entry: DiceRoll) =>
+    {
+        setLanded(entry.id);
+        onLanded?.(entry);
     };
 
     const toggleThreeD = () =>
@@ -397,7 +415,7 @@ export function DicePanel({ rolls, onRoll, system, host = false, phone = false, 
                         {failure}
                     </p>
                 )}
-                <button type="submit" className="ttrpg-segment ttrpg-segment--block ttrpg-segment--confirm" disabled={busy}>
+                <button type="submit" className="ttrpg-segment ttrpg-segment--block ttrpg-segment--confirm" disabled={busy || rolling}>
                     {busy ? <Spinner /> : <FontAwesomeIcon icon={faDiceD20} />}
                     Roll {diceName(ask)}
                 </button>
@@ -408,9 +426,9 @@ export function DicePanel({ rolls, onRoll, system, host = false, phone = false, 
             {!fresh ? (
                 <div className={`ttrpg-dice__tray${thrown ? ' ttrpg-dice__tray--3d' : ''}`} />
             ) : thrown ? (
-                <Tray3D key={scaleOf(fresh)} roll={fresh} color={colourOf(fresh)} scale={scaleOf(fresh)} onLanded={onLanded} />
+                <Tray3D key={scaleOf(fresh)} roll={fresh} color={colourOf(fresh)} scale={scaleOf(fresh)} onLanded={land} />
             ) : (
-                <Tray key={fresh.id} roll={fresh} color={colourOf(fresh)} still={calm} onLanded={onLanded} />
+                <Tray key={fresh.id} roll={fresh} color={colourOf(fresh)} still={calm} onLanded={land} />
             )}
 
             {!quick && (

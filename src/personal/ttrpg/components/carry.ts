@@ -1,9 +1,12 @@
 import type { DragEvent } from 'react';
 
-import type { Token } from '../types';
+import type { PropPicture, Token } from '../types';
 
-/** What a monster dragged toward the map looks like there, see setGhost in map/view.ts. */
-export type Carried = Pick<Token, 'name' | 'color' | 'avatar' | 'size'>;
+/**
+ * What a monster dragged toward the map looks like there, see setGhost in map/view.ts, or the
+ * picture of a prop dragged from the library, see setPropGhost.
+ */
+export type Carried = Pick<Token, 'name' | 'color' | 'avatar' | 'size'> | PropPicture;
 
 let carried: Carried | null = null;
 let blank: HTMLImageElement | null = null;
@@ -22,20 +25,20 @@ export function readyCarry()
 }
 
 /**
- * A preset or a tray tile starts its drag: the map draws the monster under the pointer instead of
- * the browser dragging a picture of the tile. The drag's own data only reads on drop, so the look
- * is kept here, until carry(null) as the drag ends.
+ * A preset, tray or prop tile starts its drag: the map draws what it carries under the pointer
+ * instead of the browser dragging a picture of the tile. The drag's own data only reads on drop,
+ * so the look is kept here, until carry(null) as the drag ends.
  */
-export function carry(event: DragEvent | null, monster: Carried | null)
+export function carry(event: DragEvent | null, what: Carried | null)
 {
-    carried = monster;
+    carried = what;
 
     if (event && blank)
         event.dataTransfer.setDragImage(blank, 0, 0);
 
 }
 
-/** The monster being dragged, or null. */
+/** The monster or picture being dragged, or null. */
 export function carrying(): Carried | null
 {
     return carried;

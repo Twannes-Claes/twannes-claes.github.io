@@ -5,7 +5,7 @@ import { drawingsAt, drawLine, extendLine, maxDrawingPoints, penWidths } from '.
 import { boxOf, closestOnSegment, distance, distanceToSegment, onMap, segmentsTouch, type Area } from './geometry.ts';
 import { cellAt, cellCenter, cellLine, nearestCorner, snapPoint } from './grid.ts';
 import { lineFeet, pathFeet } from './path.ts';
-import { fromLocal, newProp, placedSize, propAt, propCorners, propHandles, snapCenter, snapSize } from './props.ts';
+import { fromLocal, newProp, propAt, propCorners, propHandles, snapCenter, snapSize } from './props.ts';
 import { drawPill, drawRoute, tokenRadius } from './render.ts';
 import { sightSegments, visibilityPolygon } from './visibility.ts';
 
@@ -260,6 +260,28 @@ function strokeProp(ctx: CanvasRenderingContext2D, prop: Prop, colour: string, w
     ctx.strokeStyle = colour;
     ctx.lineWidth = width;
     ctx.stroke();
+}
+
+/**
+ * A prop about to land, faded, in its dashed outline: placed with clicks, see propTool, or dragged
+ * from the library, see setPropGhost in map/view.ts. The outline alone until its picture loads.
+ */
+export function drawPropGhost(ctx: CanvasRenderingContext2D, prop: Prop, picture: CanvasImageSource | null, zoom: number)
+{
+    const { x, y, width, height } = prop;
+
+    if (picture)
+    {
+        ctx.globalAlpha = 0.6;
+        ctx.drawImage(picture, x - width / 2, y - height / 2, width, height);
+        ctx.globalAlpha = 1;
+    }
+
+    ctx.setLineDash([6 / zoom, 4 / zoom]);
+    ctx.strokeStyle = highlight;
+    ctx.lineWidth = 1.5 / zoom;
+    ctx.strokeRect(x - width / 2, y - height / 2, width, height);
+    ctx.setLineDash([]);
 }
 
 function dot(ctx: CanvasRenderingContext2D, at: Point, radius: number, colour: string)
@@ -1389,9 +1411,10 @@ function propTool(change: Change, placing: PropPicture | null): MapTool
     let moved = false;
     /** The scenario when the drag started, to put back if it is cancelled. */
     let before: Scenario | null = null;
-    let hover: Point | null = null;
     /** The last pointer, for the cursor to say what a press there would do. */
     let at: ToolPointer | null = null;
+    // The picked picture, faded under the pointer. The library has shown it, so it is cached.
+    const preview = placing ? Object.assign(new Image(), { src: placing.src }) : null;
 
     const replace = (scenario: Scenario, prop: Prop) =>
     {
@@ -1479,7 +1502,6 @@ function propTool(change: Change, placing: PropPicture | null): MapTool
         {
             const { scenario, world, free } = pointer;
 
-            hover = world;
             at = pointer;
 
             if (!pressed || !drag)
@@ -1586,18 +1608,10 @@ function propTool(change: Change, placing: PropPicture | null): MapTool
                 dot(ctx, handles.turn, 6 / zoom, highlight);
             }
 
-            if (placing && hover)
-            {
-                const size = placedSize(placing, scenario.grid);
-                const ghost: Prop = { id: '', src: '', ...hover, ...size, rotation: 0 };
-                const center = snapCenter(scenario.grid, ghost, hover);
+            // Where a click lands it, snapped the same way unless Alt is held.
+            if (placing && at)
+                drawPropGhost(ctx, newProp(placing, scenario.grid, at.world, at.free), preview?.complete && preview.naturalWidth > 0 ? preview : null, zoom);
 
-                ctx.setLineDash([6 / zoom, 4 / zoom]);
-                ctx.strokeStyle = highlight;
-                ctx.lineWidth = 1.5 / zoom;
-                ctx.strokeRect(center.x - size.width / 2, center.y - size.height / 2, size.width, size.height);
-                ctx.setLineDash([]);
-            }
         },
     };
 }

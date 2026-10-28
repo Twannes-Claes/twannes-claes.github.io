@@ -82,7 +82,7 @@ interface ShellProps
 {
     /** The tab title, without the app name, which is added after it. */
     title: string;
-    /** Where the house button goes: the sessions page by default, the portfolio from the front pages. */
+    /** Where the house button goes: the sessions page by default, the portfolio from the sessions page itself. */
     home?: string;
     children: ReactNode;
 }

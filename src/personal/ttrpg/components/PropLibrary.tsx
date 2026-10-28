@@ -6,6 +6,7 @@ import type { PropPicture } from '../types';
 
 import { fileSize } from '../services/images';
 
+import { carry, readyCarry } from './carry';
 import { propDragType } from './MapCanvas';
 import { StorageMeter } from './StorageMeter';
 import { useKeydown } from './useKeys';
@@ -61,11 +62,14 @@ export function PropLibrary({ pictures, placing, onPick, onUpload, onRemove, oth
                                 aria-pressed={placing?.id === picture.id}
                                 title={`${picture.name}, ${fileSize(picture.bytes)}. Drag onto the map, or pick it to place with clicks`}
                                 draggable
+                                onPointerEnter={readyCarry}
                                 onDragStart={(event) =>
                                 {
                                     event.dataTransfer.setData(propDragType, picture.id);
                                     event.dataTransfer.effectAllowed = 'copy';
+                                    carry(event, picture);
                                 }}
+                                onDragEnd={() => carry(null, null)}
                                 onClick={() => onPick(placing?.id === picture.id ? null : picture)}
                             >
                                 <img src={picture.src} alt={picture.name} />

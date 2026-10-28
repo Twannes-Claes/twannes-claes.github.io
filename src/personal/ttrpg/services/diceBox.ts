@@ -1,3 +1,5 @@
+import type DiceBox from '@3d-dice/dice-box-threejs';
+
 import type { DiceRoll } from '../types';
 
 /*
@@ -8,6 +10,47 @@ import type { DiceRoll } from '../types';
 export function loadDiceBox()
 {
     return import('@3d-dice/dice-box-threejs');
+}
+
+/** A number within a share of 1 either way, to vary a throw by. */
+function vary(share: number)
+{
+    return 1 + (Math.random() * 2 - 1) * share;
+}
+
+/**
+ * The library throws every die of a roll from one spot, a few degrees apart, and mostly from the
+ * same side. This mirrors each roll to any side and moves, turns and spins each die a little, so
+ * no two throws look alike. Mirrored across an axis, the spin about the other one turns with it.
+ */
+export function spreadThrows(box: DiceBox)
+{
+    const work = box.startClickThrow.bind(box);
+
+    box.startClickThrow = (notation) =>
+    {
+        const thrown = work(notation);
+        const flipX = Math.random() < 0.5 ? -1 : 1;
+        const flipY = Math.random() < 0.5 ? -1 : 1;
+        const { containerWidth: width, containerHeight: height } = box.display;
+
+        for (const { pos, velocity, angle } of thrown?.vectors ?? [])
+        {
+            const turn = ((Math.random() * 2 - 1) * Math.PI) / 12;
+            const speed = vary(0.15);
+            const { x, y } = velocity;
+
+            // Kept inside the walls the library starts the dice at.
+            pos.x = Math.max(-0.9 * width, Math.min(0.9 * width, flipX * pos.x + (Math.random() - 0.5) * 0.3 * width));
+            pos.y = Math.max(-0.9 * height, Math.min(0.9 * height, flipY * pos.y + (Math.random() - 0.5) * 0.3 * height));
+            velocity.x = flipX * (x * Math.cos(turn) - y * Math.sin(turn)) * speed;
+            velocity.y = flipY * (x * Math.sin(turn) + y * Math.cos(turn)) * speed;
+            angle.x *= flipY * vary(0.3);
+            angle.y *= flipX * vary(0.3);
+        }
+
+        return thrown;
+    };
 }
 
 /**
