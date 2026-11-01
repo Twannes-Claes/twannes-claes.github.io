@@ -4,14 +4,12 @@ import { useRef, useState, type ChangeEvent, type ReactNode, type WheelEvent } f
 
 import type { GameSystem, Preset, Token } from '../types';
 
+import { maxMarkdown } from '../content/limits';
 import { statBlockTemplates, statsOf } from '../content/statBlocks';
 
 import { carry, readyCarry } from './carry';
 import { presetDragType } from './MapCanvas';
 import { PresetDialog, PresetFace } from './PresetDialog';
-
-/** As long as convex/presets.ts keeps. */
-const maxMarkdown = 20_000;
 
 /** The ring a new preset starts with, the monsters' red. */
 const monsterRed = '#b4443c';

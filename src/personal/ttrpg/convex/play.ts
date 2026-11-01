@@ -3,6 +3,8 @@ import { ConvexError, v } from 'convex/values';
 
 import type { Decal, Draft, Drawing, PlayerFight, Point, Scenario, SharedHit, SharedMark, Token } from '../types';
 import { cleanConditions, isSave } from '../content/conditions';
+import { maxPlayers } from '../content/limits';
+import { colourPattern } from '../map/colours';
 import { maxDrawingPoints, maxDrawings, penWidths } from '../map/drawings';
 import { distance } from '../map/geometry';
 import { cleanStats, conditionsAt, downedPool, hitOn, withoutNumbers, withoutSaves } from '../map/health';
@@ -35,14 +37,11 @@ import { storedPicture } from './pictures';
 
 /** A walk longer than this is not something anyone drew by hand. */
 const maxPathPoints = 1000;
-/** Players at one table, past any real group, so one password cannot fill the tokens or storage. */
-const maxPlayers = 12;
 /** Monsters and NPCs in one session, on all its maps. With the players it stays under tokensOf's 200. */
 const maxMonsters = 150;
 
 /** A 256 px WebP avatar from services/images.ts is about 20 KB. */
 export const maxAvatarBytes = 512 * 1024;
-const colourPattern = /^#[0-9a-f]{6}$/i;
 /** A 400 by 300 cell map at two samples per cell, eight samples to a byte, see packSeen in map/fog.ts. */
 const maxFogBytes = 64 * 1024;
 
@@ -895,11 +894,7 @@ export const leave = mutation({
         if (!token)
             return null;
 
-        if (token.avatarId)
-            await dropFile(ctx, token.avatarId);
-
-        await ctx.db.delete('tokens', token._id);
-        await dropDraftOf(ctx, token._id);
+        await dropToken(ctx, token);
         await dropSummonsOf(ctx, token._id);
 
         const scenario = await scenarioOf(ctx, sessionId, token.scenarioId);
@@ -929,11 +924,7 @@ export const kick = mutation({
         if (token.kind !== 'player' || (!token.userId && !token.summonOf))
             throw new ConvexError('Only players can be removed.');
 
-        if (token.avatarId)
-            await dropFile(ctx, token.avatarId);
-
-        await ctx.db.delete('tokens', tokenId);
-        await dropDraftOf(ctx, tokenId);
+        await dropToken(ctx, token);
         await dropSummonsOf(ctx, tokenId);
 
         const scenario = await scenarioOf(ctx, token.sessionId, token.scenarioId);
@@ -1076,12 +1067,7 @@ export const removeMonster = mutation({
     args: { tokenId: v.id('tokens') },
     handler: async (ctx, { tokenId }) =>
     {
-        const token = await requireMonster(ctx, tokenId);
-
-        if (token.avatarId)
-            await dropFile(ctx, token.avatarId);
-
-        await ctx.db.delete('tokens', tokenId);
+        await dropToken(ctx, await requireMonster(ctx, tokenId));
 
         return null;
     },
@@ -1395,13 +1381,7 @@ export const end = mutation({
         const players = (await tokensOf(ctx, sessionId)).filter((token) => token.kind === 'player');
 
         for (const player of players)
-        {
-            if (player.avatarId)
-                await dropFile(ctx, player.avatarId);
-
-            await ctx.db.delete('tokens', player._id);
-            await dropDraftOf(ctx, player._id);
-        }
+            await dropToken(ctx, player);
 
         await ctx.db.patch('sessions', sessionId, { live: false, frozen: false, initiative: undefined, check: undefined });
 
@@ -1649,13 +1629,7 @@ export const hit = mutation({
                 await ctx.db.patch('tokens', tokenId, { ...after, tray: true, path: undefined, movedAt: undefined });
             }
             else if (died)
-            {
-                if (token.avatarId)
-                    await dropFile(ctx, token.avatarId);
-
-                await dropDraftOf(ctx, tokenId);
-                await ctx.db.delete('tokens', tokenId);
-            }
+                await dropToken(ctx, token);
             else if (after)
                 await ctx.db.patch('tokens', tokenId, after);
 
@@ -1705,6 +1679,16 @@ export async function dropDraftOf(ctx: MutationCtx, tokenId: Id<'tokens'>)
     if (doc)
         await ctx.db.delete('drafts', doc._id);
 
+}
+
+/** Takes a token off the table with its own picture. A saved character's or companion's stays. */
+export async function dropToken(ctx: MutationCtx, token: Doc<'tokens'>)
+{
+    if (token.avatarId)
+        await dropFile(ctx, token.avatarId);
+
+    await ctx.db.delete('tokens', token._id);
+    await dropDraftOf(ctx, token._id);
 }
 
 /**

@@ -22,6 +22,8 @@ export default tseslint.config(
         },
         rules: {
             ...reactHooks.configs.recommended.rules,
+            // Syntax the React Compiler cannot handle yet, so it skips the whole component quietly.
+            'react-hooks/todo': 'error',
             'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
 
             // Formatting for .ts/.tsx. Prettier is excluded from these files

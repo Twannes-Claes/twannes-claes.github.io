@@ -137,7 +137,10 @@ export function TooltipHost()
         return null;
 
     // A shortcut at the end, as in "Walls and doors (W)", shows as keys rather than in brackets.
-    const [, words = tip.text, keys] = /^(.*) \(([^()]+)\)$/.exec(tip.text) ?? [];
+    // Not a destructuring default: the React Compiler skips a component with one of those.
+    const shortcut = /^(.*) \(([^()]+)\)$/.exec(tip.text);
+    const words = shortcut ? shortcut[1] : tip.text;
+    const keys = shortcut?.[2];
 
     return (
         <div

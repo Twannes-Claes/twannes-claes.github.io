@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 
-import { defaultAccent, paintAccent } from '../map/colours';
+import { colourPattern, defaultAccent, paintAccent } from '../map/colours';
 
 /*
  * How the app looks on this screen, dark or light and the accent colour, picked by each
@@ -74,7 +74,7 @@ function readColour(key: string, fallback: string): string
 {
     const stored = read(key);
 
-    return stored && /^#[0-9a-f]{6}$/i.test(stored) ? stored : fallback;
+    return stored && colourPattern.test(stored) ? stored : fallback;
 }
 
 const readAccent = () => readColour(accentKey, defaultAccent);

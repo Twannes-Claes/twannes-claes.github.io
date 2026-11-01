@@ -10,6 +10,9 @@ export const ground = '#1e1d1f';
 /** The app's accent before anyone picks their own, see components/useLook.ts. */
 export const defaultAccent = '#683c9b';
 
+/** A colour as six-digit hex, the only kind the server keeps and lift can read. */
+export const colourPattern = /^#[0-9a-f]{6}$/i;
+
 /** The accent made light and a little more vivid, as six-digit hex. */
 export function lift(colour: string): string
 {

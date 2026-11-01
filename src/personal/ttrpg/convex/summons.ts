@@ -2,13 +2,14 @@ import { getAuthUserId } from '@convex-dev/auth/server';
 import { ConvexError, v } from 'convex/values';
 
 import type { Token } from '../types';
+import { maxSummons } from '../content/limits';
 import { cleanStats } from '../map/health';
 
 import type { Doc, Id } from './_generated/dataModel';
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireUser } from './access';
 import { limit } from './limits';
-import { dropDraftOf, ownToken, scenarioOf, spawnSpots, tokenOf } from './play';
+import { dropDraftOf, dropToken, ownToken, scenarioOf, spawnSpots, tokenOf } from './play';
 import { sizeValidator } from './schema';
 import { refreshSight, tokensOn } from './sight';
 import { dropFile } from './usage';
@@ -20,9 +21,6 @@ import { dropFile } from './usage';
  * one vanishes onto the tray, off the map like a monster, until its player summons it again. Signed in with Discord, they
  * are kept with the character as companions and come along, off, to the next table.
  */
-
-/** A familiar, a mount, an animal companion and a summoned spell, at once. */
-export const maxSummons = 4;
 
 /** The player's own token a token answers to: itself, or the one that summoned it. */
 export async function controllerOf(ctx: QueryCtx, token: Doc<'tokens'>, userId: Id<'users'>): Promise<Doc<'tokens'> | null>
@@ -43,21 +41,11 @@ function summonsOf(ctx: QueryCtx, ownerId: Id<'tokens'>)
         .take(maxSummons);
 }
 
-/** Takes a summon off the table, its own picture with it. A companion's stays with the character. */
-async function dropSummon(ctx: MutationCtx, summon: Doc<'tokens'>)
-{
-    if (summon.avatarId)
-        await dropFile(ctx, summon.avatarId);
-
-    await ctx.db.delete('tokens', summon._id);
-    await dropDraftOf(ctx, summon._id);
-}
-
 /** A player's summons leave with them, on leaving or being removed. */
 export async function dropSummonsOf(ctx: MutationCtx, ownerId: Id<'tokens'>)
 {
     for (const summon of await summonsOf(ctx, ownerId))
-        await dropSummon(ctx, summon);
+        await dropToken(ctx, summon);
 
 }
 
@@ -292,7 +280,7 @@ export const remove = mutation({
             await ctx.db.delete('companions', companion._id);
         }
 
-        await dropSummon(ctx, summon);
+        await dropToken(ctx, summon);
 
         const scenario = await scenarioOf(ctx, owner.sessionId, owner.scenarioId);
 

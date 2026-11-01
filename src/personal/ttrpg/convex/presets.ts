@@ -1,6 +1,8 @@
 import { ConvexError, v } from 'convex/values';
 
 import type { Preset } from '../types';
+import { maxMarkdown } from '../content/limits';
+import { colourPattern } from '../map/colours';
 
 import type { Id } from './_generated/dataModel';
 import { mutation, query, type MutationCtx } from './_generated/server';
@@ -15,12 +17,9 @@ import { dropFile } from './usage';
  * one, see placeMonster in play.ts. The server keeps the Markdown as written.
  */
 
-/** Far past the longest stat block, a dragon with lair and legendary actions. */
-const maxMarkdown = 20_000;
 // ponytail: every preset is listed whole, fine for a library of a few hundred. Past that, list
 // names only and load one stat block when it is opened.
 const maxPresets = 300;
-const colourPattern = /^#[0-9a-f]{6}$/i;
 
 /** The host's presets, by name. */
 export const list = query({

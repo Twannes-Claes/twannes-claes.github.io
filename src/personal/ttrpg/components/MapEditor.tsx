@@ -5,6 +5,7 @@ import { useEffect, useEffectEvent, useRef, useState, type DragEvent, type Mouse
 import type { BloodSettings, Decal, DiceAsk, DiceRoll, Drawing, FogSettings, GameSystem, GroupCheck, HitKind, Initiative, Live, MonsterControls, MusicControls, PictureBytes, Pen, Ping, Point, Preset, PropPicture, Scenario, SharedHit, Store, Token, Track } from '../types';
 
 import { cleanConditions } from '../content/conditions';
+import { maxPlayers } from '../content/limits';
 import { blankScenario, demoTokens } from '../content/scenarios';
 import { videoId } from '../content/music';
 import { demoOgrePreset } from '../content/statBlocks';
@@ -82,16 +83,28 @@ function fightLine(fight: Initiative, tokens: Token[], asPlayers: boolean): stri
     return `Round ${fight.round} · ${asPlayers && token.hidden ? 'Enemy' : token.name}'s turn`;
 }
 
-/** How long the editor waits after the last change before it saves. */
 /** A walk along a path from now, which every screen plays, see setTokens in map/view.ts. */
 function walkFromNow(path: Point[]): Pick<Token, 'path' | 'movedAt'>
 {
     return { path, movedAt: Date.now() };
 }
 
+/**
+ * The first "Player n" from n on that no token has. Out here because the React Compiler skips a
+ * component that counts up a variable a callback then reads.
+ */
+function freePlayerName(names: Set<string>, from: number): string
+{
+    let number = from;
+
+    while (names.has(`Player ${number}`))
+        number++;
+
+    return `Player ${number}`;
+}
+
+/** How long the editor waits after the last change before it saves. */
 const saveDelay = 1000;
-/** As many test players as a live table takes, see maxPlayers in convex/play.ts. */
-const maxPlayers = 12;
 const pictureFailed = 'That picture did not upload. Is it a PNG, WebP or JPEG?';
 
 /**
@@ -478,18 +491,14 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     // One more at the spawn point, numbered after the ones there, up to a full table.
     const addTestPlayer = () =>
     {
-        const names = new Set(tokens.map((token) => token.name));
-        let number = testCount + 1;
-
-        while (names.has(`Player ${number}`))
-            number++;
+        const name = freePlayerName(new Set(tokens.map((token) => token.name)), testCount + 1);
 
         setTokens((current) => [
             ...current,
             {
                 id: crypto.randomUUID(),
                 kind: 'player',
-                name: `Player ${number}`,
+                name,
                 color: ringColours[testCount % ringColours.length],
                 size: 'medium',
                 speed: 30,

@@ -2,6 +2,8 @@ import { getAuthUserId } from '@convex-dev/auth/server';
 import { ConvexError, v } from 'convex/values';
 
 import type { CreatureSize } from '../types';
+import { maxCharacters, maxSummons } from '../content/limits';
+import { colourPattern } from '../map/colours';
 import { cleanStats } from '../map/health';
 
 import type { Doc, Id } from './_generated/dataModel';
@@ -11,7 +13,6 @@ import { limit } from './limits';
 import { storedPicture } from './pictures';
 import { maxAvatarBytes } from './play';
 import { sizeValidator } from './schema';
-import { maxSummons } from './summons';
 import { dropFile } from './usage';
 
 /*
@@ -20,9 +21,6 @@ import { dropFile } from './usage';
  * The character owns its picture; a token joined as it only shows the address, so ending a
  * session never deletes it.
  */
-
-/** Far past any one player's party of alts. */
-const maxCharacters = 20;
 
 /** What the join form sends, already checked by join in play.ts. */
 interface CharacterFields
@@ -155,8 +153,6 @@ function cleanName(name: string): string
 
     return clean;
 }
-
-const colourPattern = /^#[0-9a-f]{6}$/i;
 
 async function ownCharacter(ctx: QueryCtx, userId: Id<'users'>, characterId: Id<'characters'>): Promise<Doc<'characters'>>
 {

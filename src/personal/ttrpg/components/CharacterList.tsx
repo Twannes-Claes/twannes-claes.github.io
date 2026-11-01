@@ -7,6 +7,7 @@ import { useActionState, useState } from 'react';
 
 import type { CreatureSize } from '../types';
 
+import { maxCharacters, maxSummons } from '../content/limits';
 import { api } from '../convex/_generated/api';
 import { ringColours } from '../map/colours';
 import { explain, uploadAvatar } from '../services/backend';
@@ -206,10 +207,6 @@ export function Avatar({ name, color, avatar, small }: AvatarProps)
         </span>
     );
 }
-
-/** As many as convex/characters.ts and convex/summons.ts keep. */
-const maxCharacters = 20;
-const maxSummons = 4;
 
 type Character = NonNullable<FunctionReturnType<typeof api.characters.mine>>[number];
 
