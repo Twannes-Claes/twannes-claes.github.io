@@ -1,8 +1,7 @@
 import type { Grid, Scenario, Token, Wall } from '../types';
 
-import { cellCenter } from '../map/grid';
 import { footprintCenter } from '../map/size';
-import { spawnCells } from '../map/spawn';
+import { spawnSpots } from '../map/spawn';
 
 import { demoOgrePreset } from './statBlocks';
 
@@ -130,12 +129,12 @@ const testPlayers: Omit<Token, 'x' | 'y'>[] = demoPlayers.map((player, index) =>
  */
 export function demoTokens(scenario: Scenario, players = testPlayers): Token[]
 {
-    const spots = spawnCells(scenario.grid, scenario.walls, scenario, scenario.spawn, players.length, new Set());
+    const spots = spawnSpots(scenario, players, []);
     const placed: Token[] = players.map((player, index) => ({
         ...player,
         path: undefined,
         movedAt: undefined,
-        ...(spots[index] ? cellCenter(scenario.grid, spots[index]) : scenario.spawn),
+        ...spots[index],
     }));
 
     if (scenario.background !== demoScenario.background)

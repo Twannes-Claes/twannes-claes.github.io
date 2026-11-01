@@ -358,7 +358,7 @@ export interface Live
     setStats: (tokenId: string, stats: Stats) => Promise<void>;
     /** Sets any token's conditions, see Condition. */
     setConditions: (tokenId: string, conditions: Condition[]) => Promise<void>;
-    /** Sets any token's size, moving it onto the grid for its new footprint, see resizedAt in map/size.ts. */
+    /** Sets any token's size, moving it onto the grid for its new footprint, see resizedSpot in map/spawn.ts. */
     setSize: (tokenId: string, size: CreatureSize) => Promise<void>;
     /** The last attack or heal, null before any, see SharedHit. */
     lastHit: SharedHit | null;
@@ -610,6 +610,8 @@ export interface Scenario
     /** Drawn in order, so the last one is on top. */
     props: Prop[];
     walls: Wall[];
+    /** The fog of war switched off: players see the whole map and every monster not hidden. */
+    fogOff?: boolean;
     /** Where players appear when they join or the scenario changes. */
     spawn: Point;
 }

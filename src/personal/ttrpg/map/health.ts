@@ -38,6 +38,17 @@ export function applyHit(stats: { hp: number; maxHp: number; tempHp?: number }, 
     return { hp: Math.max(0, hp - (amount - absorbed)), tempHp: tempHp - absorbed };
 }
 
+/**
+ * Whether a player may damage a token, see PLAN.md 25: anyone while a fight is on, out of one only
+ * themselves and their own summons, for a trap or a potion gone wrong. Healing is always allowed,
+ * and the GM hits anything. Without an own token, the Player view on the table screen, only in a
+ * fight.
+ */
+export function mayHurt(fighting: boolean, own: string | null, target: Pick<Token, 'id' | 'summonOf'>): boolean
+{
+    return fighting || (own !== null && (target.id === own || target.summonOf === own));
+}
+
 /** A token's conditions at hp: above 0 without its death saves or Dying, see ConditionKind. */
 export function conditionsAt(conditions: Condition[] | undefined, hp: number)
 {

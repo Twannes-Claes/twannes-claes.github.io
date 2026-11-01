@@ -44,8 +44,10 @@ interface MapCanvasProps
     onTokenMove?: (id: string, to: Point) => void;
     /** Hears the monsters the erase tool took, already asked about. */
     onMonstersErase?: (ids: string[]) => void;
-    /** Hears a path a player let go of. */
-    onPathEnd?: (move: PendingMove) => void;
+    /** Hears a path a player let go of; true when it took it, see onPathEnd in map/view.ts. */
+    onPathEnd?: (move: PendingMove) => boolean | void;
+    /** Hears which token is being dragged or walked, and null once it is let go. */
+    onCarry?: (id: string | null) => void;
     /** Hears every change a tool makes to the scenario. */
     onScenarioChange?: (scenario: Scenario) => void;
     /** Hears how the drawing keeps up, for the ?debug display. */
@@ -152,6 +154,7 @@ export function MapCanvas({
     onTokenMove,
     onMonstersErase,
     onPathEnd,
+    onCarry,
     onScenarioChange,
     onStats,
     onView,
@@ -195,6 +198,7 @@ export function MapCanvas({
     const monstersErased = useEffectEvent((ids: string[]) => onMonstersErase?.(ids));
     const scenarioChanged = useEffectEvent((next: Scenario) => onScenarioChange?.(next));
     const pathEnded = useEffectEvent((move: PendingMove) => onPathEnd?.(move));
+    const carryChanged = useEffectEvent((id: string | null) => onCarry?.(id));
     const measured = useEffectEvent((stats: FrameStats) => onStats?.(stats));
     const viewed = useEffectEvent((center: Point) => onView?.(center));
     const toolCancelled = useEffectEvent(() => onToolCancel?.());
@@ -233,6 +237,7 @@ export function MapCanvas({
             onMonstersErase: (ids) => monstersErased(ids),
             onScenarioChange: (next) => scenarioChanged(next),
             onPathEnd: (move) => pathEnded(move),
+            onCarry: (id) => carryChanged(id),
             onStats: (stats) => measured(stats),
             onView: (center) => viewed(center),
             onToolCancel: () => toolCancelled(),

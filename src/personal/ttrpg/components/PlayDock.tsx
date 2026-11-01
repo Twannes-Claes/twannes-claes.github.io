@@ -272,8 +272,8 @@ export function PlayDock({
                     className="ttrpg-segment"
                     aria-pressed={fogOpen}
                     aria-expanded={fogOpen}
-                    aria-label="Fog"
-                    title="Fog: how it looks, or reset it"
+                    aria-label="Fog of war"
+                    title="Fog of war: how it looks, or reset it"
                     onClick={onFog}
                 >
                     <FontAwesomeIcon icon={faCloud} />

@@ -5,6 +5,7 @@ import {
     faImage,
     faPen,
     faPlus,
+    faSmog,
     faTrashCan,
     faXmark,
 } from '@fortawesome/free-solid-svg-icons';
@@ -39,6 +40,8 @@ interface ScenarioListProps
     onRemoveBackground: () => void;
     /** The colour around the open map, on every screen. */
     onOutside: (colour: string) => void;
+    /** Switches the open map's fog of war off, or back on. */
+    onFogOff: (off: boolean) => void;
     /** The open map's picture's file size, for the tip of its button. Missing when unknown. */
     backgroundBytes?: number;
 }
@@ -79,7 +82,8 @@ const noChange = () => () => undefined;
 
 /**
  * The scenarios of the session in the top right corner, one battle map each: a list to open one,
- * dragged or moved with Alt+Up and Alt+Down to reorder, rename, duplicate and delete for the open one under it, then its background. Rename swaps
+ * dragged or moved with Alt+Up and Alt+Down to reorder, rename, duplicate and delete for the open
+ * one under it, then its background, its colour around and its fog of war switch. Rename swaps
  * the dropdown for the name, saved on Enter or a click away, and Esc keeps the old one. The last
  * map cannot be deleted. Below, new maps: blank, imported from Dungeondraft or Dungeon Alchemist,
  * or from a picture. The title folds it to the open map's name, remembered in this browser.
@@ -98,6 +102,7 @@ export function ScenarioList({
     onBackground,
     onRemoveBackground,
     onOutside,
+    onFogOff,
     backgroundBytes,
 }: ScenarioListProps)
 {
@@ -256,7 +261,7 @@ export function ScenarioList({
                             title="Delete"
                             disabled={scenarios.length === 1}
                             onClick={() =>
-                                void confirmAction(`Delete ${active.name}? Its walls, props and fog go with it.`, 'Delete').then(
+                                void confirmAction(`Delete ${active.name}? Its walls, props and fog of war go with it.`, 'Delete').then(
                                     (yes) => yes && onDelete(active.id),
                                 )}
                         >
@@ -293,6 +298,20 @@ export function ScenarioList({
 
                     <h3 className="ttrpg-subhead">Around the map</h3>
                     <RingPicker value={active.outside ?? defaultOutside} onChange={onOutside} label="Around the map" colours={outsideColours} />
+
+                    <h3 className="ttrpg-subhead">Fog of war</h3>
+                    <div className="ttrpg-settings__choices">
+                        <button
+                            type="button"
+                            className="ttrpg-segment"
+                            aria-pressed={active.fogOff !== true}
+                            title="Players see only what their tokens see. Off, the whole map, for a town by day; hidden monsters stay hidden"
+                            onClick={() => onFogOff(active.fogOff !== true)}
+                        >
+                            <FontAwesomeIcon icon={faSmog} />
+                            {active.fogOff ? 'Off' : 'On'}
+                        </button>
+                    </div>
 
                     <h3 className="ttrpg-subhead">New map</h3>
                     <div className="ttrpg-settings__choices">

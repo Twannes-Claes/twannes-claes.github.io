@@ -20,13 +20,13 @@ import {
     snapPoint,
     wrapOffset,
 } from './grid.ts';
-import { applyHit, cleanStats, healthState, hitOn, withoutNumbers } from './health.ts';
+import { applyHit, cleanStats, healthState, hitOn, mayHurt, withoutNumbers } from './health.ts';
 import { begun, cleanRoll, newFight, nextTurn, swapped, upNext, withoutRoll, withRoll } from './initiative.ts';
 import { extendPath, pathBlocked, pathFeet } from './path.ts';
 import { initiativeBonus } from './presets.ts';
 import { placedSize, propAt, snapCenter, snapSize } from './props.ts';
-import { anchorAt, footprint, footprintCenter, footprintKeys, landingAt, ridesOn } from './size.ts';
-import { spawnCells } from './spawn.ts';
+import { anchorAt, footprint, footprintCenter, footprintKeys, landingAt, resizedAt, ridesOn } from './size.ts';
+import { resizedSpot, roomAt, spawnSpots, stuckAt } from './spawn.ts';
 import { createTool, measure, straighten, toggleDoor, wallInBox, type ToolPointer } from './tools.ts';
 import { scenarioFromUvtt } from './uvtt.ts';
 import { inSight, insidePolygon, sightSegments, visibilityPolygon } from './visibility.ts';
@@ -37,6 +37,12 @@ import { startWalk, walkAt } from './walk.ts';
  * inside map/ names its .ts extension because Node runs these files as they are and does not
  * guess extensions; Vite accepts either. Silent when everything holds.
  */
+
+// The props tool fades the picked picture under the pointer, and Node has no Image to load it in.
+(globalThis as { Image?: unknown }).Image ??= class
+{
+    src = '';
+};
 
 const base: Grid = {
     type: 'square',
@@ -174,18 +180,64 @@ assert.equal(pathBlocked(fence, across.slice(0, 2)), false);
 assert.equal(pathBlocked([toggleDoor({ ...fence[0], door: { open: false } })], across), false);
 
 // Spawning: the spawn cell first, skipping taken cells, never through walls or off the map.
-const map = { width: 2000, height: 2000 };
-const spawn = cellCenter(base, { q: 5, r: 5 });
-const spread = spawnCells(base, [], map, spawn, 4, new Set(['5,5']));
+const field = { grid: base, walls: [] as Wall[], width: 2000, height: 2000, spawn: cellCenter(base, { q: 5, r: 5 }) };
+const medium = { size: 'medium' } as const;
+const large = { size: 'large' } as const;
+const coverOf = (spot: Point, size: 'medium' | 'large') => keys(footprint(base, anchorAt(base, spot, size), size));
+const spread = spawnSpots(field, [medium, medium, medium, medium], [{ ...field.spawn, ...medium }]);
 
-assert.equal(spread.length, 4);
-assert.equal(new Set(keys(spread)).size, 4);
-assert.ok(spread.every((cell) => cellKey(cell) !== '5,5' && cellDistance(base, cell, { q: 5, r: 5 }) === 1));
+assert.equal(new Set(spread.flatMap((spot) => coverOf(spot, 'medium'))).size, 4);
+assert.ok(spread.every((spot) => cellDistance(base, anchorAt(base, spot, 'medium'), { q: 5, r: 5 }) === 1));
 
-// A one-cell room fits one token, however many are asked for.
+// Large ones take their whole footprint, clear of each other, as near the spawn as it allows.
+const pair = spawnSpots(field, [large, large], []);
+
+assert.equal(new Set(pair.flatMap((spot) => coverOf(spot, 'large'))).size, 8);
+assert.ok(distance(pair[0], field.spawn) < base.size);
+
+// Beside a wall a Large one stays on the spawn's side, never half in it.
+const eastWall = { ...field, walls: [wall(6, 0, 6, 20)] };
+const westOfWall = (spot: Point) => footprint(base, anchorAt(base, spot, 'large'), 'large').every((cell) => cell.q <= 5);
+const [byWall] = spawnSpots(eastWall, [large], []);
+
+assert.ok(westOfWall(byWall) && !stuckAt(eastWall, { ...byWall, ...large }));
+
+// A one-cell room fits one Medium token; the next stands on it, and a Large one across the walls.
 const box = [wall(5, 5, 6, 5), wall(6, 5, 6, 6), wall(6, 6, 5, 6), wall(5, 6, 5, 5)];
+const boxed = spawnSpots({ ...field, walls: box }, [medium, medium, large], []);
 
-assert.deepEqual(keys(spawnCells(base, box, map, spawn, 3, new Set())), ['5,5']);
+assert.deepEqual(boxed.map((spot) => coverOf(spot, 'medium')[0]).slice(0, 2), ['5,5', '5,5']);
+assert.ok(stuckAt({ ...field, walls: box }, { ...boxed[2], ...large }));
+assert.ok(roomAt(field, field.spawn, 'large') && !roomAt({ ...field, walls: box }, field.spawn, 'large'));
+
+// Growing beside a wall steps away from it, clear of others but not of its own companion; boxed
+// in, it grows where it stands.
+const hero = { id: 'hero', ...field.spawn, summonOf: undefined };
+const grown = resizedSpot(eastWall, hero, 'large', []);
+
+assert.ok(westOfWall(grown));
+assert.ok(westOfWall(resizedSpot(eastWall, hero, 'large', [{ id: 'owl', ...field.spawn, size: 'tiny', summonOf: 'hero' }])));
+
+const crowded = resizedSpot(eastWall, hero, 'large', [{ id: 'orc', ...cellCenter(base, { q: 4, r: 4 }), size: 'medium', summonOf: undefined }]);
+
+assert.ok(westOfWall(crowded) && !coverOf(crowded, 'large').includes('4,4'));
+assert.deepEqual(resizedSpot({ ...field, walls: box }, hero, 'large', []), resizedAt(base, hero, 'large'));
+
+// Out of a nook open to the west, but not past someone standing in its mouth.
+const nook = { ...field, walls: box.slice(0, 3) };
+const doorman = { id: 'orc', ...cellCenter(base, { q: 4, r: 5 }), size: 'medium' as const, summonOf: undefined };
+
+assert.ok(!stuckAt(nook, { ...resizedSpot(nook, hero, 'large', []), ...large }));
+assert.ok(stuckAt(nook, { ...resizedSpot(nook, hero, 'large', [doorman]), ...large }));
+
+// However it got there, a Large token across a wall is stuck; beside it, or a Medium one, not.
+assert.ok(stuckAt(eastWall, { ...footprintCenter(base, { q: 5, r: 5 }, 'large'), ...large }));
+assert.ok(!stuckAt(eastWall, { ...footprintCenter(base, { q: 4, r: 5 }, 'large'), ...large }));
+assert.ok(!stuckAt(eastWall, { ...cellCenter(base, { q: 5, r: 5 }), ...medium }));
+
+// Every size has room in the open on a hex grid too.
+for (const grid of grids.slice(1))
+    assert.ok((['large', 'huge', 'gargantuan'] as const).every((size) => roomAt({ ...field, grid }, field.spawn, size)));
 
 // Zooming keeps the point under the cursor where it is.
 const camera = { x: 40, y: -20, zoom: 0.5 };
@@ -695,6 +747,14 @@ assert.equal(hitOn({ kind: 'player', hp: 5, maxHp: 30 }, 'attack', 9).downed, tr
 assert.equal(hitOn({ kind: 'player', hp: 0, maxHp: 30 }, 'attack', 9).downed, false);
 assert.deepEqual(hitOn({ kind: 'npc', hp: 5, maxHp: 30 }, 'attack', 9), { after: { hp: 0, tempHp: 0, conditions: undefined }, died: true, downed: false });
 assert.deepEqual(hitOn({ kind: 'player', hp: 0, maxHp: 30, conditions: [{ id: 'prone' }, { id: 'failed', value: 2 }] }, 'heal', 4).after?.conditions, [{ id: 'prone' }]);
+
+// Out of a fight a player hurts only themselves and their summons; in one, anyone.
+assert.ok(mayHurt(false, 'me', { id: 'me' }));
+assert.ok(mayHurt(false, 'me', { id: 'wolf', summonOf: 'me' }));
+assert.ok(!mayHurt(false, 'me', { id: 'ogre' }));
+assert.ok(!mayHurt(false, 'me', { id: 'cat', summonOf: 'you' }));
+assert.ok(!mayHurt(false, null, { id: 'ogre' }));
+assert.ok(mayHurt(true, 'me', { id: 'ogre' }) && mayHurt(true, null, { id: 'ogre' }));
 
 // Conditions keep to the system's list and order, once each, values whole and in range.
 assert.deepEqual(

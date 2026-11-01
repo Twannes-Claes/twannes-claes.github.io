@@ -7,12 +7,12 @@ import { maxPlayers } from '../content/limits';
 import { colourPattern } from '../map/colours';
 import { maxDrawingPoints, maxDrawings, penWidths } from '../map/drawings';
 import { distance } from '../map/geometry';
-import { cleanStats, conditionsAt, downedPool, hitOn, withoutNumbers, withoutSaves } from '../map/health';
+import { cleanStats, conditionsAt, downedPool, hitOn, mayHurt, withoutNumbers, withoutSaves } from '../map/health';
 import { cleanFight, cleanRoll, hasRolled, nextTurn, upNext, withRoll } from '../map/initiative';
 import { pathBlocked } from '../map/path';
 import { monsterFrom } from '../map/presets';
-import { anchorAt, footprintCenter, footprintKeys, resizedAt, ridesOn } from '../map/size';
-import { spawnCells } from '../map/spawn';
+import { ridesOn } from '../map/size';
+import { resizedSpot, spawnSpots } from '../map/spawn';
 import { startWalk } from '../map/walk';
 
 import { internal } from './_generated/api';
@@ -122,27 +122,6 @@ async function memberOf(ctx: QueryCtx, sessionId: Id<'sessions'>): Promise<Doc<'
         return null;
 
     return session.ownerId === userId || (await ownToken(ctx, sessionId, userId)) ? session : null;
-}
-
-/**
- * Where tokens arriving at a scenario stand: around its spawn point, clear of everyone already
- * there. On the spawn point itself when the walls leave no room.
- */
-export function spawnSpots(
-    scenario: Scenario,
-    arriving: Pick<Token, 'size'>[],
-    staying: Pick<Token, 'x' | 'y' | 'size'>[],
-): Point[]
-{
-    const { grid, walls, spawn } = scenario;
-    const taken = new Set(
-        staying.flatMap((token) => [...footprintKeys(grid, anchorAt(grid, token, token.size), token.size)]),
-    );
-    const cells = spawnCells(grid, walls, scenario, spawn, arriving.length, taken);
-
-    return arriving.map((token, index) =>
-        cells[index] ? footprintCenter(grid, cells[index], token.size) : spawn,
-    );
 }
 
 /** Sends every player to a scenario, around its spawn point. Monsters stay on their own map. */
@@ -420,9 +399,15 @@ export const setConditions = mutation({
     },
 });
 
+/** A token document as the shared map code reads it, see resizedSpot in map/spawn.ts. */
+function mapped(doc: Doc<'tokens'>)
+{
+    return { id: doc._id as string, x: doc.x, y: doc.y, size: doc.size, summonOf: doc.summonOf as string | undefined };
+}
+
 /**
- * The host sets any token's size, a player's too, from the right-click menu. It moves onto the
- * grid for its new footprint; landing on someone is the GM's call, as with dragging.
+ * The host sets any token's size, a player's too, from the right-click menu. It moves to the
+ * nearest room for its new footprint, or grows where it stands, see resizedSpot in map/spawn.ts.
  */
 export const setSize = mutation({
     args: { tokenId: v.id('tokens'), size: sizeValidator },
@@ -435,9 +420,9 @@ export const setSize = mutation({
 
         await requireSession(ctx, token.sessionId);
         const scenario = await scenarioOf(ctx, token.sessionId, token.scenarioId);
-        const at = scenario ? resizedAt(scenario.grid, token, size) : token;
+        const at = scenario ? resizedSpot(scenario, mapped(token), size, (await tokensOn(ctx, token.sessionId, token.scenarioId)).map(mapped)) : null;
 
-        await ctx.db.patch('tokens', tokenId, { size, x: at.x, y: at.y });
+        await ctx.db.patch('tokens', tokenId, { size, ...at });
 
         if (scenario)
             await refreshSight(ctx, token.sessionId, scenario);
@@ -607,9 +592,9 @@ export const join = mutation({
         if (existing)
         {
             const stood = await scenarioOf(ctx, sessionId, existing.scenarioId);
-            const at = stood ? resizedAt(stood.grid, existing, size) : existing;
+            const at = stood ? resizedSpot(stood, mapped(existing), size, (await tokensOn(ctx, sessionId, existing.scenarioId)).map(mapped)) : null;
 
-            await ctx.db.patch('tokens', existing._id, { name: character, color, size, x: at.x, y: at.y, ...stats, initiative: stats.initiative, ...kept });
+            await ctx.db.patch('tokens', existing._id, { name: character, color, size, ...at, ...stats, initiative: stats.initiative, ...kept });
 
             return existing._id;
         }
@@ -1106,10 +1091,10 @@ export const saveFog = mutation({
         await requireSession(ctx, sessionId);
 
         if (!Number.isInteger(columns) || !Number.isInteger(rows) || Math.ceil((columns * rows) / 8) !== seen.byteLength)
-            throw new ConvexError('That fog does not fit the map.');
+            throw new ConvexError('That fog of war does not fit the map.');
 
         if (seen.byteLength > maxFogBytes)
-            throw new ConvexError('That map is too big to remember the fog of.');
+            throw new ConvexError('That map is too big to remember its fog of war.');
 
         const doc = await fogOf(ctx, sessionId, scenarioId);
 
@@ -1567,8 +1552,9 @@ export const lastHit = query({
 
 /**
  * Deals amount of damage to tokens, or heals them, see applyHit in map/health.ts. The game master
- * reaches any token on the map being played. A player only tokens they can see, attacks monsters
- * and players, heals players, and does nothing while the table is frozen. A monster brought to 0
+ * reaches any token on the map being played. A player only tokens they can see, heals any of them,
+ * damages them only in a fight, else only themselves and their summons, see mayHurt in
+ * map/health.ts, and does nothing while the table is frozen. A monster brought to 0
  * dies and leaves the map, and a decal where it fell; a player is down and stays, in a pool. A
  * token without numbers takes nothing, but still shows the hit.
  */
@@ -1616,6 +1602,9 @@ export const hit = mutation({
             const seen = token.kind === 'player' || (token.inSight === true && token.hidden !== true);
 
             if (!host && !seen)
+                continue;
+
+            if (own && kind === 'attack' && !mayHurt(session.initiative !== undefined, own._id, { id: token._id, summonOf: token.summonOf }))
                 continue;
 
             const { after, died, downed } = hitOn(token, kind, points);

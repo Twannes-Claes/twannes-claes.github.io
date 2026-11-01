@@ -78,7 +78,7 @@ function Home()
  */
 const planLimits = [
     { name: 'Function calls', limit: '1M a month', hint: 'Every query run, mutation and live update' },
-    { name: 'Database bandwidth', limit: '1 GB a month', hint: 'Everything read and written, fog and tokens most' },
+    { name: 'Database bandwidth', limit: '1 GB a month', hint: 'Everything read and written, fog of war and tokens most' },
     { name: 'File bandwidth', limit: '1 GB a month', hint: 'Maps, props and token pictures downloaded' },
     { name: 'Database storage', limit: '0.5 GB', hint: 'Sessions, maps, walls and tokens' },
 ];

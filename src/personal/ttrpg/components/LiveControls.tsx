@@ -258,8 +258,8 @@ export function LiveControls({ live, scenarioId, grid, onStarted, onDone, onErro
                                 Password
                                 <input name="password" defaultValue={live.password} autoComplete="off" required autoFocus />
                             </label>
-                            <div className="ttrpg-settings__group" role="group" aria-label="Fog">
-                                Fog
+                            <div className="ttrpg-settings__group" role="group" aria-label="Fog of war">
+                                Fog of war
                                 <div className="ttrpg-settings__choices">
                                     <button
                                         type="button"

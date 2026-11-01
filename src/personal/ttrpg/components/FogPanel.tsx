@@ -78,11 +78,11 @@ export function FogPanel({ settings, onChange, onCommit, onReset, onResetFog, on
     const set = (change: Partial<FogSettings>) => onChange({ ...settings, ...change });
 
     return (
-        <Popover title="Fog" className="ttrpg-dock-panel" onClose={onClose}>
+        <Popover title="Fog of war" className="ttrpg-dock-panel" onClose={onClose}>
             <div className="ttrpg-popover__body ttrpg-settings" onPointerUp={onCommit} onKeyUp={onCommit}>
                 <Slider
                     name="Clears in"
-                    hint="How fast the fog clears or closes in. 0 is instant."
+                    hint="How fast the fog of war clears or closes in. 0 is instant."
                     shown={`${(settings.fade / 1000).toFixed(1)} s`}
                     value={settings.fade}
                     min={0}
@@ -112,7 +112,7 @@ export function FogPanel({ settings, onChange, onCommit, onReset, onResetFog, on
                 />
                 <Slider
                     name="Far haze"
-                    hint="Fog far from the players, even where they can see."
+                    hint="Fog of war far from the players, even where they can see."
                     shown={percent(settings.haze)}
                     value={settings.haze}
                     min={0}
@@ -149,7 +149,7 @@ export function FogPanel({ settings, onChange, onCommit, onReset, onResetFog, on
                     onClick={onResetFog}
                 >
                     <FontAwesomeIcon icon={faCloud} />
-                    Reset fog
+                    Reset fog of war
                 </button>
             </div>
         </Popover>

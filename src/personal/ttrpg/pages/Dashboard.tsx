@@ -41,7 +41,7 @@ export default function Dashboard()
                 <section className="ttrpg-panel ttrpg-card" aria-label="Demo">
                     <h2>Try it first</h2>
                     <p className="ttrpg-dashboard__note">
-                        A finished battle map with walls, fog and two test players.
+                        A finished battle map with walls, fog of war and two test players.
                         <br />
                         No account needed.
                     </p>

@@ -47,6 +47,7 @@ import {
 } from './render.ts';
 import { propAt } from './props.ts';
 import { anchorAt, footprint, footprintCenter, footprintKeys, landingAt, partners } from './size.ts';
+import { stuckAt } from './spawn.ts';
 import { drawLine, penWidths } from './drawings.ts';
 import { createTool, drawBox, drawMark, drawPropGhost, fingerGap, type MapTool, type ToolId, type ToolPointer } from './tools.ts';
 import { insidePolygon, sightSegments, visibilityPolygon, type Segment } from './visibility.ts';
@@ -65,6 +66,8 @@ const ownCells = 8;
 const smokeFps = 30;
 /** How long a companion takes to get on or off its rider's ring, see perched in map/render.ts. */
 const mountTime = 300;
+/** How long a token let go keeps where it landed while its save comes back, see setTokens. */
+const landedFor = 3000;
 /** How long the table screen waits after the fog last changed before it saves it: not every step of a walk. */
 const exploredDelay = 1500;
 /** How long a press is held still before it pings, a little under a phone's own long press. */
@@ -108,8 +111,13 @@ export interface MapViewOptions
     onTokenMove?: (id: string, to: Point) => void;
     /** Monsters the erase tool took, already asked about, to take off the map. */
     onMonstersErase?: (ids: string[]) => void;
-    /** A player let go of a path they drew, see PendingMove. */
-    onPathEnd?: (move: PendingMove) => void;
+    /**
+     * A player let go of a path they drew, see PendingMove. True when the page took it some other
+     * way, like a monster let go over the tray, so no path waits for Move or Cancel.
+     */
+    onPathEnd?: (move: PendingMove) => boolean | void;
+    /** The token dragged or walked along a path being drawn, as it moves, and null once let go. */
+    onCarry?: (id: string | null) => void;
     /** Called with the scenario a tool changed, see map/tools.ts. */
     onScenarioChange?: (scenario: Scenario) => void;
     /** Twice a second while frames are drawn, for the ?debug display. */
@@ -321,7 +329,10 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     let lastShown = new Map<string, Lifted>();
     /** Tokens fading in or out, by id: since when, which way, and the token as it last showed. */
     const fading = new Map<string, { at: number; in: boolean; token?: Lifted }>();
-    /** Companions getting on or off their rider, by id: since when, and how they showed before. */
+    /**
+     * Companions getting on or off their rider, and tokens let go gliding onto the grid, by id:
+     * since when, and how they showed before.
+     */
     const mounting = new Map<string, { at: number; from: Lifted }>();
     /** The tokens the last frame drew, by id, perched or not, so one that changes can ease. */
     let lastDrawn = new Map<string, Lifted>();
@@ -437,6 +448,32 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     const fadeProgress = (at: number, time: number) =>
         fogSettings.fade > 0 ? Math.min(1, Math.max(0, (time - at) / fogSettings.fade)) : 1;
 
+    /** The stuck and hidden looks, by token id and which: since when each came or went. */
+    const rings = new Map<string, { at: number; on: boolean }>();
+    const ringMs = 200;
+    const ringProgress = (at: number, time: number) => Math.min(1, Math.max(0, (time - at) / ringMs));
+    const ringsMoving = (time: number) => !calm.matches && [...rings.values()].some((ring) => ringProgress(ring.at, time) < 1);
+
+    /** How far one look is in, 0 to 1, eased. Turning round halfway goes back from where it is. */
+    const ringAt = (key: string, on: boolean, time: number) =>
+    {
+        const ring = rings.get(key) ?? { at: -Infinity, on: false };
+        const at = ring.on === on ? ring.at : time - (1 - ringProgress(ring.at, time)) * ringMs;
+        const done = calm.matches ? 1 : ringProgress(at, time);
+
+        rings.set(key, { at, on });
+
+        return 1 - (1 - (on ? done : 1 - done)) ** 3;
+    };
+
+    /**
+     * How far each token's stuck ring, see stuckAt in map/spawn.ts, and hidden look are in, so
+     * they fade rather than blink, as a token is dragged across a wall or the GM hides one.
+     * Reduced motion jumps.
+     */
+    const withRings = (map: Scenario, tokens: Lifted[], time: number): Lifted[] =>
+        tokens.map((token) => ({ ...token, stuck: ringAt(`${token.id} stuck`, stuckAt(map, token), time), hiding: ringAt(`${token.id} hidden`, token.hidden === true, time) }));
+
     /** Starts a token fading. One fading the other way turns round from where it is, no jump. */
     const startFade = (id: string, fadingIn: boolean, time: number, token?: Lifted) =>
     {
@@ -551,9 +588,12 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         return [...visible.map((token) => ({ ...token, alpha: alphaOf(token.id) })), ...going];
     };
 
-    /** Monsters stay hidden from players until a player can see them, and while the GM hides them. */
+    /**
+     * Monsters stay hidden from players until a player can see them, or anywhere with the fog of
+     * war off, and while the GM hides them.
+     */
     const seenByPlayers = (token: Token) =>
-        token.kind === 'player' || (!token.hidden && lit.some((polygon) => insidePolygon(token, polygon)));
+        token.kind === 'player' || (!token.hidden && (scenario?.fogOff === true || lit.some((polygon) => insidePolygon(token, polygon))));
 
     /**
      * Hands what has been seen on to be shared, once it has stopped changing for a moment, or at
@@ -625,6 +665,15 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     {
         if (!fogEnabled || !scenario)
             return;
+
+        // With the fog of war off nothing is lit or remembered, the whole map just shows.
+        if (scenario.fogOff)
+        {
+            lit = [];
+            redraw();
+
+            return;
+        }
 
         explored ??= createExplored(scenario);
         layers ??= createFogLayers(scenario, explored, fogSettings);
@@ -901,7 +950,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         ];
         const decalsMoving = blood.ground && (clearedDecals.length > 0 || decals.some((decal) => progress(decal.at, decalSpread) < 1));
         const settling =
-            fading.size > 0 || mounting.size > 0 || pings.length > 0 || hits.length > 0 || decalsMoving || (layers !== null && time - layers.changedAt < fogSettings.fade);
+            fading.size > 0 || ringsMoving(time) || mounting.size > 0 || pings.length > 0 || hits.length > 0 || decalsMoving || (layers !== null && time - layers.changedAt < fogSettings.fade);
 
         // Only the smoke is moving: skip frames until its own rate comes round.
         if (!urgent && !walking && !settling && time - drawnAt < 1000 / smokeFps)
@@ -934,7 +983,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             }
         }
 
-        const fog = fogEnabled ? layers : null;
+        const fog = fogEnabled && !scenario.fogOff ? layers : null;
         const background = scenario.background ? loaded(scenario.background) : null;
         const path = pathShown(scenario);
         // Other screens' paths, for tokens this screen shows, never the one drawn here.
@@ -979,7 +1028,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             scenario: fogEnabled && !peek ? { ...scenario, props: scenario.props.filter((prop) => !prop.hidden) } : scenario,
             background,
             picture: loaded,
-            tokens: landing ? [...fadeTokens(visible, time), landing] : fadeTokens(visible, time),
+            tokens: withRings(scenario, landing ? [...fadeTokens(visible, time), landing] : fadeTokens(visible, time), time),
             editing: !fogEnabled,
             own,
             ownRestedAt,
@@ -1087,11 +1136,11 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         for (const hit of hits)
             drawHit(context, hit, (time - hit.start) / hitLife, camera.zoom, !calm.matches);
 
-        // The smoke drifts, walking tokens move, fog changes and tokens fade, so they ask for
+        // The smoke drifts, walking tokens move, fog changes, tokens fade and glide, so they ask for
         // the next frame. Reduced motion keeps the smoke still and skips the fades; a walk still
         // plays. Only once: the fog refreshed above may already have asked, and two would draw
         // every frame twice.
-        if ((walking || fading.size > 0 || pings.length > 0 || hits.length > 0 || decalsMoving || (fog && !calm.matches)) && frame === 0)
+        if ((walking || fading.size > 0 || ringsMoving(time) || mounting.size > 0 || pings.length > 0 || hits.length > 0 || decalsMoving || (fog && !calm.matches)) && frame === 0)
             frame = requestAnimationFrame(draw);
 
         measure(time, performance.now() - started);
@@ -1234,6 +1283,25 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         redraw();
     };
 
+    /** Tokens let go glide from where they showed to where they land, as a companion boards. */
+    const glide = (ids: string[]) =>
+    {
+        if (calm.matches)
+            return;
+
+        for (const id of ids)
+        {
+            const shown = lastDrawn.get(id);
+
+            if (shown)
+                mounting.set(id, { at: performance.now(), from: shown });
+
+        }
+    };
+
+    /** Tokens just let go, by id: where they landed, kept until the parent's tokens say so too. */
+    const landed = new Map<string, { to: Point; until: number }>();
+
     /** Whether a token is being dragged, on its own or with the ones picked. */
     const held = (id: string) => dragging?.group.some((member) => member.id === id) === true;
 
@@ -1253,7 +1321,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
      */
     const seenGround = (point: Point) =>
     {
-        if (!fogEnabled || !explored || lit.some((polygon) => insidePolygon(point, polygon)))
+        if (!fogEnabled || scenario?.fogOff || !explored || lit.some((polygon) => insidePolygon(point, polygon)))
             return true;
 
         const known = explored;
@@ -1558,6 +1626,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             const world = onMap(scenario, toWorld(camera, local(event)));
 
             extendRoute(scenario, world);
+            options.onCarry?.(route?.id ?? null);
 
             if (route && event.pointerType !== 'mouse')
                 route = { ...route, finger: world };
@@ -1585,6 +1654,8 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
                 moveTokens(new Map(dragging.group.map((member) => [member.id, { x: member.from.x + to.x - from.x, y: member.from.y + to.y - from.y }])));
             }
+
+            options.onCarry?.(dragging.id);
 
             return;
         }
@@ -1666,13 +1737,19 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             feet: routeFeet(current, finished),
             blocked: endTaken(current, token, end),
         };
-        options.onPathEnd?.(pending);
+
+        if (options.onPathEnd?.(pending) === true)
+            pending = null;
+
     };
 
     const up = (event: PointerEvent) =>
     {
         pointers.delete(event.pointerId);
         letGo();
+
+        if (route?.pointerId === event.pointerId || dragging?.pointerId === event.pointerId)
+            options.onCarry?.(null);
 
         if (middlePan === event.pointerId)
         {
@@ -1734,20 +1811,24 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         // master drags freely, so hidden monsters count too. With Alt held it may land on someone.
         const moved = tokens.filter((token) => group.some((member) => member.id === token.id));
         const stay = event.altKey ? [] : tokens.filter((token) => !moved.includes(token));
-        const landed = new Map<string, Point>();
+        const landing = new Map<string, Point>();
 
         for (const token of moved)
         {
             const to = landingAt(scenario, token, token.size, stay.filter((other) => !partners(token, other)));
 
-            landed.set(token.id, to);
+            landing.set(token.id, to);
             stay.push({ ...token, ...to });
         }
 
-        moveTokens(landed);
+        glide(moved.map((token) => token.id));
+        moveTokens(landing);
 
-        for (const [id, to] of landed)
+        for (const [id, to] of landing)
+        {
+            landed.set(id, { to, until: performance.now() + landedFor });
             options.onTokenMove?.(id, to);
+        }
     };
 
     /** Drops a path being drawn, or puts a dragged token back. False when neither was going on. */
@@ -1757,7 +1838,13 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             return false;
 
         if (dragging)
+        {
+            glide(dragging.group.map((member) => member.id));
             moveTokens(new Map(dragging.group.map((member) => [member.id, member.from])));
+        }
+
+        if (route || dragging)
+            options.onCarry?.(null);
 
         route = null;
         dragging = null;
@@ -1957,11 +2044,25 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
                 }
             }
 
-            // Tokens in mid drag keep following the finger rather than jumping back.
+            // Tokens in mid drag keep following the finger rather than jumping back, and ones just
+            // let go stay where they landed until the save comes back, or would glide back to
+            // where they came from and out again. A save that fails lets go after landedFor.
             const holding = new Map(tokens.filter((token) => held(token.id)).map((token) => [token.id, token]));
+            const now = performance.now();
+
+            for (const token of next)
+            {
+                const pending = landed.get(token.id);
+
+                if (pending && (now > pending.until || (token.x === pending.to.x && token.y === pending.to.y)))
+                    landed.delete(token.id);
+
+            }
+
+            const shown = (token: Token) => holding.get(token.id) ?? (landed.has(token.id) ? { ...token, ...landed.get(token.id)?.to } : token);
 
             // Bigger first, so a small token standing in a big one's space is drawn and picked on top.
-            tokens = next.map((token) => holding.get(token.id) ?? token).sort((a, b) => drawnAcross(b.size) - drawnAcross(a.size));
+            tokens = next.map(shown).sort((a, b) => drawnAcross(b.size) - drawnAcross(a.size));
             focusOwn();
             // From where walking tokens are now: their end would light up first and jump back.
             refreshFog(tokensAt(performance.now()));

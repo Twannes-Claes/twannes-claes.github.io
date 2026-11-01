@@ -95,6 +95,7 @@ export const scenarioValidator = v.object({
             ring: v.optional(v.string()),
         }),
     ),
+    fogOff: v.optional(v.boolean()),
     spawn: v.object({ x: v.number(), y: v.number() }),
 });
 
@@ -170,6 +171,7 @@ export default defineSchema({
          * staging in PLAN.md. Its x and y mean nothing until it is dragged onto the map.
          */
         tray: v.optional(v.boolean()),
+        /** Put on the spawn point without room there, in a wall, for the GM to move, see map/spawn.ts. */
         /** A monster a player can see right now, kept by sight.ts. Others are not sent to players. */
         inSight: v.optional(v.boolean()),
         /**

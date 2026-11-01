@@ -24,7 +24,8 @@ export interface Viewport
 
 /** A token as it shows mid walk: lift is how high it is off the map, 0 to 1, see map/walk.ts. */
 /** A token as drawn: lifted while it walks, and smaller riding on its carrier's ring, see perched. */
-export type Lifted = Token & { lift?: number; radius?: number };
+/** stuck and hiding: how far its stuck ring and hidden look are in, see withRings in map/view.ts. */
+export type Lifted = Token & { lift?: number; radius?: number; stuck?: number; hiding?: number };
 
 /**
  * A drop of blood a badly hurt token left as it walked, see map/view.ts: seed shapes it, and
@@ -898,8 +899,11 @@ function drawToken(
 
     drawWound(ctx, token, inner, time, motion, wounds);
 
-    if (token.hidden)
-        drawHidden(ctx, token, inner, radius);
+    if (token.hiding)
+        drawHidden(ctx, token, inner, radius, token.hiding);
+
+    if (token.stuck)
+        drawStuck(ctx, token, radius, token.stuck);
 
     // Every value over every badge, so the next badge down never covers one.
     const badges = conditionBadges(token, base);
@@ -912,13 +916,28 @@ function drawToken(
 
 }
 
+/** A token across a wall, see stuckAt in map/spawn.ts: a red dashed ring for the GM to see, faded by amount. */
+function drawStuck(ctx: CanvasRenderingContext2D, token: Lifted, radius: number, amount: number)
+{
+    ctx.save();
+    ctx.globalAlpha *= amount;
+    ctx.beginPath();
+    ctx.arc(token.x, token.y, radius * 1.2, 0, Math.PI * 2);
+    ctx.setLineDash([radius * 0.25, radius * 0.15]);
+    ctx.lineWidth = radius * 0.1;
+    ctx.strokeStyle = danger;
+    ctx.stroke();
+    ctx.restore();
+}
+
 /**
  * A monster the GM keeps from the players, as only the GM's screens get it: dimmed, an eye struck
  * through over it, unless the skull of a downed one is there already, and a dashed line around it.
  */
-function drawHidden(ctx: CanvasRenderingContext2D, token: Lifted, inner: number, radius: number)
+function drawHidden(ctx: CanvasRenderingContext2D, token: Lifted, inner: number, radius: number, amount: number)
 {
     ctx.save();
+    ctx.globalAlpha *= amount;
     ctx.beginPath();
     ctx.arc(token.x, token.y, inner, 0, Math.PI * 2);
     ctx.fillStyle = 'rgb(18 17 19 / 0.5)';

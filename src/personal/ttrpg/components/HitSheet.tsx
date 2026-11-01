@@ -37,6 +37,8 @@ interface HitSheetProps
 {
     /** The tokens picked so far, in the order they were picked. */
     targets: Token[];
+    /** Whether a token may take damage, see mayHurt in map/health.ts. The GM hurts anyone. */
+    hurts?: (token: Token) => boolean;
     /** Fails with the message to show. */
     onApply: (kind: HitKind, amount: number) => Promise<void>;
     onCancel: () => void;
@@ -44,15 +46,17 @@ interface HitSheetProps
 
 /**
  * While picking targets, at the bottom where a thumb reaches like the move sheet: who is picked,
- * how much, and Damage or Heal for all of them at once. Enter deals damage, Esc stops picking.
+ * how much, and Damage or Heal for all of them at once. Enter deals damage, or heals once no
+ * target may take damage, and Esc stops picking.
  */
-export function HitSheet({ targets, onApply, onCancel }: HitSheetProps)
+export function HitSheet({ targets, hurts = () => true, onApply, onCancel }: HitSheetProps)
 {
     const [amount, setAmount] = useState('');
     const [failure, setFailure] = useState('');
     const [busy, setBusy] = useState(false);
     const value = Number(amount);
     const ready = targets.length > 0 && amount !== '' && Number.isInteger(value) && value >= 1 && !busy;
+    const damage = targets.length === 0 || targets.some(hurts);
 
     useKeydown((event) =>
     {
@@ -76,7 +80,7 @@ export function HitSheet({ targets, onApply, onCancel }: HitSheetProps)
     const submit = (event: FormEvent) =>
     {
         event.preventDefault();
-        apply('attack');
+        apply(damage ? 'attack' : 'heal');
     };
 
     return (
@@ -93,6 +97,7 @@ export function HitSheet({ targets, onApply, onCancel }: HitSheetProps)
                     ))}
                 </ul>
             )}
+            {!damage && <p className="ttrpg-hit__hint">Out of initiative you heal, or hurt only yourself and your summons.</p>}
             <label className="ttrpg-field">
                 Amount
                 <input
@@ -123,10 +128,12 @@ export function HitSheet({ targets, onApply, onCancel }: HitSheetProps)
                     <FontAwesomeIcon icon={faHeart} />
                     Heal
                 </button>
-                <button type="submit" className="ttrpg-segment ttrpg-segment--block ttrpg-segment--hit" disabled={!ready}>
-                    {busy ? <Spinner /> : <FontAwesomeIcon icon={faBurst} />}
-                    Damage
-                </button>
+                {damage && (
+                    <button type="submit" className="ttrpg-segment ttrpg-segment--block ttrpg-segment--hit" disabled={!ready}>
+                        {busy ? <Spinner /> : <FontAwesomeIcon icon={faBurst} />}
+                        Damage
+                    </button>
+                )}
             </div>
         </form>
     );

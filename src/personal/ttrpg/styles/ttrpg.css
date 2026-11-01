@@ -972,7 +972,7 @@ html:has(.ttrpg[data-theme='light']) {
     margin-top: 0.5rem;
 }
 
-/* A preset held over it. */
+/* A preset or a monster held over it. */
 .ttrpg-tray--over {
     border-color: var(--ttrpg-accent);
     box-shadow:

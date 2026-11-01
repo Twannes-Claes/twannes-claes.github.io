@@ -1073,14 +1073,137 @@ own and fit in anywhere.
 13's menu, and 7 fills 14's tray. 17 is built with 6, which shares its pop-up. 12, 15 and 18 stand
 on their own.
 
-### Optional, for later
+### Still to build
 
-| Feature          | What                                                                                      |
-| ---------------- | ----------------------------------------------------------------------------------------- |
-| Better decals    | Blood, bodies and loot from art the GM uploads, instead of drawn in code                  |
-| Lights           | The `.dd2vtt` light sources, for dark dungeons                                            |
-| Smaller pictures | Shrink map and prop uploads further, to cut file egress (the bulk of it, not the queries) |
-| Spell effects    | After a ruler area is drawn, pick an element and it plays there on every screen, in code  |
+Everything above is built. This is what is left, in the order to build it unless a session picks
+otherwise, one feature per session as before. Each gets a **Built.** note once it is done.
+
+#### Rules
+
+**25. Attacks only in initiative.** Out of initiative a player only heals, anyone they can see, and
+damages only themselves and their own summons, for a trap or a potion gone wrong; anyone else
+needs a fight to be on, and then their turn, as now. `play.hit` checks it, and the phone's sheet
+hides Damage when no target may take it. The GM still hits anything at any time (6, item 14).
+
+- **Built.** `mayHurt` in `map/health.ts` holds the rule, for the server and every screen: anyone
+  while `sessions.initiative` is set, else only the own token and tokens whose `summonOf` it is.
+  `play.hit` skips the rest of an attack quietly, like targets out of sight. `HitSheet` takes it as
+  `hurts`: with no picked target that may take damage it hides Damage, says why, and Enter heals.
+  The phone and the table screen's Player view pass the player's own token, none on the table
+  screen, so there only a fight brings Damage back; the editor's Player view does the same, and
+  the demo leaves out of a hit what the rule leaves out. The GM view passes nothing.
+
+**26. Room at the spawn point.** Arriving tokens are placed by single cells now (`spawnCells` in
+`map/spawn.ts`), so a Large one at the demo's spawn in the house can land half in a wall or on
+someone. Spawning checks the whole footprint: the nearest spot where it fits, reached without
+crossing a wall. Where none is reached, it is placed anyway at the spawn point, stuck in the wall
+rather than refused, with a warning: the player's phone says the GM has to move them, and the GM
+view marks the token. The Spawn tool in Edit warns too when a Large token would not fit around the
+point.
+
+- **Built.** `spawnSpots` in `map/spawn.ts`, shared by the server, the demo's test players and a
+  summon called beside its owner, walks out from the spawn cell without crossing a wall and takes
+  an anchor where the token's whole footprint is on the map, free, and has no wall between its own
+  cells; of those within a footprint's width of the first, the one centred nearest the point. Each
+  arriving token takes its room before the next looks. With none, it lands on the spawn point's
+  anchor. A size change runs the same walk from where the token stands (`resizedSpot`, for
+  `play.setSize`, a rejoin and the demo), so one growing beside a wall steps clear of it, or out
+  of a room too small, and grows where it stands only when nothing fits. Unlike a spawn it never
+  walks past another token, only its own companions, who may share its space. Stuck is not stored:
+  `stuckAt` works it out from where a token stands, a wall between two cells it covers, so a
+  spawn, a resize, a drag and a drop all count without each having to set it. The phone shows a
+  toast saying the GM has to move them, or their summon; the GM view a toast naming who to
+  Alt-drag out, and the map a red dashed ring round the token. `roomAt` tells the Spawn tool to
+  warn, as a toast, when a Large token alone has no room.
+
+#### At the table
+
+**27. Chat and handouts.** A chat button on the phones, in the GM view's dock and in the Player
+view: one table chat for everyone, plus whispers between a player and the GM. The GM can send a
+picture or a short text as a **handout**, a letter, a clue, a map, to everyone or one player: it
+shows in the chat, opens full screen with a tap, and the phone keeps a list of its handouts. The
+last 50 messages per session, like the dice log, rate limited in `convex/limits.ts`, cleared with
+their pictures by End session. An unread dot on the button and a short buzz on a phone. Rolls stay
+in the dice log.
+
+**28. Mist.** Areas of mist the GM puts on the map, drawn like Reveal's polygon or circle, with a
+colour and a density: grey haze, green poison, purple arcane. It drifts like the fog's smoke and
+shows on every screen, over the fog. Whether thick mist blocks sight shows in testing. Saved with
+the map, removed with the eraser. With mist next to it, the fog itself is named **Fog of war**
+everywhere in the UI, so the two never get mixed up.
+
+**29. Fog of war off.** A switch per map, in the map panel: off, the players see the whole map,
+for a town in daylight. Hidden monsters stay hidden.
+
+- **Built.** `fogOff` on the scenario (`types.ts`, the scenario validator in `convex/schema.ts`),
+  switched under **Fog of war** in the map panel and saved with the map, so undo takes it back.
+  Off, `refreshSight` in `convex/sight.ts` marks every monster on the map in sight, so the
+  players' tokens query sends all but the hidden ones; a save of the played map runs it, as a door
+  does. Every screen's view (`map/view.ts`) draws no fog, counts every monster not hidden as seen,
+  lets players walk anywhere, and neither lights nor remembers anything, so switching it back on
+  shows what was explored before. The fog is called **Fog of war** in the UI now too: the dock's
+  button and panel, Reset, the start dialog, the account page and the server's messages.
+
+**30. Condition rounds.** A condition can get a number of rounds, set when it is put on. It counts
+down at the start of its token's turn in initiative (6) and comes off at 0, with a toast. Without
+a number it stays until taken off, as now. Out of initiative nothing counts down.
+
+**31. Tray in the GM view.** The tray (14) shows in the GM view too, so the GM drags in a monster
+staged in Edit mid-fight, hidden until shown.
+
+- **Built.** The GM view shows the tray in the same corner as Edit while it holds a monster, or
+  while one is dragged or walked on the map, empty or not, and takes a tile dropped on the map like
+  Edit does, hidden. It does not fade when the mouse rests, as a drag from it moves no mouse and
+  would lose its tile. The map tells the page which token is carried (`onCarry` in `map/view.ts`),
+  and the tray lights up while a monster is over it, as it does for a preset. Let go there, a
+  dragged monster goes onto it as before, and in the GM view, where a monster walks a path, so does
+  one whose path ends there (`onPathEnd` takes it, so no Move waits). A tile that leaves the tray
+  fades out where it stood before the rest glide into place, and a new one fades in, see
+  `components/Tray.tsx`.
+
+**32. Hit log and undo.** The GM view lists the fight's hits (who, how much, damage or heal), and
+the GM can undo the last one, for a mistyped number.
+
+**33. GM notes.** Pins on the map with a text, on the GM view only, saved with the map: what is in
+the chest, what the statue says.
+
+**34. Concentration and height.** Concentration as a condition in 5e, and a height on a token, like
+30 ft up for a flying one, shown as a small badge and counted by the ruler.
+
+#### Rulers and effects
+
+**35. Line and cube rulers.** A line with a width (a lightning bolt, 5 ft wide) and a cube join
+Line, Circle and Cone in the ruler's pop-out (10, 16).
+
+**36. Spell effects.** After a ruler area is drawn, pick an element (fire, frost, lightning, acid,
+radiant) and it plays there on every screen, drawn in code, a few seconds long.
+
+#### Looks
+
+**37. Styles.** Next to Dark and Light in Look (22): Modern, today's look, and Fantasy, Medieval
+and Forest, each its own fonts, panel textures, borders and colours under a `data-style` on the
+app's root in `styles/ttrpg.css`. Fonts free to use and imported by the app's pages. Optional, and
+one style first to see if it is worth the rest.
+
+**38. Lights.** The `.dd2vtt` light sources, for dark dungeons: outside every light the map stays
+dark even where a player sees. No darkvision or vision ranges, see Dropped.
+
+**39. Better decals.** Blood, bodies and loot from art the GM uploads, instead of drawn in code.
+
+#### Under the hood
+
+**40. Smaller pictures.** Shrink map and prop uploads further, to cut file egress, the bulk of it
+rather than the queries.
+
+**41. Checks before real sessions**, with the Convex and security skills, no new features:
+
+- Tests for the rules in `convex/play.ts` (turns, sight, hits, moves), the wrong player refused
+  included (`convex-test`, `convex-verify`). Only `map/map.check.ts` tests anything now.
+- An access review of every mutation a player can call (`convex-authz`, `convex-reviewer`,
+  `security-audit`).
+- What eats the free plan's quota on the dev deployment (`convex-advisor`, `convex-cost`).
+- What can go or be simpler, `MapEditor.tsx` above all (`ponytail-audit`).
+- A backup and a restore tried once (`convex-backup`).
 
 ### Dropped
 

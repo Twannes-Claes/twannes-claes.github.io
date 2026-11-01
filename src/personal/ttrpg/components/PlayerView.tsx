@@ -7,6 +7,7 @@ import {
     faImage,
     faRightFromBracket,
     faSnowflake,
+    faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
 import { faDiscord } from '@fortawesome/free-brands-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -22,8 +23,9 @@ import type { Id } from '../convex/_generated/dataModel';
 import { highlight } from '../map/colours';
 import { penWidths } from '../map/drawings';
 import { defaultFogSettings } from '../map/fog';
-import { defaultBlood, downPlayer } from '../map/health';
+import { defaultBlood, downPlayer, mayHurt } from '../map/health';
 import { initiativeBonus } from '../map/presets';
+import { stuckAt } from '../map/spawn';
 import type { FrameStats, PendingMove } from '../map/view';
 import { confirmAction } from '../services/confirm';
 import { buzz } from '../services/haptics';
@@ -432,6 +434,8 @@ function Table({ sessionId, mine, frozen, fogLook, blood, secretSaves, system, f
     const touched = !onTable && lastHit?.targets.some((target) => own.some((token) => token.x === target.x && token.y === target.y));
     const hitAt = touched && lastHit ? lastHit.at : null;
     const hitKind = lastHit?.kind;
+    // Across a wall, see stuckAt in map/spawn.ts.
+    const stuck = scenario ? own.filter((token) => stuckAt(scenario, token)) : [];
 
     useEffect(() =>
     {
@@ -793,6 +797,11 @@ function Table({ sessionId, mine, frozen, fogLook, blood, secretSaves, system, f
                         You are up next
                     </Toast>
                 )}
+                {stuck.length > 0 && (
+                    <Toast kind="info" icon={faTriangleExclamation}>
+                        {`${stuck.map((token) => (token.id === mine ? 'You' : token.name)).join(' and ')} ${stuck.length === 1 && stuck[0].id !== mine ? 'is' : 'are'} stuck in a wall. The GM has to move ${stuck.length === 1 && stuck[0].id === mine ? 'you' : 'them'}.`}
+                    </Toast>
+                )}
                 {uploading && <Toast kind="busy">Uploading your picture</Toast>}
                 {message.message && (
                     <Toast kind={message.message.kind} onClose={message.clear}>
@@ -806,6 +815,7 @@ function Table({ sessionId, mine, frozen, fogLook, blood, secretSaves, system, f
             {targets && (
                 <HitSheet
                     targets={picked}
+                    hurts={(target) => mayHurt(fight !== null, mine, target)}
                     onApply={dealHit}
                     onCancel={() => setTargets(null)}
                 />

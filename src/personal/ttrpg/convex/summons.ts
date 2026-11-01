@@ -4,12 +4,13 @@ import { ConvexError, v } from 'convex/values';
 import type { Token } from '../types';
 import { maxSummons } from '../content/limits';
 import { cleanStats } from '../map/health';
+import { spawnSpots } from '../map/spawn';
 
 import type { Doc, Id } from './_generated/dataModel';
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireUser } from './access';
 import { limit } from './limits';
-import { dropDraftOf, dropToken, ownToken, scenarioOf, spawnSpots, tokenOf } from './play';
+import { dropDraftOf, dropToken, ownToken, scenarioOf, tokenOf } from './play';
 import { sizeValidator } from './schema';
 import { refreshSight, tokensOn } from './sight';
 import { dropFile } from './usage';

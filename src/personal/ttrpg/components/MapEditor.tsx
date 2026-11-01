@@ -14,11 +14,12 @@ import { highlight, ringColours } from '../map/colours';
 import { penWidths } from '../map/drawings';
 import { rollDice } from '../map/dice';
 import { defaultFogSettings } from '../map/fog';
-import { cleanStats, conditionsAt, defaultBlood, downedPool, hitOn, withoutNumbers, withoutSaves } from '../map/health';
+import { cleanStats, conditionsAt, defaultBlood, downedPool, hitOn, mayHurt, withoutNumbers, withoutSaves } from '../map/health';
 import { nextTurn } from '../map/initiative';
 import { monsterFrom } from '../map/presets';
 import { newProp } from '../map/props';
-import { landingAt, resizedAt } from '../map/size';
+import { landingAt } from '../map/size';
+import { resizedSpot, roomAt, spawnSpots, stuckAt } from '../map/spawn';
 import { toggleDoor, type ToolId } from '../map/tools';
 import { scenarioFromUvtt } from '../map/uvtt';
 import type { FrameStats, PendingMove } from '../map/view';
@@ -457,7 +458,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
         },
         setStats: (id, stats) => changeToken(id, (token) => ({ ...token, ...cleanStats(stats) })),
         setConditions: (id, conditions) => changeToken(id, (token) => ({ ...token, conditions: cleanConditions(demoSystem, conditions) })),
-        setSize: (id, size) => changeToken(id, (token) => ({ ...token, size, ...resizedAt(active.grid, token, size) })),
+        setSize: (id, size) => changeToken(id, (token) => ({ ...token, size, ...resizedSpot(active, token, size, shown) })),
     };
     const monsterControls = live ?? demoMonsters;
 
@@ -483,7 +484,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const testPlayers: Pick<Live, 'setStats' | 'setConditions' | 'setSize'> = {
         setStats: (id, stats) => changeToken(id, (token) => ({ ...token, ...cleanStats(stats), initiative: cleanStats(stats).initiative, conditions: conditionsAt(token.conditions, cleanStats(stats).hp) })),
         setConditions: (id, conditions) => changeToken(id, (token) => ({ ...token, conditions })),
-        setSize: (id, size) => changeToken(id, (token) => ({ ...token, size, ...resizedAt(active.grid, token, size) })),
+        setSize: (id, size) => changeToken(id, (token) => ({ ...token, size, ...resizedSpot(active, token, size, shown) })),
     };
     const playerControls = liveMap ?? testPlayers;
     const testCount = tokens.filter((token) => token.kind === 'player').length;
@@ -507,10 +508,13 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 tempHp: 0,
                 ac: 12,
                 perception: 10,
-                ...landingAt(active, active.spawn, 'medium', shown),
+                ...spawnSpots(active, [{ size: 'medium' }], shown)[0],
             },
         ]);
     };
+
+    // Across a wall, see stuckAt in map/spawn.ts; the map rings them too.
+    const stuck = shown.filter((token) => stuckAt(active, token));
 
     const removeTestPlayer = (id: string) => setTokens((current) => current.filter((token) => token.id !== id));
 
@@ -538,7 +542,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const ontoTray = (id: string) =>
     {
         const at = letGo.current;
-        const box = document.querySelector('.ttrpg-tray:not(.ttrpg-hidden)')?.getBoundingClientRect();
+        const box = document.querySelector('.ttrpg-tray:not(.ttrpg-hidden, .ttrpg-leaving)')?.getBoundingClientRect();
 
         if (!at || !box || at.x < box.left || at.x > box.right || at.y < box.top || at.y > box.bottom)
             return false;
@@ -551,6 +555,21 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
         return true;
     };
+
+    // The GM view walks a monster along a path, so one let go over the tray goes onto it too.
+    const pathEnded = (move: PendingMove) =>
+    {
+        const taken = ontoTray(move.id);
+
+        if (!taken)
+            setPending(move);
+
+        return taken;
+    };
+
+    // The token being dragged or walked on the map, so the tray shows and lights up for a monster.
+    const [carried, setCarried] = useState<string | null>(null);
+    const carryingMonster = carried !== null && monstersHere.some((monster) => monster.id === carried);
 
     // Dragged freely, or walked along a path: to the server for the live map's tokens and a saved
     // session's monsters on any map, here for the test players and the demo.
@@ -723,9 +742,12 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
     };
 
+    // The Player view hurts like a player without a token of their own, see mayHurt in map/health.ts.
+    const hurts = (token: Token) => mode !== 'players' || mayHurt(fight !== null, null, token);
+
     const dealHit = (kind: HitKind, amount: number) =>
     {
-        const ids = targets ?? [];
+        const ids = shown.filter((token) => targets?.includes(token.id) && (kind === 'heal' || hurts(token))).map((token) => token.id);
 
         if (liveMap)
             return liveMap.hit(ids, kind, amount).then(() => setTargets(null));
@@ -807,7 +829,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const resetFog = () =>
     {
         setFogEpoch((epoch) => epoch + 1);
-        message.done(liveMap ? 'Fog reset on every screen.' : 'Fog reset.');
+        message.done(liveMap ? 'Fog of war reset on every screen.' : 'Fog of war reset.');
 
         if (liveMap)
             fail(liveMap.resetFog());
@@ -1042,12 +1064,13 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 peek={mode === 'gm'}
                 onTokenMove={moveToken}
                 onMonstersErase={removeMonsters}
-                onPathEnd={setPending}
+                onPathEnd={pathEnded}
+                onCarry={setCarried}
                 onPathCancel={() => setPending(null)}
                 onScenarioChange={changeScenario}
                 onStats={showStats ? setStats : undefined}
                 onPresetDrop={playing ? undefined : (presetId, at, stack) => fail(monsterControls.placeMonster(presetId, active.id, at, stack))}
-                onTrayDrop={playing ? undefined : fromTray}
+                onTrayDrop={mode === 'players' ? undefined : fromTray}
                 onPropDrop={playing ? undefined : dropProp}
                 onToolCancel={putToolAway}
                 shared={liveMap ? liveMap.fog : null}
@@ -1106,7 +1129,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                     aria-pressed={mode === 'gm'}
                     title={
                         liveMap
-                            ? 'Live: the fog dimmed, every monster, and your GM controls'
+                            ? 'Live: the fog of war dimmed, every monster, and your GM controls'
                             : 'Run the map, with test players'
                     }
                     onClick={() => switchMode('gm')}
@@ -1254,6 +1277,16 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                         {fightLine(fight, shown, mode === 'players')}
                     </Toast>
                 )}
+                {mode === 'gm' && stuck.length > 0 && (
+                    <Toast kind="info" icon={faTriangleExclamation}>
+                        {`${stuck.map((token) => token.name).join(', ')} ${stuck.length === 1 ? 'stands' : 'stand'} across a wall. Alt-drag them out.`}
+                    </Toast>
+                )}
+                {mode === 'edit' && tool === 'spawn' && !roomAt(active, active.spawn, 'large') && (
+                    <Toast kind="info" icon={faTriangleExclamation}>
+                        A Large token has no room around this spawn point.
+                    </Toast>
+                )}
                 {busy && <Toast kind="busy">{busy}</Toast>}
                 {message.message && (
                     <Toast kind={message.message.kind} onClose={message.clear}>
@@ -1273,6 +1306,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
             {playing && targets && (
                 <HitSheet
                     targets={shown.filter((token) => targets.includes(token.id))}
+                    hurts={hurts}
                     onApply={dealHit}
                     onCancel={() => setTargets(null)}
                 />
@@ -1350,6 +1384,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                         onBackground={setBackground}
                         onRemoveBackground={removeBackground}
                         onOutside={(colour) => updateScenario(active.id, (scenario) => ({ ...scenario, outside: colour }))}
+                        onFogOff={(off) => updateScenario(active.id, (scenario) => ({ ...scenario, fogOff: off || undefined }))}
                         backgroundBytes={active.background ? pictureBytes.get(active.background) : undefined}
                     />
                     {store.save && <SaveState unsaved={unsaved} failed={saveFailed} />}
@@ -1457,13 +1492,16 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 />
             )}
 
-            {/* In Edit only for now, with the tools that move monsters, so one can be dragged onto it
-                even while it is empty. */}
-            {mode === 'edit' && (tool === 'monsters' || tool === 'select' || tool === 'pick') && (
+            {/* In Edit with the tools that move monsters, so one can be dragged onto it even while it is
+                empty. In the GM view while it holds any, to drag one in mid-fight, still hidden, or
+                while a monster is dragged, to put it there. Not hidden when idle like the dock: a
+                drag from it moves no mouse, and would lose its tile. */}
+            {((mode === 'edit' && (tool === 'monsters' || tool === 'select' || tool === 'pick')) || (mode === 'gm' && (tray.length > 0 || carryingMonster))) && (
                 <Tray
                     monsters={tray}
                     onPresetDrop={tool === 'monsters' ? (presetId) => fail(monsterControls.placeMonster(presetId, active.id, null)) : undefined}
                     onMenu={(id, at) => setMenu({ id, at })}
+                    carrying={carryingMonster}
                 />
             )}
 

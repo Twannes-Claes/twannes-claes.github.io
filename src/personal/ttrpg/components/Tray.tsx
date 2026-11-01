@@ -1,12 +1,15 @@
 import { faChevronDown } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useState, type DragEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type DragEvent } from 'react';
 
 import type { Point, Token } from '../types';
 
 import { carry, readyCarry } from './carry';
 import { presetDragType, trayDragType } from './MapCanvas';
 import { PresetFace } from './PresetDialog';
+
+/** How long a tile takes to fade out, fade in or glide to its new place. */
+const tileMs = 180;
 
 interface TrayProps
 {
@@ -16,18 +19,120 @@ interface TrayProps
     onPresetDrop?: (presetId: string) => void;
     /** Opens a monster's menu, with where on the page, see TokenMenu.tsx. */
     onMenu: (id: string, at: Point) => void;
+    /** A monster on the map is being dragged, which lands here if let go over the tray. */
+    carrying?: boolean;
 }
 
 /**
- * The open map's tray, bottom right in Edit: monsters made ready off the grid, hidden,
- * to drag onto the map when they are needed, see Monster staging in PLAN.md. A monster dragged
- * off the map and let go over it goes onto it, see ontoTray in MapEditor.tsx. A click or
+ * The open map's tray, bottom right in Edit and the GM view: monsters made ready off the grid,
+ * hidden, to drag onto the map when they are needed, see Monster staging in PLAN.md. A monster
+ * dragged off the map and let go over it goes onto it, see ontoTray in MapEditor.tsx. A click or
  * right click opens one's menu, as on the map.
  */
-export function Tray({ monsters, onPresetDrop, onMenu }: TrayProps)
+export function Tray({ monsters, onPresetDrop, onMenu, carrying = false }: TrayProps)
 {
     // A preset held over the tray, to show it lands here.
     const [over, setOver] = useState(false);
+    // The same for a monster dragged off the map, which is no drag the browser knows of: the map
+    // holds the pointer, so its moves only pass by the window.
+    const [held, setHeld] = useState(false);
+    const box = useRef<HTMLElement>(null);
+
+    useEffect(() =>
+    {
+        if (!carrying)
+            return;
+
+        const track = (event: PointerEvent) =>
+        {
+            const rect = box.current?.getBoundingClientRect();
+
+            setHeld(rect !== undefined && event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom);
+        };
+
+        window.addEventListener('pointermove', track, true);
+
+        return () =>
+        {
+            window.removeEventListener('pointermove', track, true);
+            setHeld(false);
+        };
+    }, [carrying]);
+
+    // The tiles drawn: the monsters on the tray, and those that just left it, kept until they have
+    // faded out where they stood. Under reduced motion they go at once.
+    const [kept, setKept] = useState(monsters);
+    const [keptFor, setKeptFor] = useState(monsters);
+    const calm = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (monsters !== keptFor)
+    {
+        setKeptFor(monsters);
+        setKept((current) => [
+            ...current.flatMap((tile) =>
+            {
+                const now = monsters.find((monster) => monster.id === tile.id);
+
+                return now ? [now] : calm ? [] : [tile];
+            }),
+            ...monsters.filter((monster) => !current.some((tile) => tile.id === monster.id)),
+        ]);
+    }
+
+    // Where each tile stood, so the rest glide into place once one goes or comes, and the tiles
+    // fading out now, so each fades once.
+    const places = useRef(new Map<string, DOMRect>());
+    const fading = useRef(new Set<string>());
+
+    useLayoutEffect(() =>
+    {
+        const tiles = [...(box.current?.querySelectorAll<HTMLElement>('[data-tile]') ?? [])];
+        const before = places.current;
+
+        places.current = new Map(tiles.map((tile) => [tile.dataset.tile ?? '', tile.getBoundingClientRect()]));
+
+        if (calm || !box.current)
+            return;
+
+        // Moves inside the panel are in its zoomed pixels, see the control size in useScreenSettings.ts.
+        const zoom = Number(getComputedStyle(box.current).getPropertyValue('--ttrpg-ui')) || 1;
+        const timing = { duration: tileMs, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' };
+
+        for (const tile of tiles)
+        {
+            const id = tile.dataset.tile ?? '';
+            const was = before.get(id);
+            const now = places.current.get(id);
+
+            if (!monsters.some((monster) => monster.id === id))
+            {
+                if (fading.current.has(id))
+                    continue;
+
+                fading.current.add(id);
+                // Cancelled when it comes back first, and then it stays.
+                tile.animate({ opacity: [1, 0], scale: [1, 0.8] }, { ...timing, fill: 'forwards' }).finished.then(
+                    () =>
+                    {
+                        fading.current.delete(id);
+                        setKept((current) => current.filter((other) => other.id !== id));
+                    },
+                    () => fading.current.delete(id),
+                );
+            }
+            else if (fading.current.has(id))
+            {
+                for (const motion of tile.getAnimations())
+                    motion.cancel();
+
+            }
+            else if (!was && before.size > 0)
+                tile.animate({ opacity: [0, 1], scale: [0.8, 1] }, timing);
+            else if (was && now && (was.left !== now.left || was.top !== now.top))
+                tile.animate({ translate: [`${(was.left - now.left) / zoom}px ${(was.top - now.top) / zoom}px`, '0 0'] }, timing);
+
+        }
+    }, [kept, monsters, calm]);
 
     const accepts = (event: DragEvent) => Boolean(onPresetDrop) && event.dataTransfer.types.includes(presetDragType);
 
@@ -41,7 +146,8 @@ export function Tray({ monsters, onPresetDrop, onMenu }: TrayProps)
 
     return (
         <section
-            className={`ttrpg-panel ttrpg-tray${over ? ' ttrpg-tray--over' : ''}`}
+            ref={box}
+            className={`ttrpg-panel ttrpg-tray${over || held ? ' ttrpg-tray--over' : ''}`}
             aria-label="Tray"
             onDragOver={(event) =>
             {
@@ -78,14 +184,14 @@ export function Tray({ monsters, onPresetDrop, onMenu }: TrayProps)
                     <FontAwesomeIcon icon={faChevronDown} className="ttrpg-usage__chevron" />
                 </summary>
                 <div className="ttrpg-tray__body">
-                    {monsters.length === 0 ? (
+                    {kept.length === 0 ? (
                         <p className="ttrpg-tray__empty">
                             {onPresetDrop ? 'Drop a preset or a monster here to keep it off the map.' : 'Drag a monster here to keep it off the map.'}
                         </p>
                     ) : (
                         <ul className="ttrpg-tray__list">
-                            {monsters.map((monster) => (
-                                <li key={monster.id}>
+                            {kept.map((monster) => (
+                                <li key={monster.id} data-tile={monster.id} inert={!monsters.some((other) => other.id === monster.id)}>
                                     <button
                                         type="button"
                                         className="ttrpg-library__item ttrpg-preset-tile"
