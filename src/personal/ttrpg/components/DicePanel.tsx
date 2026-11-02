@@ -305,8 +305,11 @@ function Tray3D({ roll, color, scale, onLanded }: { roll: DiceRoll; color: strin
 export function DicePanel({ rolls, onRoll, system, host = false, phone = false, quick = false, modifier: start = 0, own, onLanded, onClose }: DicePanelProps)
 {
     const [sides, setSides] = useState(20);
-    const [count, setCount] = useState(1);
-    const [modifier, setModifier] = useState(start);
+    // Held as typed, so a field can be emptied before the next number goes in.
+    const [countText, setCountText] = useState('1');
+    const [modifierText, setModifierText] = useState(String(start));
+    const count = Math.min(maxDice, Math.max(1, Math.round(Number(countText)) || 1));
+    const modifier = Math.min(99, Math.max(-99, Math.round(Number(modifierText)) || 0));
     const [edge, setEdge] = useState<DiceAsk['edge']>();
     // The GM's rolls from their initiative start hidden, as monsters' are.
     const [hidden, setHidden] = useState(quick);
@@ -382,11 +385,11 @@ export function DicePanel({ rolls, onRoll, system, host = false, phone = false, 
                 <div className="ttrpg-dice__numbers">
                     <label className="ttrpg-field">
                         How many
-                        <input type="number" inputMode="numeric" min={1} max={maxDice} value={count} onChange={(event) => setCount(Math.min(maxDice, Math.max(1, Math.round(Number(event.target.value)) || 1)))} />
+                        <input type="number" inputMode="numeric" min={1} max={maxDice} value={countText} onChange={(event) => setCountText(event.target.value)} onBlur={() => setCountText(String(count))} />
                     </label>
                     <label className="ttrpg-field">
                         Add
-                        <input type="number" inputMode="numeric" min={-99} max={99} value={modifier} onChange={(event) => setModifier(Math.min(99, Math.max(-99, Math.round(Number(event.target.value)) || 0)))} />
+                        <input type="number" inputMode="numeric" min={-99} max={99} value={modifierText} onChange={(event) => setModifierText(event.target.value)} onBlur={() => setModifierText(String(modifier))} />
                     </label>
                 </div>
                 <div className="ttrpg-picks">

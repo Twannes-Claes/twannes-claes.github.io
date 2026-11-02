@@ -7,7 +7,7 @@ import {
     type IconDefinition,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useRef, type ChangeEvent, type CSSProperties } from 'react';
+import { useRef, useState, type CSSProperties } from 'react';
 
 import type { Grid } from '../types';
 
@@ -52,14 +52,6 @@ function diagonalRules(feet: number): { id: NonNullable<Grid['diagonals']>; labe
     ];
 }
 
-/** A number field's value, or the old one while the field is empty or half typed. */
-function numberFrom(event: ChangeEvent<HTMLInputElement>, fallback: number): number
-{
-    const value = event.target.valueAsNumber;
-
-    return Number.isFinite(value) ? value : fallback;
-}
-
 /** How finely the offset fields move, and how far under a cell they stop. */
 const offsetStep = 0.5;
 
@@ -80,6 +72,11 @@ interface NumberFieldProps
 function NumberField({ label, value, step, min = -Infinity, onChange }: NumberFieldProps)
 {
     const drag = useRef<{ x: number; from: number; moved: boolean; pressed: boolean } | null>(null);
+    // The text as typed while the field has focus, so it can be emptied or half typed; a whole
+    // number in it still changes the grid at once.
+    const [draft, setDraft] = useState<string | null>(null);
+    // The value when the field got focus, which an emptied field goes back to.
+    const before = useRef(value);
 
     return (
         <label>
@@ -130,8 +127,28 @@ function NumberField({ label, value, step, min = -Infinity, onChange }: NumberFi
                 type="number"
                 min={Number.isFinite(min) ? min : undefined}
                 step={step}
-                value={Number(value.toFixed(2))}
-                onChange={(event) => onChange(Math.max(min, numberFrom(event, value)), false)}
+                value={draft ?? Number(value.toFixed(2))}
+                onChange={(event) =>
+                {
+                    setDraft(event.target.value);
+
+                    if (Number.isFinite(event.target.valueAsNumber))
+                        onChange(Math.max(min, event.target.valueAsNumber), false);
+
+                }}
+                onFocus={() =>
+                {
+                    before.current = value;
+                }}
+                onBlur={(event) =>
+                {
+                    // Typing over "25" passes through "2" on the way to empty, so go back to
+                    // what was there before, folded into the same undo step.
+                    if (!Number.isFinite(event.target.valueAsNumber))
+                        onChange(before.current, true);
+
+                    setDraft(null);
+                }}
             />
         </label>
     );
@@ -221,7 +238,7 @@ export function GridPanel({ grid, onChange }: GridPanelProps)
                         disabled={!grid.visible}
                         onChange={(event) =>
                         {
-                            set({ opacity: numberFrom(event, grid.opacity) }, sliding.current);
+                            set({ opacity: event.target.valueAsNumber }, sliding.current);
                             sliding.current = true;
                         }}
                         onPointerUp={letGo}
