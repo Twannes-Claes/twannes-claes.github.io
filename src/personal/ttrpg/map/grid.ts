@@ -49,12 +49,44 @@ export function sameCell(a: Cell, b: Cell): boolean
  */
 export function wrapOffset(grid: Grid): Grid
 {
-    const hex = grid.type === 'hex';
-    const wide = hex && grid.hexOrientation === 'flat' ? sqrt3 : 1;
-    const tall = hex && grid.hexOrientation === 'pointy' ? sqrt3 : 1;
+    const { x, y } = repeat(grid);
     const wrap = (value: number, period: number) => ((value % period) + period) % period;
 
-    return { ...grid, offsetX: wrap(grid.offsetX, grid.size * wide), offsetY: wrap(grid.offsetY, grid.size * tall) };
+    return { ...grid, offsetX: wrap(grid.offsetX, x), offsetY: wrap(grid.offsetY, y) };
+}
+
+/** How far the grid runs before it looks the same again, across and down. */
+function repeat(grid: Grid): Point
+{
+    const hex = grid.type === 'hex';
+
+    return { x: grid.size * (hex && grid.hexOrientation === 'flat' ? sqrt3 : 1), y: grid.size * (hex && grid.hexOrientation === 'pointy' ? sqrt3 : 1) };
+}
+
+/** Whether two grids lay out the same cells, so tokens standing on one still stand on the other. */
+export function sameCells(a: Grid, b: Grid): boolean
+{
+    return a.type === b.type && a.hexOrientation === b.hexOrientation && a.size === b.size && a.offsetX === b.offsetX && a.offsetY === b.offsetY;
+}
+
+/**
+ * Where a point on one grid lands on another: the same spot in its cell, as if the picture under
+ * it were scaled and shifted with the lines, so tokens ride along with them. Of the offsets that
+ * draw the new grid alike, see wrapOffset, it takes the one nearest the old, so a shift past a
+ * whole cell is no jump back. A new kind of grid lines up with nothing, and the point stays.
+ */
+export function carried(from: Grid, to: Grid, point: Point): Point
+{
+    if (from.type !== to.type || (to.type === 'hex' && from.hexOrientation !== to.hexOrientation))
+        return point;
+
+    const scale = to.size / from.size;
+    const period = repeat(to);
+    const near = (offset: number, old: number, step: number) => offset + Math.round((old - offset) / step) * step;
+    const x = near(to.offsetX, from.offsetX, period.x);
+    const y = near(to.offsetY, from.offsetY, period.y);
+
+    return { x: x + (point.x - from.offsetX) * scale, y: y + (point.y - from.offsetY) * scale };
 }
 
 /** From the centre of a hex to one of its corners. */

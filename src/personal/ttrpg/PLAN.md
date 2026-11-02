@@ -1116,6 +1116,34 @@ point.
   Alt-drag out, and the map a red dashed ring round the token. `roomAt` tells the Spawn tool to
   warn, as a toast, when a Large token alone has no room.
 
+**42. Grid changes carry the tokens and the spawn point.** Tokens, walls, props and the spawn point
+are stored in world pixels (`wrapOffset` in `map/grid.ts`), so changing the cell size, offset or
+type in the grid panel moves the lines and nothing else: the spawn point stays put, and tokens end
+up between cells or no longer match their footprint, some following and some not. Walls and props
+belong to the picture and stay where they are, since lining the grid up with the picture is what
+the panel is for. Everything that stands on cells moves to the new grid: every token on that map,
+on every screen and in the demo, monsters not yet shown included, to the cell under its centre,
+footprint whole and out of walls (`spawnSpots` in `map/spawn.ts`); the spawn point to its cell's
+centre. One drag of a field is one step to undo, tokens included. Find first which tokens did not
+follow and why.
+
+- **Built.** None followed: nothing moved a token on a grid change, and the ones that seemed to
+  were those whose centre still fell near a new cell's centre, close to the grid's origin or on a
+  whole-cell change. `carried` in `map/grid.ts` takes a point to the same spot in its cell on the
+  new grid, as if the picture were scaled and shifted with the lines, taking the offset nearest
+  the old so a wrapped offset is no jump; a new kind of grid carries nothing. `regridSpots` in
+  `map/spawn.ts` then puts each token on the cell there with its whole footprint, never looking for
+  room elsewhere, so it does not hop about mid-drag; one carried across a wall shows as stuck; `regridSpawn` carries the spawn point
+  onto its cell's centre, in the same undo step as the grid. `sameCells` tells a new grid from new
+  lines. The editor carries this tab's
+  tokens (the demo's players and monsters, and a session's test players) whenever the open map's
+  grid changes, so undo and redo carry them back. A saved session's tokens, every one on that map,
+  players and monsters, shown or not, played or not, move in `sessions.save` (`regrid` in
+  `convex/play.ts`), carried from the grid saved before, in one transaction rather than a move per
+  token; undo saves again and brings them back. Until the save the editor shows them where it
+  will put them (`regridded` in `MapEditor.tsx`), so they ride the lines while a field is dragged
+  rather than only grow and jump a second later. Tray monsters are off the map and stay.
+
 #### At the table
 
 **27. Chat and handouts.** A chat button on the phones, in the GM view's dock and in the Player

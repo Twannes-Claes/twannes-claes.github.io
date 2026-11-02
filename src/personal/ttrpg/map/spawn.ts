@@ -1,7 +1,7 @@
-import type { Cell, CreatureSize, Point, Scenario, Token } from '../types';
+import type { Cell, CreatureSize, Grid, Point, Scenario, Token } from '../types';
 
-import { distance } from './geometry.ts';
-import { cellAt, cellCenter, cellKey, neighbours, stepBlocked } from './grid.ts';
+import { distance, distanceToSegment } from './geometry.ts';
+import { carried, cellAt, cellCenter, cellKey, neighbours, stepBlocked } from './grid.ts';
 import { anchorAt, cellsAcross, footprint, footprintCenter, footprintKeys, partners, resizedAt } from './size.ts';
 
 type Ground = Pick<Scenario, 'grid' | 'walls' | 'width' | 'height'>;
@@ -12,12 +12,18 @@ function takenBy(grid: Scenario['grid'], tokens: Pick<Token, 'x' | 'y' | 'size'>
     return new Set(tokens.flatMap((token) => [...footprintKeys(grid, anchorAt(grid, token, token.size), token.size)]));
 }
 
-/** Whether a wall runs between any two of the cells, which a creature cannot stand across. */
+/**
+ * Whether a wall runs between any two of the cells, or through the middle of one, which a creature
+ * cannot stand across. A wall along a cell's edge is a quarter cell or more from the middle.
+ */
 function walled(ground: Ground, cells: Cell[]): boolean
 {
+    const { grid, walls } = ground;
     const keys = new Set(cells.map(cellKey));
+    const through = (cell: Cell) =>
+        walls.some((wall) => wall.blocksMove && distanceToSegment(cellCenter(grid, cell), { x: wall.x1, y: wall.y1 }, { x: wall.x2, y: wall.y2 }) < grid.size / 4);
 
-    return cells.some((cell) => neighbours(ground.grid, cell).some((next) => keys.has(cellKey(next)) && stepBlocked(ground.grid, ground.walls, cell, next)));
+    return cells.some((cell) => through(cell) || neighbours(grid, cell).some((next) => keys.has(cellKey(next)) && stepBlocked(grid, walls, cell, next)));
 }
 
 /**
@@ -106,6 +112,28 @@ export function spawnSpots(
     });
 }
 
+/**
+ * Where tokens stand once the grid changed from another, see GridPanel: each carried along with
+ * the lines, then on the cell under its centre with its whole footprint. It never looks for room
+ * elsewhere, which would make it hop about while a field is dragged: one the lines carry across a
+ * wall shows as stuck there, see stuckAt, for the GM to move. Without a grid they stay put.
+ */
+export function regridSpots(scenario: Ground, tokens: Pick<Token, 'x' | 'y' | 'size'>[], from: Grid): Point[]
+{
+    const { grid } = scenario;
+
+    if (grid.type === 'none')
+        return tokens.map(({ x, y }) => ({ x, y }));
+
+    return tokens.map(({ x, y, size }) => footprintCenter(grid, anchorAt(grid, carried(from, grid, { x, y }), size), size));
+}
+
+/** The spawn point carried along with the lines onto the centre of its cell, see regridSpots. */
+export function regridSpawn({ grid }: Ground, spawn: Point, from: Grid): Point
+{
+    return grid.type === 'none' ? spawn : cellCenter(grid, cellAt(grid, carried(from, grid, spawn)));
+}
+
 /** Whether a creature of a size, alone, has room around a spawn point, for the Spawn tool. */
 export function roomAt(scenario: Ground, spawn: Point, size: CreatureSize): boolean
 {
@@ -139,7 +167,7 @@ export function resizedSpot(
 /**
  * Whether a token stands across a wall, however it got there: put on a walled-in spawn point, grown
  * with no room, or dragged or dropped by the GM. Worked out from where it stands rather than kept,
- * so nothing that moves a token has to remember it. A Medium one covers a single cell, never.
+ * so nothing that moves a token has to remember it. A Medium one only with a wall through its cell.
  */
 export function stuckAt(scenario: Ground, token: Pick<Token, 'x' | 'y' | 'size'>): boolean
 {

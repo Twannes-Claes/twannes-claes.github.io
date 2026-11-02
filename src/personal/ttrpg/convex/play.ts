@@ -1,7 +1,7 @@
 import { getAuthUserId } from '@convex-dev/auth/server';
 import { ConvexError, v } from 'convex/values';
 
-import type { Decal, Draft, Drawing, PlayerFight, Point, Scenario, SharedHit, SharedMark, Token } from '../types';
+import type { Decal, Draft, Drawing, Grid, PlayerFight, Point, Scenario, SharedHit, SharedMark, Token } from '../types';
 import { cleanConditions, isSave } from '../content/conditions';
 import { maxPlayers } from '../content/limits';
 import { colourPattern } from '../map/colours';
@@ -12,7 +12,7 @@ import { cleanFight, cleanRoll, hasRolled, nextTurn, upNext, withRoll } from '..
 import { pathBlocked } from '../map/path';
 import { monsterFrom } from '../map/presets';
 import { ridesOn } from '../map/size';
-import { resizedSpot, spawnSpots } from '../map/spawn';
+import { regridSpots, resizedSpot, spawnSpots } from '../map/spawn';
 import { startWalk } from '../map/walk';
 
 import { internal } from './_generated/api';
@@ -155,6 +155,25 @@ async function respawn(ctx: MutationCtx, session: Doc<'sessions'>, scenarioId: s
     // A fight stays on the map it was fought on.
     await ctx.db.patch('sessions', session._id, { activeScenarioId: scenarioId, initiative: undefined });
     await refreshSight(ctx, session._id, scenario);
+}
+
+/**
+ * Puts every token on a map back on its cells after the editor saved a new grid for it, see
+ * regridSpots, players and monsters not yet shown alike, played or not. The caller refreshes sight.
+ */
+export async function regrid(ctx: MutationCtx, sessionId: Id<'sessions'>, scenario: Scenario, from: Grid)
+{
+    const here = (await tokensOf(ctx, sessionId)).filter((token) => token.scenarioId === scenario.id && token.tray !== true);
+    const spots = regridSpots(scenario, here, from);
+
+    for (const [index, token] of here.entries())
+    {
+        const { x, y } = spots[index];
+
+        if (x !== token.x || y !== token.y)
+            await ctx.db.patch('tokens', token._id, { x, y, path: undefined, movedAt: undefined, leavingUntil: undefined });
+
+    }
 }
 
 /**

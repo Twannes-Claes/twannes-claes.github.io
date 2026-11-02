@@ -2,11 +2,13 @@ import { ConvexError, v } from 'convex/values';
 
 import { demoOgre, demoScenario } from '../content/scenarios';
 import { demoOgreStatBlock } from '../content/statBlocks';
+import { sameCells } from '../map/grid';
 
 import type { Id } from './_generated/dataModel';
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireHost, requireSession } from './access';
 import { clearRolls } from './dice';
+import { regrid } from './play';
 import { scenarioValidator, systemValidator } from './schema';
 import { refreshSight, tokensOf } from './sight';
 import { dropFile, totalBytes } from './usage';
@@ -324,6 +326,10 @@ export const save = mutation({
                 await ctx.db.replace('scenarios', doc._id, { sessionId, scenario });
             else
                 await ctx.db.insert('scenarios', { sessionId, scenario });
+
+            // Undo and redo save too, so they carry the tokens back along with the grid.
+            if (doc && !sameCells(doc.scenario.grid, scenario.grid))
+                await regrid(ctx, sessionId, scenario, doc.scenario.grid);
 
         }
 

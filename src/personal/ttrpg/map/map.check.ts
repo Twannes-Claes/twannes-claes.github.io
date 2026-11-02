@@ -9,6 +9,7 @@ import { createExplored, markSeen, packedFlag, packSeen, wasSeen } from './fog.t
 import { drawingsAt, extendLine, maxDrawingPoints } from './drawings.ts';
 import { distance } from './geometry.ts';
 import {
+    carried,
     cellAt,
     cellCenter,
     cellCorners,
@@ -17,6 +18,7 @@ import {
     cellLine,
     nearestCorner,
     neighbours,
+    sameCells,
     snapPoint,
     wrapOffset,
 } from './grid.ts';
@@ -26,7 +28,7 @@ import { extendPath, pathBlocked, pathFeet } from './path.ts';
 import { initiativeBonus } from './presets.ts';
 import { placedSize, propAt, snapCenter, snapSize } from './props.ts';
 import { anchorAt, footprint, footprintCenter, footprintKeys, landingAt, resizedAt, ridesOn } from './size.ts';
-import { resizedSpot, roomAt, spawnSpots, stuckAt } from './spawn.ts';
+import { regridSpawn, regridSpots, resizedSpot, roomAt, spawnSpots, stuckAt } from './spawn.ts';
 import { createTool, measure, straighten, toggleDoor, wallInBox, type ToolPointer } from './tools.ts';
 import { scenarioFromUvtt } from './uvtt.ts';
 import { inSight, insidePolygon, sightSegments, visibilityPolygon } from './visibility.ts';
@@ -210,6 +212,32 @@ assert.deepEqual(boxed.map((spot) => coverOf(spot, 'medium')[0]).slice(0, 2), ['
 assert.ok(stuckAt({ ...field, walls: box }, { ...boxed[2], ...large }));
 assert.ok(roomAt(field, field.spawn, 'large') && !roomAt({ ...field, walls: box }, field.spawn, 'large'));
 
+// A new grid carries each token along with the lines to the same cell, footprint whole, staying
+// there even across a wall or on another, and the spawn point to its cell's centre. A shift back by a hair that
+// wraps the offset round to nearly a cell is still a hair. The lines' look is no new grid.
+const moved: Grid = { ...base, size: base.size * 1.2, offsetX: base.offsetX + 7 };
+const onMoved = { ...eastWall, grid: moved };
+const standing = [
+    { ...cellCenter(base, { q: 2, r: 2 }), ...medium },
+    { ...cellCenter(base, { q: 2, r: 2 }), ...medium },
+    { ...byWall, ...large },
+];
+const regridded = regridSpots(onMoved, standing, base);
+const onCells = (spot: Point, size: 'medium' | 'large') => distance(spot, footprintCenter(moved, anchorAt(moved, spot, size), size)) < 1e-9;
+
+assert.ok(distance(regridded[0], cellCenter(moved, { q: 2, r: 2 })) < 1e-9);
+assert.ok(regridded.every((spot, index) => onCells(spot, standing[index].size)));
+assert.deepEqual(regridded[1], regridded[0]);
+assert.ok(distance(regridded[2], footprintCenter(moved, anchorAt(moved, carried(base, moved, byWall), 'large'), 'large')) < 1e-9);
+assert.deepEqual(regridSpots({ ...field, grid: { ...moved, type: 'none' } }, standing, base).slice(0, 1), [cellCenter(base, { q: 2, r: 2 })]);
+assert.ok(distance(regridSpawn(onMoved, field.spawn, base), cellCenter(moved, { q: 5, r: 5 })) < 1e-9);
+assert.ok(sameCells(base, { ...base, opacity: 0.2 }) && !sameCells(base, moved));
+
+const backAHair = wrapOffset({ ...base, offsetX: base.offsetX - 1 });
+
+assert.ok(Math.abs(carried(base, backAHair, field.spawn).x - (field.spawn.x - 1)) < 1e-9);
+assert.deepEqual(carried(base, { ...base, type: 'hex' }, field.spawn), field.spawn);
+
 // Growing beside a wall steps away from it, clear of others but not of its own companion; boxed
 // in, it grows where it stands.
 const hero = { id: 'hero', ...field.spawn, summonOf: undefined };
@@ -234,6 +262,7 @@ assert.ok(stuckAt(nook, { ...resizedSpot(nook, hero, 'large', [doorman]), ...lar
 assert.ok(stuckAt(eastWall, { ...footprintCenter(base, { q: 5, r: 5 }, 'large'), ...large }));
 assert.ok(!stuckAt(eastWall, { ...footprintCenter(base, { q: 4, r: 5 }, 'large'), ...large }));
 assert.ok(!stuckAt(eastWall, { ...cellCenter(base, { q: 5, r: 5 }), ...medium }));
+assert.ok(stuckAt({ ...field, walls: [wall(5.5, 0, 5.5, 20)] }, { ...cellCenter(base, { q: 5, r: 5 }), ...medium }));
 
 // Every size has room in the open on a hex grid too.
 for (const grid of grids.slice(1))

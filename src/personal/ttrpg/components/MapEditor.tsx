@@ -19,7 +19,8 @@ import { nextTurn } from '../map/initiative';
 import { monsterFrom } from '../map/presets';
 import { newProp } from '../map/props';
 import { landingAt } from '../map/size';
-import { resizedSpot, roomAt, spawnSpots, stuckAt } from '../map/spawn';
+import { sameCells } from '../map/grid';
+import { regridSpawn, regridSpots, resizedSpot, roomAt, spawnSpots, stuckAt } from '../map/spawn';
 import { toggleDoor, type ToolId } from '../map/tools';
 import { scenarioFromUvtt } from '../map/uvtt';
 import type { FrameStats, PendingMove } from '../map/view';
@@ -102,6 +103,20 @@ function freePlayerName(names: Set<string>, from: number): string
         number++;
 
     return `Player ${number}`;
+}
+
+/**
+ * A saved session's tokens where the server puts them once the scenario's grid is saved, see
+ * regrid in convex/play.ts, so they ride the lines before then too. As they are once it is saved.
+ */
+function regridded<T extends Token>(scenario: Scenario, tokens: T[], savedGrid: Scenario['grid'] | undefined): T[]
+{
+    if (!savedGrid || sameCells(savedGrid, scenario.grid))
+        return tokens;
+
+    const spots = regridSpots(scenario, tokens, savedGrid);
+
+    return tokens.map((token, at) => ({ ...token, ...spots[at] }));
 }
 
 /** How long the editor waits after the last change before it saves. */
@@ -369,6 +384,26 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
     // Undo can take away the open scenario, then the first one shows.
     const active = scenarios.find((scenario) => scenario.id === activeId) ?? scenarios[0];
+    // The grid this tab's tokens stand on. Whatever changes it, the Grid panel, undo or redo, puts
+    // them back on its cells. A saved session's tokens are moved by its save, see regrid in
+    // convex/play.ts.
+    const [standingOn, setStandingOn] = useState({ id: active.id, grid: active.grid });
+
+    if (standingOn.id !== active.id || standingOn.grid !== active.grid)
+    {
+        setStandingOn({ id: active.id, grid: active.grid });
+
+        if (standingOn.id === active.id && !sameCells(standingOn.grid, active.grid))
+        {
+            setTokens((current) =>
+            {
+                const here = current.filter((token) => token.tray !== true);
+                const spots = regridSpots(active, here, standingOn.grid);
+
+                return current.map((token) => (here.includes(token) ? { ...token, ...spots[here.indexOf(token)], path: undefined, movedAt: undefined } : token));
+            });
+        }
+    }
 
     // The map being played shows the players' tokens, live. Any other map, or a session not
     // started, previews play mode with the test players.
@@ -378,9 +413,11 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     // The ones on the map's tray are off it, see Tray.tsx; the live map's tokens never hold them.
     const monstersOf = live ? live.monsters.filter((monster) => monster.scenarioId === active.id) : tokens.filter((token) => token.kind === 'npc');
     const tray = monstersOf.filter((monster) => monster.tray === true);
-    const monstersHere = liveMap ? liveMap.tokens.filter((token) => token.kind === 'npc') : monstersOf.filter((monster) => monster.tray !== true);
+    const onMap = liveMap ? liveMap.tokens : monstersOf.filter((monster) => monster.tray !== true);
+    const fromServer = live ? regridded(active, onMap, saved.find((scenario) => scenario.id === active.id)?.grid) : onMap;
+    const monstersHere = liveMap ? fromServer.filter((token) => token.kind === 'npc') : fromServer;
     const shown = liveMap
-        ? liveMap.tokens
+        ? fromServer
         : live
             ? [...tokens.filter((token) => token.kind === 'player'), ...monstersHere]
             : tokens.filter((token) => token.tray !== true);
@@ -1367,7 +1404,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                     {tool === 'align' && (
                         <GridPanel
                             grid={active.grid}
-                            onChange={(grid, merge) => changeScenario({ ...active, grid }, merge)}
+                            onChange={(grid, merge) => changeScenario({ ...active, grid, spawn: regridSpawn({ ...active, grid }, active.spawn, active.grid) }, merge)}
                         />
                     )}
                     <ScenarioList
