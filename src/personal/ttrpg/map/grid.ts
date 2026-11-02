@@ -55,6 +55,19 @@ export function wrapOffset(grid: Grid): Grid
     return { ...grid, offsetX: wrap(grid.offsetX, x), offsetY: wrap(grid.offsetY, y) };
 }
 
+/**
+ * The grid with its offset held from 0 to a step under one repeat of the grid, see wrapOffset, for
+ * the Grid panel. A dragged offset stops there rather than wrapping round, which would look the
+ * same but carry the tokens back a cell, see carried.
+ */
+export function clampOffset(grid: Grid, step: number): Grid
+{
+    const { x, y } = repeat(grid);
+    const clamp = (value: number, period: number) => Math.min(Math.max(value, 0), period - step);
+
+    return { ...grid, offsetX: clamp(grid.offsetX, x), offsetY: clamp(grid.offsetY, y) };
+}
+
 /** How far the grid runs before it looks the same again, across and down. */
 function repeat(grid: Grid): Point
 {
@@ -71,9 +84,9 @@ export function sameCells(a: Grid, b: Grid): boolean
 
 /**
  * Where a point on one grid lands on another: the same spot in its cell, as if the picture under
- * it were scaled and shifted with the lines, so tokens ride along with them. Of the offsets that
- * draw the new grid alike, see wrapOffset, it takes the one nearest the old, so a shift past a
- * whole cell is no jump back. A new kind of grid lines up with nothing, and the point stays.
+ * it were scaled and shifted with the lines, so tokens ride along with them. Exact, so carrying in
+ * steps lands where carrying at once does. A new kind of grid lines up with nothing, and the point
+ * stays.
  */
 export function carried(from: Grid, to: Grid, point: Point): Point
 {
@@ -81,12 +94,8 @@ export function carried(from: Grid, to: Grid, point: Point): Point
         return point;
 
     const scale = to.size / from.size;
-    const period = repeat(to);
-    const near = (offset: number, old: number, step: number) => offset + Math.round((old - offset) / step) * step;
-    const x = near(to.offsetX, from.offsetX, period.x);
-    const y = near(to.offsetY, from.offsetY, period.y);
 
-    return { x: x + (point.x - from.offsetX) * scale, y: y + (point.y - from.offsetY) * scale };
+    return { x: to.offsetX + (point.x - from.offsetX) * scale, y: to.offsetY + (point.y - from.offsetY) * scale };
 }
 
 /** From the centre of a hex to one of its corners. */

@@ -1130,8 +1130,9 @@ follow and why.
 - **Built.** None followed: nothing moved a token on a grid change, and the ones that seemed to
   were those whose centre still fell near a new cell's centre, close to the grid's origin or on a
   whole-cell change. `carried` in `map/grid.ts` takes a point to the same spot in its cell on the
-  new grid, as if the picture were scaled and shifted with the lines, taking the offset nearest
-  the old so a wrapped offset is no jump; a new kind of grid carries nothing. `regridSpots` in
+  new grid, as if the picture were scaled and shifted with the lines, exactly, so carrying in steps
+  lands where carrying at once does; the Grid panel holds the offset under a cell (`clampOffset`)
+  rather than wrapping it round, which looked the same but carried the tokens back a cell; a new kind of grid carries nothing. `regridSpots` in
   `map/spawn.ts` then puts each token on the cell there with its whole footprint, never looking for
   room elsewhere, so it does not hop about mid-drag; one carried across a wall shows as stuck; `regridSpawn` carries the spawn point
   onto its cell's centre, in the same undo step as the grid. `sameCells` tells a new grid from new

@@ -2,14 +2,21 @@ import assert from 'node:assert/strict';
 
 import type { Cell, Drawing, GameSystem, Grid, Mark, Point, Scenario, Token, Wall } from '../types';
 import { cleanConditions } from '../content/conditions.ts';
-import { blocksOf, demoOgreStatBlock, initiativeOf, spansOf, statBlockTemplates, statsOf } from '../content/statBlocks.ts';
+import {
+    blocksOf,
+    demoOgreStatBlock,
+    initiativeOf,
+    spansOf,
+    statBlockTemplates,
+    statsOf,
+} from '../content/statBlocks.ts';
 
 import { toScreen, toWorld, zoomAt } from './camera.ts';
 import { createExplored, markSeen, packedFlag, packSeen, wasSeen } from './fog.ts';
 import { drawingsAt, extendLine, maxDrawingPoints } from './drawings.ts';
 import { distance } from './geometry.ts';
 import {
-    carried,
+    carried, clampOffset,
     cellAt,
     cellCenter,
     cellCorners,
@@ -23,13 +30,37 @@ import {
     wrapOffset,
 } from './grid.ts';
 import { applyHit, cleanStats, healthState, hitOn, mayHurt, withoutNumbers } from './health.ts';
-import { begun, cleanRoll, newFight, nextTurn, swapped, upNext, withoutRoll, withRoll } from './initiative.ts';
+import {
+    begun,
+    cleanRoll,
+    newFight,
+    nextTurn,
+    swapped,
+    upNext,
+    withoutRoll,
+    withRoll,
+} from './initiative.ts';
 import { extendPath, pathBlocked, pathFeet } from './path.ts';
 import { initiativeBonus } from './presets.ts';
 import { placedSize, propAt, snapCenter, snapSize } from './props.ts';
-import { anchorAt, footprint, footprintCenter, footprintKeys, landingAt, resizedAt, ridesOn } from './size.ts';
+import {
+    anchorAt,
+    footprint,
+    footprintCenter,
+    footprintKeys,
+    landingAt,
+    resizedAt,
+    ridesOn,
+} from './size.ts';
 import { regridSpawn, regridSpots, resizedSpot, roomAt, spawnSpots, stuckAt } from './spawn.ts';
-import { createTool, measure, straighten, toggleDoor, wallInBox, type ToolPointer } from './tools.ts';
+import {
+    createTool,
+    measure,
+    straighten,
+    toggleDoor,
+    wallInBox,
+    type ToolPointer,
+} from './tools.ts';
 import { scenarioFromUvtt } from './uvtt.ts';
 import { inSight, insidePolygon, sightSegments, visibilityPolygon } from './visibility.ts';
 import { startWalk, walkAt } from './walk.ts';
@@ -101,15 +132,23 @@ for (const grid of grids)
 
             for (const neighbour of neighbours(grid, cell))
                 assert.equal(cellDistance(grid, cell, neighbour), 1, label);
-
         }
     }
 
     // A line is as long as the distance, and every step is to a neighbour.
     for (const [a, b] of [
-        [{ q: 0, r: 0 }, { q: 7, r: 3 }],
-        [{ q: -2, r: 5 }, { q: 4, r: -6 }],
-        [{ q: 1, r: 1 }, { q: 1, r: 1 }],
+        [
+            { q: 0, r: 0 },
+            { q: 7, r: 3 },
+        ],
+        [
+            { q: -2, r: 5 },
+            { q: 4, r: -6 },
+        ],
+        [
+            { q: 1, r: 1 },
+            { q: 1, r: 1 },
+        ],
     ])
     {
         const line = cellLine(grid, a, b);
@@ -120,7 +159,6 @@ for (const grid of grids)
 
         for (let index = 1; index < line.length; index++)
             assert.equal(cellDistance(grid, line[index - 1], line[index]), 1, label);
-
     }
 }
 
@@ -175,21 +213,36 @@ assert.deepEqual(keys(extendPath(base, [wall(1, -3, 1, 1)], [{ q: 0, r: 0 }], { 
 
 // The server's check of a walk: a path across the fence is refused, one up to it is not, and an
 // open door lets it through.
-const across = [cellCenter(base, { q: 0, r: 0 }), cellCenter(base, { q: 2, r: 0 }), cellCenter(base, { q: 4, r: 0 })];
+const across = [
+    cellCenter(base, { q: 0, r: 0 }),
+    cellCenter(base, { q: 2, r: 0 }),
+    cellCenter(base, { q: 4, r: 0 }),
+];
 
 assert.equal(pathBlocked(fence, across), true);
 assert.equal(pathBlocked(fence, across.slice(0, 2)), false);
 assert.equal(pathBlocked([toggleDoor({ ...fence[0], door: { open: false } })], across), false);
 
 // Spawning: the spawn cell first, skipping taken cells, never through walls or off the map.
-const field = { grid: base, walls: [] as Wall[], width: 2000, height: 2000, spawn: cellCenter(base, { q: 5, r: 5 }) };
+const field = {
+    grid: base,
+    walls: [] as Wall[],
+    width: 2000,
+    height: 2000,
+    spawn: cellCenter(base, { q: 5, r: 5 }),
+};
 const medium = { size: 'medium' } as const;
 const large = { size: 'large' } as const;
-const coverOf = (spot: Point, size: 'medium' | 'large') => keys(footprint(base, anchorAt(base, spot, size), size));
+const coverOf = (spot: Point, size: 'medium' | 'large') =>
+    keys(footprint(base, anchorAt(base, spot, size), size));
 const spread = spawnSpots(field, [medium, medium, medium, medium], [{ ...field.spawn, ...medium }]);
 
 assert.equal(new Set(spread.flatMap((spot) => coverOf(spot, 'medium'))).size, 4);
-assert.ok(spread.every((spot) => cellDistance(base, anchorAt(base, spot, 'medium'), { q: 5, r: 5 }) === 1));
+assert.ok(
+    spread.every(
+        (spot) => cellDistance(base, anchorAt(base, spot, 'medium'), { q: 5, r: 5 }) === 1,
+    ),
+);
 
 // Large ones take their whole footprint, clear of each other, as near the spawn as it allows.
 const pair = spawnSpots(field, [large, large], []);
@@ -199,7 +252,8 @@ assert.ok(distance(pair[0], field.spawn) < base.size);
 
 // Beside a wall a Large one stays on the spawn's side, never half in it.
 const eastWall = { ...field, walls: [wall(6, 0, 6, 20)] };
-const westOfWall = (spot: Point) => footprint(base, anchorAt(base, spot, 'large'), 'large').every((cell) => cell.q <= 5);
+const westOfWall = (spot: Point) =>
+    footprint(base, anchorAt(base, spot, 'large'), 'large').every((cell) => cell.q <= 5);
 const [byWall] = spawnSpots(eastWall, [large], []);
 
 assert.ok(westOfWall(byWall) && !stuckAt(eastWall, { ...byWall, ...large }));
@@ -210,11 +264,13 @@ const boxed = spawnSpots({ ...field, walls: box }, [medium, medium, large], []);
 
 assert.deepEqual(boxed.map((spot) => coverOf(spot, 'medium')[0]).slice(0, 2), ['5,5', '5,5']);
 assert.ok(stuckAt({ ...field, walls: box }, { ...boxed[2], ...large }));
-assert.ok(roomAt(field, field.spawn, 'large') && !roomAt({ ...field, walls: box }, field.spawn, 'large'));
+assert.ok(
+    roomAt(field, field.spawn, 'large') && !roomAt({ ...field, walls: box }, field.spawn, 'large'),
+);
 
 // A new grid carries each token along with the lines to the same cell, footprint whole, staying
-// there even across a wall or on another, and the spawn point to its cell's centre. A shift back by a hair that
-// wraps the offset round to nearly a cell is still a hair. The lines' look is no new grid.
+// there even across a wall or on another, and the spawn point to its cell's centre. A shift past
+// half a cell, at once or in steps, carries the whole way. The lines' look is no new grid.
 const moved: Grid = { ...base, size: base.size * 1.2, offsetX: base.offsetX + 7 };
 const onMoved = { ...eastWall, grid: moved };
 const standing = [
@@ -223,20 +279,41 @@ const standing = [
     { ...byWall, ...large },
 ];
 const regridded = regridSpots(onMoved, standing, base);
-const onCells = (spot: Point, size: 'medium' | 'large') => distance(spot, footprintCenter(moved, anchorAt(moved, spot, size), size)) < 1e-9;
+const onCells = (spot: Point, size: 'medium' | 'large') =>
+    distance(spot, footprintCenter(moved, anchorAt(moved, spot, size), size)) < 1e-9;
 
 assert.ok(distance(regridded[0], cellCenter(moved, { q: 2, r: 2 })) < 1e-9);
 assert.ok(regridded.every((spot, index) => onCells(spot, standing[index].size)));
 assert.deepEqual(regridded[1], regridded[0]);
-assert.ok(distance(regridded[2], footprintCenter(moved, anchorAt(moved, carried(base, moved, byWall), 'large'), 'large')) < 1e-9);
-assert.deepEqual(regridSpots({ ...field, grid: { ...moved, type: 'none' } }, standing, base).slice(0, 1), [cellCenter(base, { q: 2, r: 2 })]);
-assert.ok(distance(regridSpawn(onMoved, field.spawn, base), cellCenter(moved, { q: 5, r: 5 })) < 1e-9);
+assert.ok(
+    distance(
+        regridded[2],
+        footprintCenter(moved, anchorAt(moved, carried(base, moved, byWall), 'large'), 'large'),
+    ) < 1e-9,
+);
+assert.deepEqual(
+    regridSpots({ ...field, grid: { ...moved, type: 'none' } }, standing, base).slice(0, 1),
+    [cellCenter(base, { q: 2, r: 2 })],
+);
+assert.ok(
+    distance(regridSpawn(onMoved, field.spawn, base), cellCenter(moved, { q: 5, r: 5 })) < 1e-9,
+);
 assert.ok(sameCells(base, { ...base, opacity: 0.2 }) && !sameCells(base, moved));
 
-const backAHair = wrapOffset({ ...base, offsetX: base.offsetX - 1 });
+const halfway = { ...base, offsetX: base.offsetX + base.size * 0.4 };
+const farther = { ...base, offsetX: base.offsetX + base.size * 0.8 };
 
-assert.ok(Math.abs(carried(base, backAHair, field.spawn).x - (field.spawn.x - 1)) < 1e-9);
+assert.ok(
+    Math.abs(carried(base, farther, field.spawn).x - (field.spawn.x + base.size * 0.8)) < 1e-9,
+);
+assert.ok(
+    distance(
+        carried(halfway, farther, carried(base, halfway, field.spawn)),
+        carried(base, farther, field.spawn),
+    ) < 1e-9,
+);
 assert.deepEqual(carried(base, { ...base, type: 'hex' }, field.spawn), field.spawn);
+assert.deepEqual([clampOffset({ ...base, offsetX: -3, offsetY: base.size * 5 }, 0.5)].map(({ offsetX, offsetY }) => [offsetX, offsetY]), [[0, base.size - 0.5]]);
 
 // Growing beside a wall steps away from it, clear of others but not of its own companion; boxed
 // in, it grows where it stands.
@@ -244,16 +321,32 @@ const hero = { id: 'hero', ...field.spawn, summonOf: undefined };
 const grown = resizedSpot(eastWall, hero, 'large', []);
 
 assert.ok(westOfWall(grown));
-assert.ok(westOfWall(resizedSpot(eastWall, hero, 'large', [{ id: 'owl', ...field.spawn, size: 'tiny', summonOf: 'hero' }])));
+assert.ok(
+    westOfWall(
+        resizedSpot(eastWall, hero, 'large', [
+            { id: 'owl', ...field.spawn, size: 'tiny', summonOf: 'hero' },
+        ]),
+    ),
+);
 
-const crowded = resizedSpot(eastWall, hero, 'large', [{ id: 'orc', ...cellCenter(base, { q: 4, r: 4 }), size: 'medium', summonOf: undefined }]);
+const crowded = resizedSpot(eastWall, hero, 'large', [
+    { id: 'orc', ...cellCenter(base, { q: 4, r: 4 }), size: 'medium', summonOf: undefined },
+]);
 
 assert.ok(westOfWall(crowded) && !coverOf(crowded, 'large').includes('4,4'));
-assert.deepEqual(resizedSpot({ ...field, walls: box }, hero, 'large', []), resizedAt(base, hero, 'large'));
+assert.deepEqual(
+    resizedSpot({ ...field, walls: box }, hero, 'large', []),
+    resizedAt(base, hero, 'large'),
+);
 
 // Out of a nook open to the west, but not past someone standing in its mouth.
 const nook = { ...field, walls: box.slice(0, 3) };
-const doorman = { id: 'orc', ...cellCenter(base, { q: 4, r: 5 }), size: 'medium' as const, summonOf: undefined };
+const doorman = {
+    id: 'orc',
+    ...cellCenter(base, { q: 4, r: 5 }),
+    size: 'medium' as const,
+    summonOf: undefined,
+};
 
 assert.ok(!stuckAt(nook, { ...resizedSpot(nook, hero, 'large', []), ...large }));
 assert.ok(stuckAt(nook, { ...resizedSpot(nook, hero, 'large', [doorman]), ...large }));
@@ -262,11 +355,22 @@ assert.ok(stuckAt(nook, { ...resizedSpot(nook, hero, 'large', [doorman]), ...lar
 assert.ok(stuckAt(eastWall, { ...footprintCenter(base, { q: 5, r: 5 }, 'large'), ...large }));
 assert.ok(!stuckAt(eastWall, { ...footprintCenter(base, { q: 4, r: 5 }, 'large'), ...large }));
 assert.ok(!stuckAt(eastWall, { ...cellCenter(base, { q: 5, r: 5 }), ...medium }));
-assert.ok(stuckAt({ ...field, walls: [wall(5.5, 0, 5.5, 20)] }, { ...cellCenter(base, { q: 5, r: 5 }), ...medium }));
+assert.ok(
+    stuckAt(
+        { ...field, walls: [wall(5.5, 0, 5.5, 20)] },
+        { ...cellCenter(base, { q: 5, r: 5 }), ...medium },
+    ),
+);
 
 // Every size has room in the open on a hex grid too.
 for (const grid of grids.slice(1))
-    assert.ok((['large', 'huge', 'gargantuan'] as const).every((size) => roomAt({ ...field, grid }, field.spawn, size)));
+{
+    assert.ok(
+        (['large', 'huge', 'gargantuan'] as const).every((size) =>
+            roomAt({ ...field, grid }, field.spawn, size),
+        ),
+    );
+}
 
 // Zooming keeps the point under the cursor where it is.
 const camera = { x: 40, y: -20, zoom: 0.5 };
@@ -330,7 +434,6 @@ for (const [scenario, polygon] of [
         { x: 750, y: 100 },
     ])
         assert.equal(inSight(scenario.walls, eye, point), insidePolygon(point, polygon));
-
 }
 
 assert.ok(inSight(glass.walls, eye, { x: 750, y: 500 }));
@@ -343,12 +446,27 @@ assert.equal(explored.seen[10 * explored.columns + 2], 1);
 assert.equal(explored.seen[10 * explored.columns + 15], 0);
 assert.equal(markSeen(explored, sight), false);
 // Players only walk where it was seen, see extendRoute in map/view.ts.
-assert.deepEqual([{ x: 125, y: 525 }, { x: 775, y: 525 }, { x: -10, y: 525 }].map((point) => wasSeen(explored, point)), [true, false, false]);
+assert.deepEqual(
+    [
+        { x: 125, y: 525 },
+        { x: 775, y: 525 },
+        { x: -10, y: 525 },
+    ].map((point) => wasSeen(explored, point)),
+    [true, false, false],
+);
 
 // Reveal area marks the samples whose centres the polygon reaches, and nothing outside it. Its
 // corners snap to grid corners, Shift keeps a side straight, and clicking the first corner closes it.
 const revealed = createExplored(walled);
-const press = (x: number, y: number, straight = false): ToolPointer => ({ world: { x, y }, free: false, straight, zoom: 1, scenario: walled, seen: () => true, system: '5e' });
+const press = (x: number, y: number, straight = false): ToolPointer => ({
+    world: { x, y },
+    free: false,
+    straight,
+    zoom: 1,
+    scenario: walled,
+    seen: () => true,
+    system: '5e',
+});
 const uncover = (polygon: Point[]) => void markSeen(revealed, polygon);
 const revealTool = createTool('reveal', () => {}, null, uncover);
 
@@ -379,16 +497,33 @@ revealed.seen.fill(0);
 circleTool.down(press(400, 500));
 circleTool.move(press(650, 500), true);
 circleTool.up?.(press(650, 500));
-assert.deepEqual([425, 575, 125, 75].map((x) => wasSeen(revealed, { x, y: 525 })), [true, false, true, false]);
+assert.deepEqual(
+    [425, 575, 125, 75].map((x) => wasSeen(revealed, { x, y: 525 })),
+    [true, false, true, false],
+);
 
 // Hiding a box forgets what it covers, and nothing else.
-const hideTool = createTool('hide', () => {}, null, (polygon, hide) => void markSeen(revealed, polygon, hide ? 0 : 1));
+const hideTool = createTool(
+    'hide',
+    () => {},
+    null,
+    (polygon, hide) => void markSeen(revealed, polygon, hide ? 0 : 1),
+);
 
 assert.ok(hideTool);
-for (const [x, y] of [[400, 500], [450, 500], [450, 550], [400, 550], [400, 500]])
+for (const [x, y] of [
+    [400, 500],
+    [450, 500],
+    [450, 550],
+    [400, 550],
+    [400, 500],
+])
     hideTool.down({ ...press(x, y), free: true });
 
-assert.deepEqual([425, 125].map((x) => wasSeen(revealed, { x, y: 525 })), [false, true]);
+assert.deepEqual(
+    [425, 125].map((x) => wasSeen(revealed, { x, y: 525 })),
+    [false, true],
+);
 
 // A Universal VTT file: cells become pixels from the map's origin, every stretch of a line of
 // sight is a wall, and a closed door blocks while an open one does not.
@@ -396,11 +531,30 @@ const uvtt = scenarioFromUvtt(
     JSON.stringify({
         format: 0.3,
         resolution: { map_origin: { x: 1, y: 2 }, map_size: { x: 10, y: 8 }, pixels_per_grid: 70 },
-        line_of_sight: [[{ x: 1, y: 2 }, { x: 4, y: 2 }, { x: 4, y: 2 }, { x: 4, y: 6 }]],
+        line_of_sight: [
+            [
+                { x: 1, y: 2 },
+                { x: 4, y: 2 },
+                { x: 4, y: 2 },
+                { x: 4, y: 6 },
+            ],
+        ],
         objects_line_of_sight: [],
         portals: [
-            { bounds: [{ x: 6, y: 2 }, { x: 7, y: 2 }], closed: true },
-            { bounds: [{ x: 8, y: 2 }, { x: 9, y: 2 }], closed: false },
+            {
+                bounds: [
+                    { x: 6, y: 2 },
+                    { x: 7, y: 2 },
+                ],
+                closed: true,
+            },
+            {
+                bounds: [
+                    { x: 8, y: 2 },
+                    { x: 9, y: 2 },
+                ],
+                closed: false,
+            },
         ],
         image: 'iVBORw0KGgo=',
     }),
@@ -444,7 +598,9 @@ for (const grid of grids.slice(1))
     const center = cellCenter(grid, { q: 2, r: 1 });
     const corner = nearestCorner(grid, center);
 
-    assert.ok(Math.abs(Math.hypot(corner.x - center.x, corner.y - center.y) - 100 / Math.sqrt(3)) < 1e-9);
+    assert.ok(
+        Math.abs(Math.hypot(corner.x - center.x, corner.y - center.y) - 100 / Math.sqrt(3)) < 1e-9,
+    );
 }
 
 // An offset past a whole repeat of the grid wraps back under it, and every cell stays where it was.
@@ -454,8 +610,16 @@ for (const grid of grids)
     const wrapped = wrapOffset(far);
     const spot = { x: 333, y: 444 };
 
-    assert.ok(wrapped.offsetX >= 0 && wrapped.offsetX < 200 && wrapped.offsetY >= 0 && wrapped.offsetY < 200);
-    assert.ok(distance(cellCenter(far, cellAt(far, spot)), cellCenter(wrapped, cellAt(wrapped, spot))) < 1e-6);
+    assert.ok(
+        wrapped.offsetX >= 0 &&
+        wrapped.offsetX < 200 &&
+        wrapped.offsetY >= 0 &&
+        wrapped.offsetY < 200,
+    );
+    assert.ok(
+        distance(cellCenter(far, cellAt(far, spot)), cellCenter(wrapped, cellAt(wrapped, spot))) <
+            1e-6,
+    );
 }
 
 // The tools, clicked the way a person would, on an empty map with the grid at the origin.
@@ -496,7 +660,10 @@ const beforeFree = edited;
 wallTool.cancel?.();
 wallTool.down(click(297, 103, true));
 wallTool.down(click(296, 250, true));
-assert.deepEqual(edited.walls.map((made) => [made.x1, made.y1, made.x2, made.y2]).at(-1), [300, 100, 300, 250]);
+assert.deepEqual(
+    edited.walls.map((made) => [made.x1, made.y1, made.x2, made.y2]).at(-1),
+    [300, 100, 300, 250],
+);
 wallTool.cancel?.();
 edited = beforeFree;
 
@@ -511,7 +678,10 @@ doorTool.down(click(200, 103));
 assert.deepEqual([edited.walls[0].door, edited.walls[0].blocksMove], [{ open: true }, false]);
 assert.equal(toggleDoor(edited.walls[0]).blocksSight, true);
 doorTool.down(click(200, 103));
-assert.deepEqual([edited.walls[0].door, edited.walls[0].blocksSight, edited.walls[0].blocksMove], [undefined, true, true]);
+assert.deepEqual(
+    [edited.walls[0].door, edited.walls[0].blocksSight, edited.walls[0].blocksMove],
+    [undefined, true, true],
+);
 // A press away from every wall is left alone, so it pans.
 assert.equal(doorTool.down(click(700, 700)), false);
 
@@ -521,7 +691,10 @@ const playTool = createTool('open-doors', keep);
 assert.ok(playTool);
 assert.equal(playTool.down(click(302, 250)), false);
 // A door in the fog does not react until the players see it.
-edited = { ...edited, walls: [{ ...edited.walls[0], door: { open: false } }, ...edited.walls.slice(1)] };
+edited = {
+    ...edited,
+    walls: [{ ...edited.walls[0], door: { open: false } }, ...edited.walls.slice(1)],
+};
 assert.equal(playTool.down({ ...click(200, 103), seen: () => false }), false);
 assert.equal(playTool.down(click(200, 103)), true);
 assert.equal(edited.walls[0].door?.open, true);
@@ -533,7 +706,12 @@ assert.ok(eraseTool);
 eraseTool.down(click(302, 250));
 assert.equal(edited.walls.length, 1);
 // Away from every wall, it takes the prop under the click, turned or not.
-edited = { ...edited, props: [{ id: 'crate', src: '', x: 600, y: 600, width: 100, height: 40, rotation: Math.PI / 2 }] };
+edited = {
+    ...edited,
+    props: [
+        { id: 'crate', src: '', x: 600, y: 600, width: 100, height: 40, rotation: Math.PI / 2 },
+    ],
+};
 eraseTool.down(click(610, 560));
 assert.deepEqual([edited.props.length, edited.walls.length], [0, 1]);
 
@@ -547,7 +725,14 @@ ringTool.down(click(845, 160));
 ringTool.move(click(895, 155), true);
 ringTool.up?.(click(895, 155));
 assert.equal(edited.walls.length, plain + 12);
-assert.ok(edited.walls.slice(plain).every((made) => Math.abs(distance({ x: made.x1, y: made.y1 }, { x: 850, y: 150 }) - 50) < 1e-9));
+assert.ok(
+    edited.walls
+        .slice(plain)
+        .every(
+            (made) =>
+                Math.abs(distance({ x: made.x1, y: made.y1 }, { x: 850, y: 150 }) - 50) < 1e-9,
+        ),
+);
 assert.equal(createTool('doors', keep)?.down(click(900, 150)), false);
 eraseTool.down(click(900, 150));
 assert.equal(edited.walls.length, plain);
@@ -566,7 +751,14 @@ assert.equal(createTool('align', keep), null);
 assert.equal(createTool('select', keep), null);
 
 // Props land one cell along their longest side, however big the picture.
-const picture = { id: 'barrel', name: 'Barrel', src: 'barrel.png', width: 4000, height: 2000, bytes: 0 };
+const picture = {
+    id: 'barrel',
+    name: 'Barrel',
+    src: 'barrel.png',
+    width: 4000,
+    height: 2000,
+    bytes: 0,
+};
 
 assert.deepEqual(placedSize(picture, base), { width: 100, height: 50 });
 
@@ -593,7 +785,6 @@ const record = (next: Scenario, final = true) =>
 
     if (final)
         steps++;
-
 };
 
 // A 100 pixel grid at the origin, with no props.
@@ -659,7 +850,12 @@ for (const grid of grids)
 
     for (const size of sizes)
     {
-        for (const point of [{ x: 1000, y: 800 }, { x: -300, y: 400 }, { x: 500, y: 2000 }, { x: 0, y: 0 }])
+        for (const point of [
+            { x: 1000, y: 800 },
+            { x: -300, y: 400 },
+            { x: 500, y: 2000 },
+            { x: 0, y: 0 },
+        ])
         {
             const anchor = anchorAt(grid, landingAt(map, point, size), size);
             const label = `${grid.type} ${grid.hexOrientation} ${size} ${point.x},${point.y}`;
@@ -685,14 +881,19 @@ for (const grid of grids)
         const anchor = anchorAt(grid, landingAt(map, other, size, [other]), size);
         const theirs = footprintKeys(grid, anchorAt(grid, other, 'medium'), 'medium');
 
-        assert.ok(footprint(grid, anchor, size).every((cell) => !theirs.has(cellKey(cell))), `${grid.type} ${grid.hexOrientation} ${size}`);
+        assert.ok(
+            footprint(grid, anchor, size).every((cell) => !theirs.has(cellKey(cell))),
+            `${grid.type} ${grid.hexOrientation} ${size}`,
+        );
     }
 }
 
 // The three hexes of a Large creature all touch each other.
 const triangle = footprint(grids[1], { q: 0, r: 0 }, 'large');
 
-assert.ok(triangle.every((a) => triangle.every((b) => a === b || cellDistance(grids[1], a, b) === 1)));
+assert.ok(
+    triangle.every((a) => triangle.every((b) => a === b || cellDistance(grids[1], a, b) === 1)),
+);
 
 // A one cell gap in a wall lets a Medium creature through but stops a Large one at the wall.
 const gap = [wall(3, -5, 3, 0), wall(3, 1, 3, 5)];
@@ -723,7 +924,10 @@ assert.deepEqual([walkAt(walk, 1760).point, walkAt(walk, 1760).done], [{ x: 200,
 assert.ok(walkAt(walk, 1050).point.x < 50 / 2);
 
 // It lifts once and stays up while it walks, rather than bobbing on every cell, and lands at rest.
-assert.deepEqual([walkAt(walk, 1000).lift, walkAt(walk, 1380).lift, walkAt(walk, 1760).lift], [0, 1, 0]);
+assert.deepEqual(
+    [walkAt(walk, 1000).lift, walkAt(walk, 1380).lift, walkAt(walk, 1760).lift],
+    [0, 1, 0],
+);
 
 const corner = startWalk(
     [
@@ -735,9 +939,17 @@ const corner = startWalk(
     100,
 );
 
-assert.deepEqual([corner.points[0], corner.points[corner.points.length - 1]], [{ x: 0, y: 0 }, { x: 100, y: 100 }]);
+assert.deepEqual(
+    [corner.points[0], corner.points[corner.points.length - 1]],
+    [
+        { x: 0, y: 0 },
+        { x: 100, y: 100 },
+    ],
+);
 assert.ok(!corner.points.some((point) => point.x === 100 && point.y === 0));
-assert.ok(corner.points.every((point) => point.x >= 0 && point.y <= 100 && point.x - point.y <= 100));
+assert.ok(
+    corner.points.every((point) => point.x >= 0 && point.y <= 100 && point.x - point.y <= 100),
+);
 
 // The eraser's box takes a wall inside it, one crossing it, and not one beside it.
 const eraserBox = { left: 100, top: 100, right: 300, bottom: 300 };
@@ -754,16 +966,45 @@ const mask = Uint8Array.from([1, 0, 0, 1, 0, 0, 0, 0, 1, 1]);
 const packed = new Uint8Array(packSeen(mask));
 
 assert.equal(packed.length, 2);
-assert.deepEqual([...mask].map((_, index) => (packedFlag(packed, index) ? 1 : 0)), [...mask]);
+assert.deepEqual(
+    [...mask].map((_, index) => (packedFlag(packed, index) ? 1 : 0)),
+    [...mask],
+);
 
 // How hurt looks: bloodied at half, critical at a quarter, down at 0, and the numbers stay home.
-assert.deepEqual([40, 39, 20, 11, 10, 0].map((hp) => healthState(hp, 40)), ['unhurt', 'hurt', 'bloodied', 'bloodied', 'critical', 'down']);
+assert.deepEqual(
+    [40, 39, 20, 11, 10, 0].map((hp) => healthState(hp, 40)),
+    ['unhurt', 'hurt', 'bloodied', 'bloodied', 'critical', 'down'],
+);
 
-const hidden = withoutNumbers<Token>({ id: 'a', kind: 'player', name: 'A', color: '#000000', size: 'medium', speed: 30, x: 0, y: 0, hp: 5, maxHp: 40, tempHp: 3, ac: 15, perception: 12 });
+const hidden = withoutNumbers<Token>({
+    id: 'a',
+    kind: 'player',
+    name: 'A',
+    color: '#000000',
+    size: 'medium',
+    speed: 30,
+    x: 0,
+    y: 0,
+    hp: 5,
+    maxHp: 40,
+    tempHp: 3,
+    ac: 15,
+    perception: 12,
+});
 
 assert.equal(hidden.state, 'critical');
-assert.deepEqual([hidden.hp, hidden.maxHp, hidden.tempHp, hidden.ac, hidden.perception], [undefined, undefined, undefined, undefined, undefined]);
-assert.deepEqual(cleanStats({ hp: 50, maxHp: 30.4, tempHp: -2, ac: Number.NaN, perception: 99 }), { hp: 30, maxHp: 30, tempHp: 0, ac: 0, perception: 50 });
+assert.deepEqual(
+    [hidden.hp, hidden.maxHp, hidden.tempHp, hidden.ac, hidden.perception],
+    [undefined, undefined, undefined, undefined, undefined],
+);
+assert.deepEqual(cleanStats({ hp: 50, maxHp: 30.4, tempHp: -2, ac: Number.NaN, perception: 99 }), {
+    hp: 30,
+    maxHp: 30,
+    tempHp: 0,
+    ac: 0,
+    perception: 50,
+});
 
 // Damage takes temp HP first and stops at 0; healing stops at max and never adds temp HP.
 assert.deepEqual(applyHit({ hp: 20, maxHp: 30, tempHp: 5 }, 'attack', 8), { hp: 17, tempHp: 0 });
@@ -774,8 +1015,24 @@ assert.deepEqual(applyHit({ hp: 25, maxHp: 30, tempHp: 2 }, 'heal', 10), { hp: 3
 // A player brought to 0 goes down once, not again while there; a monster dies instead.
 assert.equal(hitOn({ kind: 'player', hp: 5, maxHp: 30 }, 'attack', 9).downed, true);
 assert.equal(hitOn({ kind: 'player', hp: 0, maxHp: 30 }, 'attack', 9).downed, false);
-assert.deepEqual(hitOn({ kind: 'npc', hp: 5, maxHp: 30 }, 'attack', 9), { after: { hp: 0, tempHp: 0, conditions: undefined }, died: true, downed: false });
-assert.deepEqual(hitOn({ kind: 'player', hp: 0, maxHp: 30, conditions: [{ id: 'prone' }, { id: 'failed', value: 2 }] }, 'heal', 4).after?.conditions, [{ id: 'prone' }]);
+assert.deepEqual(hitOn({ kind: 'npc', hp: 5, maxHp: 30 }, 'attack', 9), {
+    after: { hp: 0, tempHp: 0, conditions: undefined },
+    died: true,
+    downed: false,
+});
+assert.deepEqual(
+    hitOn(
+        {
+            kind: 'player',
+            hp: 0,
+            maxHp: 30,
+            conditions: [{ id: 'prone' }, { id: 'failed', value: 2 }],
+        },
+        'heal',
+        4,
+    ).after?.conditions,
+    [{ id: 'prone' }],
+);
 
 // Out of a fight a player hurts only themselves and their summons; in one, anyone.
 assert.ok(mayHurt(false, 'me', { id: 'me' }));
@@ -787,13 +1044,27 @@ assert.ok(mayHurt(true, 'me', { id: 'ogre' }) && mayHurt(true, null, { id: 'ogre
 
 // Conditions keep to the system's list and order, once each, values whole and in range.
 assert.deepEqual(
-    cleanConditions('5e', [{ id: 'prone' }, { id: 'clumsy', value: 2 }, { id: 'exhaustion', value: 9.6 }, { id: 'prone' }, { id: 'blinded', value: 3 }]),
+    cleanConditions('5e', [
+        { id: 'prone' },
+        { id: 'clumsy', value: 2 },
+        { id: 'exhaustion', value: 9.6 },
+        { id: 'prone' },
+        { id: 'blinded', value: 3 },
+    ]),
     [{ id: 'blinded' }, { id: 'exhaustion', value: 6 }, { id: 'prone' }],
 );
-assert.deepEqual(cleanConditions('pf2e', [{ id: 'frightened' }, { id: 'dying', value: 0 }]), [{ id: 'dying', value: 1 }, { id: 'frightened', value: 1 }]);
+assert.deepEqual(cleanConditions('pf2e', [{ id: 'frightened' }, { id: 'dying', value: 0 }]), [
+    { id: 'dying', value: 1 },
+    { id: 'frightened', value: 1 },
+]);
 
 // Initiative: higher rolls first; a tie goes to players in 5e and to monsters in Pathfinder 2e.
-const kinds: Record<string, Token['kind']> = { ann: 'player', bo: 'player', orc: 'npc', imp: 'npc' };
+const kinds: Record<string, Token['kind']> = {
+    ann: 'player',
+    bo: 'player',
+    orc: 'npc',
+    imp: 'npc',
+};
 const kindOf = (id: string) => kinds[id];
 const roll = (system: 'pf2e' | '5e') =>
     [
@@ -801,7 +1072,11 @@ const roll = (system: 'pf2e' | '5e') =>
         { id: 'ann', roll: 12 },
         { id: 'bo', roll: 18 },
         { id: 'imp', roll: 3 },
-    ].reduce((fight, { id, roll: value }) => withRoll(fight, { id, kind: kinds[id] }, value, kindOf, system), newFight);
+    ].reduce(
+        (fight, { id, roll: value }) =>
+            withRoll(fight, { id, kind: kinds[id] }, value, kindOf, system),
+        newFight,
+    );
 const order = (fight: typeof newFight) => fight.order.map((entry) => entry.tokenId);
 
 assert.deepEqual(order(roll('5e')), ['bo', 'ann', 'orc', 'imp']);
@@ -823,12 +1098,39 @@ const wrapped = nextTurn({ ...fight, turn: 'imp' }, everyone);
 assert.deepEqual([order(orcGone), orcGone.turn], [['bo', 'ann', 'imp'], 'imp']);
 assert.deepEqual([wrapped.round, wrapped.turn], [2, 'bo']);
 assert.equal(withoutRoll(fight, 'bo', everyone).turn, 'ann');
-assert.deepEqual(order(withRoll(fight, { id: 'cy', kind: 'player' }, 15, kindOf, '5e')), ['bo', 'cy', 'ann', 'orc', 'imp']);
+assert.deepEqual(order(withRoll(fight, { id: 'cy', kind: 'player' }, 15, kindOf, '5e')), [
+    'bo',
+    'cy',
+    'ann',
+    'orc',
+    'imp',
+]);
 
 // A stat block gives a token its numbers in either system, and shows as the blocks it is written in.
-assert.deepEqual(statsOf(statBlockTemplates['5e']), { name: 'Monster name', size: 'medium', ac: 12, maxHp: 11, speed: 30, perception: 12 });
-assert.deepEqual(statsOf(statBlockTemplates.pf2e), { name: 'Creature name', size: 'medium', ac: 16, maxHp: 20, speed: 25, perception: 16 });
-assert.deepEqual(statsOf('> ## Ogre\n> *Large giant*\n> **AC:** 11'), { name: '', size: 'large', ac: 11, maxHp: undefined, speed: undefined, perception: undefined });
+assert.deepEqual(statsOf(statBlockTemplates['5e']), {
+    name: 'Monster name',
+    size: 'medium',
+    ac: 12,
+    maxHp: 11,
+    speed: 30,
+    perception: 12,
+});
+assert.deepEqual(statsOf(statBlockTemplates.pf2e), {
+    name: 'Creature name',
+    size: 'medium',
+    ac: 16,
+    maxHp: 20,
+    speed: 25,
+    perception: 16,
+});
+assert.deepEqual(statsOf('> ## Ogre\n> *Large giant*\n> **AC:** 11'), {
+    name: '',
+    size: 'large',
+    ac: 11,
+    maxHp: undefined,
+    speed: undefined,
+    perception: undefined,
+});
 assert.deepEqual(
     blocksOf('# Imp\n**AC** 13\n**HP** 10\n\n| A | B |\n|---|---|\n| 1 | 2 |\n- one\n---'),
     [
@@ -847,10 +1149,21 @@ assert.deepEqual(spansOf('***Bite.*** *Hit:* 5 x * 2'), [
 ]);
 
 // A monster that goes down at 0 lies there like a player rather than dying.
-assert.deepEqual(hitOn({ kind: 'npc', hp: 5, maxHp: 30, downs: true }, 'attack', 9), { after: { hp: 0, tempHp: 0, conditions: undefined }, died: false, downed: true });
+assert.deepEqual(hitOn({ kind: 'npc', hp: 5, maxHp: 30, downs: true }, 'attack', 9), {
+    after: { hp: 0, tempHp: 0, conditions: undefined },
+    died: false,
+    downed: true,
+});
 
 // The example session's ogre preset gives the numbers its token starts with.
-assert.deepEqual(statsOf(demoOgreStatBlock), { name: 'Ogre', size: 'large', ac: 11, maxHp: 59, speed: 40, perception: 8 });
+assert.deepEqual(statsOf(demoOgreStatBlock), {
+    name: 'Ogre',
+    size: 'large',
+    ac: 11,
+    maxHp: 59,
+    speed: 40,
+    perception: 8,
+});
 
 // Initiative: the DEX modifier in 5e, an Initiative line over it, a bare DEX score worked out,
 // Perception in Pathfinder 2e, then a Pathfinder token's passive Perception without a preset.
@@ -863,7 +1176,10 @@ assert.equal(initiativeOf('# Rat', '5e'), undefined);
 assert.equal(initiativeBonus({ perception: 14 }, [], 'pf2e'), 4);
 assert.equal(initiativeBonus({ perception: 14 }, [], '5e'), undefined);
 assert.equal(initiativeBonus({ perception: 14, initiative: 5 }, [], '5e'), 5);
-assert.deepEqual(cleanStats({ hp: 5, maxHp: 5, tempHp: 0, ac: 10, perception: 10, initiative: -40 }).initiative, -20);
+assert.deepEqual(
+    cleanStats({ hp: 5, maxHp: 5, tempHp: 0, ac: 10, perception: 10, initiative: -40 }).initiative,
+    -20,
+);
 
 // A companion shares its player's space: the smaller rides, the player at the same size, and
 // only while it stands on the other.
@@ -889,12 +1205,30 @@ assert.deepEqual(cleanStats({ hp: 5, maxHp: 5, tempHp: 0, ac: 10, perception: 10
 {
     const shared: (Mark | null)[] = [];
     const cell = edited.grid.size;
-    const cone = createTool('cone', () => {}, null, undefined, 1, (mark) => void shared.push(mark));
-    const at = (x: number, y: number, system: GameSystem): ToolPointer => ({ world: { x, y }, free: false, zoom: 1, scenario: edited, seen: () => true, system });
+    const cone = createTool(
+        'cone',
+        () => {},
+        null,
+        undefined,
+        1,
+        (mark) => void shared.push(mark),
+    );
+    const at = (x: number, y: number, system: GameSystem): ToolPointer => ({
+        world: { x, y },
+        free: false,
+        zoom: 1,
+        scenario: edited,
+        seen: () => true,
+        system,
+    });
 
     cone?.down(at(cell - 2, cell + 2, 'pf2e'));
     cone?.move(at(cell * 3.9, cell * 1.6, 'pf2e'), true);
-    assert.deepEqual(shared.at(-1), { kind: 'cone', from: { x: cell, y: cell }, to: { x: cell * 4, y: cell } });
+    assert.deepEqual(shared.at(-1), {
+        kind: 'cone',
+        from: { x: cell, y: cell },
+        to: { x: cell * 4, y: cell },
+    });
 
     cone?.move(at(cell * 3.9, cell * 1.6, '5e'), true);
     const free = shared.at(-1);
@@ -915,8 +1249,24 @@ assert.deepEqual(cleanStats({ hp: 5, maxHp: 5, tempHp: 0, ac: 10, perception: 10
     assert.equal(extendLine(full, { x: 1e6, y: 0 }, 1), full);
 
     const lines: Drawing[] = [
-        { id: 'mine', points: [{ x: 0, y: 0 }, { x: 100, y: 0 }], width: 4, erasable: true },
-        { id: 'theirs', points: [{ x: 0, y: 4 }, { x: 100, y: 4 }], width: 4, erasable: false },
+        {
+            id: 'mine',
+            points: [
+                { x: 0, y: 0 },
+                { x: 100, y: 0 },
+            ],
+            width: 4,
+            erasable: true,
+        },
+        {
+            id: 'theirs',
+            points: [
+                { x: 0, y: 4 },
+                { x: 100, y: 4 },
+            ],
+            width: 4,
+            erasable: false,
+        },
         { id: 'dot', points: [{ x: 300, y: 300 }], width: 4, erasable: true },
     ];
 

@@ -12,7 +12,7 @@ import { useRef, type ChangeEvent, type CSSProperties } from 'react';
 import type { Grid } from '../types';
 
 import { defaultGrid } from '../content/scenarios';
-import { wrapOffset } from '../map/grid';
+import { clampOffset, wrapOffset } from '../map/grid';
 
 type GridKind = 'none' | 'square' | 'pointy' | 'flat';
 
@@ -59,6 +59,9 @@ function numberFrom(event: ChangeEvent<HTMLInputElement>, fallback: number): num
 
     return Number.isFinite(value) ? value : fallback;
 }
+
+/** How finely the offset fields move, and how far under a cell they stop. */
+const offsetStep = 0.5;
 
 interface NumberFieldProps
 {
@@ -143,8 +146,8 @@ interface GridPanelProps
 /** The grid's settings, shown with the Grid tool. Size and offset line it up with the picture. */
 export function GridPanel({ grid, onChange }: GridPanelProps)
 {
-    // Kept under one repeat of the grid, so an offset never grows past what lines it up.
-    const set = (change: Partial<Grid>, merge = false) => onChange(wrapOffset({ ...grid, ...change }), merge);
+    // Held under one repeat of the grid, so an offset never grows past what lines it up.
+    const set = (change: Partial<Grid>, merge = false) => onChange(clampOffset({ ...grid, ...change }, offsetStep), merge);
     // True while the Lines slider is held, so one slide, or one held arrow key, undoes as one.
     const sliding = useRef(false);
     const letGo = () =>
@@ -199,8 +202,8 @@ export function GridPanel({ grid, onChange }: GridPanelProps)
             <div className="ttrpg-settings__group" role="group" aria-label="Offset">
                 Offset
                 <div className="ttrpg-settings__pair">
-                    <NumberField label="X" value={grid.offsetX} step={0.5} onChange={(offsetX, merge) => set({ offsetX }, merge)} />
-                    <NumberField label="Y" value={grid.offsetY} step={0.5} onChange={(offsetY, merge) => set({ offsetY }, merge)} />
+                    <NumberField label="X" value={grid.offsetX} step={offsetStep} onChange={(offsetX, merge) => set({ offsetX }, merge)} />
+                    <NumberField label="Y" value={grid.offsetY} step={offsetStep} onChange={(offsetY, merge) => set({ offsetY }, merge)} />
                 </div>
             </div>
             <div className="ttrpg-settings__group" role="group" aria-label="Lines">
