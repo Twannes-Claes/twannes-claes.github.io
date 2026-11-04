@@ -707,8 +707,8 @@ A player at 0 is down and stays on the map, and in 5e makes death saves.
 - Shown as small round badges on the token's edge, Font Awesome icons, the name on hover or tap.
   Everyone sees them on any token they can see, monsters too, as at the table.
 - The GM sets them on anyone. A player only on themselves and their summons.
-- No durations: a condition stays until it is taken off. Rounds can count down once initiative (6)
-  is built.
+- No durations: a condition stays until it is taken off. Counting rounds down was dropped, see
+  Dropped.
 - **Built.** The lists are in `content/conditions.ts`, shared with the server, which keeps what
   it is sent to the session's list (`cleanConditions`, `play.setConditions`, `tokens.conditions`).
   Players and Monsters have a Conditions button per row, next to the numbers; a phone has Your
@@ -1216,10 +1216,6 @@ for a town in daylight. Hidden monsters stay hidden.
   shows what was explored before. The fog is called **Fog of war** in the UI now too: the dock's
   button and panel, Reset, the start dialog, the account page and the server's messages.
 
-**30. Condition rounds.** A condition can get a number of rounds, set when it is put on. It counts
-down at the start of its token's turn in initiative (6) and comes off at 0, with a toast. Without
-a number it stays until taken off, as now. Out of initiative nothing counts down.
-
 **31. Tray in the GM view.** The tray (14) shows in the GM view too, so the GM drags in a monster
 staged in Edit mid-fight, hidden until shown.
 
@@ -1281,6 +1277,9 @@ rather than the queries.
 
 - **Rectangle wall tool.** Chains of walls and the `.dd2vtt` import cover rooms.
 - **Darkvision and vision ranges.** Too much complexity for what it adds.
+- **Condition rounds (30).** Typing rounds when a condition goes on is more work than the table
+  tracking "for a minute" itself, and the one condition whose value counts down on its own,
+  Pathfinder's Frightened, did not pay for a setting, a toast and the server logic.
 
 ---
 
