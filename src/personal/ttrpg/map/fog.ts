@@ -1,4 +1,4 @@
-import type { FogSettings, Point, Scenario, Wall } from '../types';
+import type { FogSettings, Mist, Point, Scenario, Wall } from '../types';
 
 import { inSight, insidePolygon, visibilityPolygon, type Segment } from './visibility.ts';
 
@@ -618,6 +618,36 @@ function smokeTile(): HTMLCanvasElement
 let sharedTile: HTMLCanvasElement | null = null;
 
 /**
+ * In cells, so the smoke looks the same whatever the canvas's resolution: how wide one tile of
+ * smoke is, and how many cells a second it drifts.
+ */
+const drift = [
+    { across: 11, x: 0.18, y: 0.07, alpha: 0.45 },
+    { across: 20, x: -0.12, y: 0.15, alpha: 0.3 },
+];
+
+/** Fills a canvas with the two drifting layers of smoke, cell being one grid cell in its pixels. */
+function fillSmoke(ctx: CanvasRenderingContext2D, pattern: CanvasPattern, cell: number, time: number, strength: number)
+{
+    const seconds = time / 1000;
+
+    ctx.fillStyle = pattern;
+
+    for (const layer of drift)
+    {
+        pattern.setTransform(
+            new DOMMatrix()
+                .translate(seconds * layer.x * cell, seconds * layer.y * cell)
+                .scale((layer.across * cell) / tileSize),
+        );
+        ctx.globalAlpha = Math.min(1, layer.alpha * strength);
+        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    }
+
+    ctx.globalAlpha = 1;
+}
+
+/**
  * Draws the fog over the map, under the world transform the caller set. Two layers of the smoke
  * tile at different sizes drift in different directions, then are cut to the fog's shape, so
  * the smoke is thick in the shadow, faint where it was seen before and gone where it is lit.
@@ -670,29 +700,7 @@ export function drawFog(
 
     if (layers.pattern)
     {
-        // In cells, so the smoke looks the same whatever the fog canvas's resolution: how wide
-        // one tile of smoke is, and how many cells a second it drifts.
-        const drift = [
-            { across: 11, x: 0.18, y: 0.07, alpha: 0.45 },
-            { across: 20, x: -0.12, y: 0.15, alpha: 0.3 },
-        ];
-        const cell = scenario.grid.size * layers.scale;
-        const seconds = time / 1000;
-
-        smokeCtx.fillStyle = layers.pattern;
-
-        for (const layer of drift)
-        {
-            layers.pattern.setTransform(
-                new DOMMatrix()
-                    .translate(seconds * layer.x * cell, seconds * layer.y * cell)
-                    .scale((layer.across * cell) / tileSize),
-            );
-            smokeCtx.globalAlpha = layer.alpha * look.settings.smoke;
-            smokeCtx.fillRect(0, 0, smoke.width, smoke.height);
-        }
-
-        smokeCtx.globalAlpha = 1;
+        fillSmoke(smokeCtx, layers.pattern, scenario.grid.size * layers.scale, time, look.settings.smoke);
         smokeCtx.globalCompositeOperation = 'destination-in';
         smokeCtx.drawImage(fog, 0, 0);
     }
@@ -709,4 +717,114 @@ export function drawFog(
     ctx.globalAlpha = look.opacity;
     ctx.drawImage(smoke, 0, 0, scenario.width, scenario.height);
     ctx.globalAlpha = 1;
+}
+
+/** How the mist tool's next area looks, see Mist in types.ts. */
+export type MistLook = Pick<Mist, 'color' | 'density'>;
+
+/** The mist tool's swatches: grey haze, green poison, purple arcane, frost, embers and blood. */
+export const mistColors = ['#b4bcc6', '#7fd14f', '#a67cf4', '#7cc8f0', '#f08a4b', '#d0465a'];
+
+/** Mist canvas pixels per grid cell: blurred over half a cell, it needs fewer than the fog. */
+const mistCellPixels = 12;
+
+/**
+ * The mists' shapes, coloured and blurred, redrawn only when they change, and the canvas the
+ * smoke is cut to them on every frame.
+ */
+interface MistLayers
+{
+    mists: Mist[];
+    width: number;
+    height: number;
+    cellSize: number;
+    scale: number;
+    shapes: HTMLCanvasElement;
+    smoke: HTMLCanvasElement;
+    pattern: CanvasPattern | null;
+}
+
+// ponytail: one map's mist at a time, which is all a screen shows.
+let mistLayers: MistLayers | null = null;
+
+function mistLayersFor({ mists = [], width, height, grid }: Scenario): MistLayers
+{
+    if (mistLayers?.mists === mists && mistLayers.width === width && mistLayers.height === height && mistLayers.cellSize === grid.size)
+        return mistLayers;
+
+    const scale = Math.min(mistCellPixels / grid.size, maxFogSide / 2 / Math.max(width, height));
+    const shapes = canvas(Math.ceil(width * scale), Math.ceil(height * scale));
+    const ctx = context(shapes);
+
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.filter = `blur(${grid.size * scale * 0.25}px)`;
+
+    for (const mist of mists)
+    {
+        ctx.beginPath();
+        mist.points.forEach((point, index) => (index === 0 ? ctx.moveTo(point.x, point.y) : ctx.lineTo(point.x, point.y)));
+        ctx.closePath();
+        ctx.globalAlpha = mist.density;
+        ctx.fillStyle = mist.color;
+        ctx.fill();
+    }
+
+    // Eaten into by the smoke, a tile three cells across, so the edges fray and the inside is
+    // blotchy rather than an even wash.
+    sharedTile ??= smokeTile();
+
+    const ragged = ctx.createPattern(sharedTile, 'repeat');
+
+    if (ragged)
+    {
+        ragged.setTransform(new DOMMatrix().scale((3 * grid.size) / tileSize));
+        ctx.filter = 'none';
+        ctx.globalAlpha = 0.8;
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.fillStyle = ragged;
+        ctx.fillRect(0, 0, width, height);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+    }
+
+    mistLayers = { mists, width, height, cellSize: grid.size, scale, shapes, smoke: canvas(shapes.width, shapes.height), pattern: null };
+
+    return mistLayers;
+}
+
+/**
+ * Draws the scenario's mists, over the fog and under the world transform the caller set: the
+ * fog's smoke, drifting the same way, coloured by and cut to each mist's shape, over a thinner
+ * even haze of it, so it reads as moving through the area. time is 0 to keep it still.
+ */
+export function drawMists(ctx: CanvasRenderingContext2D, scenario: Scenario, time: number)
+{
+    if (!scenario.mists?.length)
+        return;
+
+    const layers = mistLayersFor(scenario);
+    const { smoke, shapes } = layers;
+    const smokeCtx = context(smoke);
+
+    sharedTile ??= smokeTile();
+    layers.pattern ??= smokeCtx.createPattern(sharedTile, 'repeat');
+
+    smokeCtx.globalCompositeOperation = 'source-over';
+    smokeCtx.clearRect(0, 0, smoke.width, smoke.height);
+
+    if (layers.pattern)
+        fillSmoke(smokeCtx, layers.pattern, scenario.grid.size * layers.scale, time, 3);
+
+    // The smoke's own colour goes, the mist's comes in where both are.
+    smokeCtx.globalCompositeOperation = 'source-in';
+    smokeCtx.drawImage(shapes, 0, 0);
+    smokeCtx.globalCompositeOperation = 'destination-over';
+    smokeCtx.globalAlpha = 0.85;
+    smokeCtx.drawImage(shapes, 0, 0);
+    smokeCtx.globalAlpha = 1;
+    smokeCtx.globalCompositeOperation = 'source-over';
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'low';
+    ctx.drawImage(smoke, 0, 0, scenario.width, scenario.height);
 }

@@ -13,7 +13,7 @@ import { gameSystems } from '../content/systems';
 import { defaultAccent, ringColours } from '../map/colours';
 import { penWidths } from '../map/drawings';
 import { rollDice } from '../map/dice';
-import { defaultFogSettings } from '../map/fog';
+import { defaultFogSettings, mistColors, type MistLook } from '../map/fog';
 import { cleanStats, conditionsAt, defaultBlood, downedPool, hitOn, mayHurt, withoutNumbers, withoutSaves } from '../map/health';
 import { nextTurn } from '../map/initiative';
 import { monsterFrom } from '../map/presets';
@@ -61,6 +61,7 @@ import { useScreenSettings } from './useScreenSettings';
 import { useIdle, useWakeLock } from './useScreen';
 import { WallPanel, type WallKind } from './WallPanel';
 import { RingPicker } from './RingPicker';
+import { MistPanel } from './MistPanel';
 
 /**
  * Both play modes show the map in play. The GM view dims the fog and shows every monster, with
@@ -198,6 +199,8 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const [placing, setPlacing] = useState<PropPicture | null>(null);
     const [wallSnap, setWallSnap] = useState(1);
     const [wallKind, setWallKind] = useState<WallKind>('wall');
+    const [mistCircle, setMistCircle] = useState(false);
+    const [mistLook, setMistLook] = useState<MistLook>({ color: mistColors[0], density: 0.6 });
     const [pending, setPending] = useState<PendingMove | null>(null);
     const [frozen, setFrozen] = useState(false);
     const [playTool, setPlayTool] = useState<PlayTool>('open-doors');
@@ -1112,6 +1115,9 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
     };
 
+    // The walls and mist tools each draw in more than one way, picked in their panel.
+    const editTool: ToolId = tool === 'walls' ? wallTools[wallKind] : tool === 'mist' && mistCircle ? 'mist-circle' : tool;
+
     // Without this the browser opens a dropped file itself instead of handing it to the page.
     const draggedOver = (event: DragEvent) => event.preventDefault();
 
@@ -1122,9 +1128,10 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 // The Player view shows how hurt everyone looks, not the numbers.
                 tokens={mode === 'players' ? shown.map((token) => (secretSaves ? withoutSaves(withoutNumbers(token)) : withoutNumbers(token))) : shown}
                 mode={playing ? 'play' : 'edit'}
-                tool={playing ? playTool : tool === 'walls' ? wallTools[wallKind] : tool}
+                tool={playing ? playTool : editTool}
                 placing={playing ? null : placing}
                 wallSnap={wallSnap}
+                mist={mistLook}
                 fogEpoch={fogEpoch}
                 pending={pending}
                 frozen={isFrozen}
@@ -1449,6 +1456,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                     {tool === 'walls' && (
                         <WallPanel kind={wallKind} onKind={setWallKind} snap={wallSnap} onSnap={setWallSnap} />
                     )}
+                    {tool === 'mist' && <MistPanel circle={mistCircle} onCircle={setMistCircle} look={mistLook} onLook={setMistLook} />}
                     {tool === 'align' && (
                         <GridPanel
                             grid={active.grid}

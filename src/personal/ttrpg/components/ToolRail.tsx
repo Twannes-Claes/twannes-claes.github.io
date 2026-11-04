@@ -7,6 +7,7 @@ import {
     faLocationDot,
     faRotateLeft,
     faRotateRight,
+    faSmog,
     faTree,
     faVectorSquare,
     type IconDefinition,
@@ -25,6 +26,7 @@ const tools: { id: ToolId; label: string; key: string; icon: IconDefinition }[] 
     { id: 'erase', label: 'Erase', key: 'e', icon: faEraser },
     { id: 'props', label: 'Props', key: 'p', icon: faTree },
     { id: 'monsters', label: 'Monsters', key: 'm', icon: faDragon },
+    { id: 'mist', label: 'Mist', key: 'i', icon: faSmog },
     { id: 'spawn', label: 'Spawn point', key: 's', icon: faLocationDot },
     { id: 'align', label: 'Grid', key: 'g', icon: faBorderAll },
 ];

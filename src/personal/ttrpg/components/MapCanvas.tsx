@@ -4,7 +4,7 @@ import type { BloodSettings, Decal, Draft, Drawing, FogSettings, GameSystem, Mar
 
 import { demoCredit, demoScenario } from '../content/scenarios';
 import { penWidths } from '../map/drawings';
-import { defaultFogSettings } from '../map/fog';
+import { defaultFogSettings, type MistLook } from '../map/fog';
 import { defaultBlood } from '../map/health';
 import { newProp } from '../map/props';
 import type { ToolId } from '../map/tools';
@@ -30,6 +30,8 @@ interface MapCanvasProps
     placing: PropPicture | null;
     /** Snap points per cell side for the walls tool, 0 for none. */
     wallSnap?: number;
+    /** How the mist tool's next area looks. */
+    mist?: MistLook | null;
     /** Bump to forget everything seen before. */
     fogEpoch: number;
     /** The drawn path waiting for Move or Cancel. */
@@ -146,6 +148,7 @@ export function MapCanvas({
     tool,
     placing,
     wallSnap = 1,
+    mist = null,
     fogEpoch,
     pending,
     frozen,
@@ -290,8 +293,8 @@ export function MapCanvas({
 
     useEffect(() =>
     {
-        view.current?.setTool(tool, placing, wallSnap);
-    }, [tool, placing, wallSnap]);
+        view.current?.setTool(tool, placing, wallSnap, mist);
+    }, [tool, placing, wallSnap, mist]);
 
     useEffect(() =>
     {

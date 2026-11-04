@@ -640,6 +640,20 @@ export interface Draft
     feet: number;
 }
 
+/**
+ * An area of mist the GM puts on the map, see PLAN.md: drawn over the fog of war on every screen,
+ * only a look, so it never blocks sight.
+ */
+export interface Mist
+{
+    id: string;
+    /** Its outline in world pixels, a polygon or a circle's points. */
+    points: Point[];
+    color: string;
+    /** How thick it looks, 0 to 1. */
+    density: number;
+}
+
 /** One battle map of a session, see PLAN.md. */
 export interface Scenario
 {
@@ -658,6 +672,8 @@ export interface Scenario
     walls: Wall[];
     /** The fog of war switched off: players see the whole map and every monster not hidden. */
     fogOff?: boolean;
+    /** Drawn in order, so the last one is on top. */
+    mists?: Mist[];
     /** Where players appear when they join or the scenario changes. */
     spawn: Point;
 }

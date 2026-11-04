@@ -1,13 +1,14 @@
-import type { Drawing, GameSystem, Mark, Point, Prop, PropPicture, Scenario, Token, Wall } from '../types';
+import type { Drawing, GameSystem, Mark, Mist, Point, Prop, PropPicture, Scenario, Token, Wall } from '../types';
 
 import { danger, door as doorColour, erasing, faded, ground, highlight, ink } from './colours.ts';
 import { drawingsAt, drawLine, extendLine, maxDrawingPoints, penWidths } from './drawings.ts';
 import { boxOf, closestOnSegment, distance, distanceToSegment, onMap, segmentsTouch, type Area } from './geometry.ts';
+import type { MistLook } from './fog.ts';
 import { cellAt, cellCenter, cellLine, nearestCorner, snapPoint } from './grid.ts';
 import { lineFeet, pathFeet } from './path.ts';
 import { fromLocal, newProp, propAt, propCorners, propHandles, snapCenter, snapSize } from './props.ts';
 import { drawPill, drawRoute, tokenRadius } from './render.ts';
-import { sightSegments, visibilityPolygon } from './visibility.ts';
+import { insidePolygon, sightSegments, visibilityPolygon } from './visibility.ts';
 
 import { confirmAction } from '../services/confirm.ts';
 
@@ -37,6 +38,8 @@ export type ToolId =
     | 'reveal-circle'
     | 'hide'
     | 'hide-circle'
+    | 'mist'
+    | 'mist-circle'
     | 'draw'
     | 'rub-out';
 
@@ -48,9 +51,9 @@ export type Change = (next: Scenario, final?: boolean) => void;
 
 /**
  * Hears what Reveal uncovers, a polygon or a circle, as a polygon in world pixels, and whether it hides
- * it again instead.
+ * it again instead. The mist tool draws with Reveal's, and adds the shape to the scenario.
  */
-export type Reveal = (polygon: Point[], hide: boolean) => void;
+export type Reveal = (polygon: Point[], hide: boolean, scenario: Scenario) => void;
 
 /** Hears a ruler or an area as it is dragged, to show on every screen, and null once let go. */
 export type ShareMark = (mark: Mark | null) => void;
@@ -1047,7 +1050,7 @@ function revealTool(reveal: Reveal, hide: boolean, snap: number): MapTool
 
             if (closes(pointer.world, pointer.zoom) || closes(point, pointer.zoom))
             {
-                reveal(corners, hide);
+                reveal(corners, hide, pointer.scenario);
                 corners = [];
             }
             else if (!last || distance(last, point) * pointer.zoom >= 4)
@@ -1137,8 +1140,17 @@ function revealCircleTool(reveal: Reveal, hide: boolean): MapTool
                 const points = circlePoints(center, radius, 64);
                 const edge = points.map((a, index) => ({ a, b: points[(index + 1) % points.length] }));
 
+                // A ray can slip out between two of the edge's segments and run on to a far wall,
+                // a spike out of the circle, so every point is held inside it.
+                const inside = (point: Point) =>
+                {
+                    const far = distance(center, point);
+
+                    return far <= radius ? point : { x: center.x + ((point.x - center.x) * radius) / far, y: center.y + ((point.y - center.y) * radius) / far };
+                };
+
                 // Hiding forgets the whole circle, walls or not.
-                reveal(hide ? points : visibilityPolygon(center, [...sightSegments(scenario), ...edge]), hide);
+                reveal(hide ? points : visibilityPolygon(center, [...sightSegments(scenario), ...edge]).map(inside), hide, scenario);
             }
 
             drag = null;
@@ -1214,15 +1226,38 @@ function strokeMonster(ctx: CanvasRenderingContext2D, monster: Token, radius: nu
     ctx.stroke();
 }
 
+/** The middle of a shape's points, which an eraser's box has to catch. */
+function middleOf(points: Point[]): Point
+{
+    const sum = points.reduce((total, point) => ({ x: total.x + point.x, y: total.y + point.y }), { x: 0, y: 0 });
+
+    return { x: sum.x / points.length, y: sum.y / points.length };
+}
+
+/** A mist's outline in red, about to go. */
+function strokeMist(ctx: CanvasRenderingContext2D, mist: Mist, zoom: number)
+{
+    ctx.save();
+    // A circle cut by walls has sharp corners, which a mitred line would stretch into spikes.
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    mist.points.forEach((point, index) => (index === 0 ? ctx.moveTo(point.x, point.y) : ctx.lineTo(point.x, point.y)));
+    ctx.closePath();
+    ctx.lineWidth = 3 / zoom;
+    ctx.strokeStyle = danger;
+    ctx.stroke();
+    ctx.restore();
+}
+
 /**
- * The eraser: click a wall, a prop or a monster to take it away, or drag a box from the floor and
+ * The eraser: click a wall, a prop, a monster or a mist to take it away, or drag a box from the floor and
  * everything in it goes when it is let go, once confirmed. Walls and props go as one step to undo;
  * a monster lives beside the map rather than in it, so a click on one asks first, and eraseMonsters
  * takes it off for good. What is about to go shows red.
  */
 function eraseTool(change: Change, eraseMonsters: EraseMonsters): MapTool
 {
-    let hover: { wall?: Wall; prop?: Prop; monster?: Token } = {};
+    let hover: { wall?: Wall; prop?: Prop; monster?: Token; mist?: Mist } = {};
     let drag: Drag | null = null;
     // The monsters the last pointer saw, for drawing, which gets no pointer.
     let monsters: Token[] = [];
@@ -1240,14 +1275,20 @@ function eraseTool(change: Change, eraseMonsters: EraseMonsters): MapTool
 
         const wall = wallNear(pointer);
 
-        return wall ? { wall } : { prop: propAt(pointer.scenario.props, pointer.world) };
+        if (wall)
+            return { wall };
+
+        const prop = propAt(pointer.scenario.props, pointer.world);
+
+        // Mist covers whole rooms, so only a press with nothing else under it takes one.
+        return prop ? { prop } : { mist: [...(pointer.scenario.mists ?? [])].reverse().find((mist) => insidePolygon(pointer.world, mist.points)) };
     };
 
-    /** The walls in the box, and the props and monsters with their middle in it. */
+    /** The walls in the box, and the props, monsters and mists with their middle in it. */
     const inBox = (scenario: Scenario) =>
     {
         if (!drag)
-            return { walls: [], props: [], caught: [] };
+            return { walls: [], props: [], caught: [], mists: [] };
 
         const box = boxOf(drag.start, drag.end);
         const inside = ({ x, y }: Point) => x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
@@ -1259,13 +1300,14 @@ function eraseTool(change: Change, eraseMonsters: EraseMonsters): MapTool
             walls: scenario.walls.filter((wall) => wallInBox(wall, box) || rings.has(wall.ring)),
             props: scenario.props.filter(inside),
             caught: monsters.filter(inside),
+            mists: (scenario.mists ?? []).filter((mist) => inside(middleOf(mist.points))),
         };
     };
 
     return {
         get cursor()
         {
-            return hover.wall || hover.prop || hover.monster ? 'pointer' : 'crosshair';
+            return hover.wall || hover.prop || hover.monster || hover.mist ? 'pointer' : 'crosshair';
         },
         down: (pointer) =>
         {
@@ -1273,7 +1315,7 @@ function eraseTool(change: Change, eraseMonsters: EraseMonsters): MapTool
 
             monsters = pointer.monsters ?? [];
 
-            const { wall, prop, monster } = under(pointer);
+            const { wall, prop, monster, mist } = under(pointer);
 
             hover = {};
 
@@ -1294,6 +1336,15 @@ function eraseTool(change: Change, eraseMonsters: EraseMonsters): MapTool
             }
             else if (prop)
                 change(withoutProp(scenario, prop.id));
+            else if (mist)
+            {
+                void confirmAction('Erase this mist?', 'Erase').then((yes) =>
+                {
+                    if (yes)
+                        change({ ...scenario, mists: scenario.mists?.filter((other) => other !== mist) });
+
+                });
+            }
             else
                 drag = { start: pointer.world, end: pointer.world };
 
@@ -1311,9 +1362,9 @@ function eraseTool(change: Change, eraseMonsters: EraseMonsters): MapTool
         up: (pointer) =>
         {
             const { scenario } = pointer;
-            const { walls, props, caught } = inBox(scenario);
-            const doomed = new Set([...walls, ...props].map((thing) => thing.id));
-            const what = [counted(walls.length, 'wall'), counted(props.length, 'prop'), counted(caught.length, 'monster')]
+            const { walls, props, caught, mists } = inBox(scenario);
+            const doomed = new Set([...walls, ...props, ...mists].map((thing) => thing.id));
+            const what = [counted(walls.length, 'wall'), counted(props.length, 'prop'), counted(mists.length, 'mist'), counted(caught.length, 'monster')]
                 .filter(Boolean)
                 .join(' and ');
 
@@ -1333,6 +1384,7 @@ function eraseTool(change: Change, eraseMonsters: EraseMonsters): MapTool
                             ...scenario,
                             walls: scenario.walls.filter((wall) => !doomed.has(wall.id)),
                             props: scenario.props.filter((prop) => !doomed.has(prop.id)),
+                            mists: scenario.mists?.filter((mist) => !doomed.has(mist.id)),
                         });
                     }
 
@@ -1365,10 +1417,16 @@ function eraseTool(change: Change, eraseMonsters: EraseMonsters): MapTool
             if (hover.monster)
                 strokeMonster(ctx, hover.monster, tokenRadius(scenario.grid, hover.monster.size), zoom);
 
+            if (hover.mist)
+                strokeMist(ctx, hover.mist, zoom);
+
             if (!drag)
                 return;
 
-            const { walls, props, caught } = inBox(scenario);
+            const { walls, props, caught, mists } = inBox(scenario);
+
+            for (const mist of mists)
+                strokeMist(ctx, mist, zoom);
 
             for (const wall of walls)
                 strokeWall(ctx, wall, danger, 7 / zoom);
@@ -1695,7 +1753,7 @@ function movablePropTool(doors: MapTool, change: Change): MapTool
  * picture the props tool places with each click, null to select and edit placed props. reveal
  * hears what Reveal uncovers or hides, which changes what was seen, not the scenario. snap is
  * how many points per cell side walls snap to, 0 for none. share hears the ruler and the area
- * tool as they are dragged.
+ * tool as they are dragged. mist is how the mist tool's next area looks.
  */
 export function createTool(
     id: ToolId,
@@ -1706,6 +1764,7 @@ export function createTool(
     share: ShareMark = () => {},
     eraseMonsters: EraseMonsters = () => {},
     sketching: Sketching = noSketching,
+    mist: MistLook | null = null,
 ): MapTool | null
 {
     switch (id)
@@ -1752,6 +1811,16 @@ export function createTool(
         case 'reveal-circle':
         case 'hide-circle':
             return revealCircleTool(reveal, id === 'hide-circle');
+        case 'mist':
+        case 'mist-circle':
+        {
+            // Drawn like Reveal's polygon or circle, and kept with the map as one step to undo.
+            const add: Reveal = (points, _hide, scenario) =>
+                mist && change({ ...scenario, mists: [...(scenario.mists ?? []), { id: crypto.randomUUID(), points, ...mist }] });
+
+            return id === 'mist' ? revealTool(add, false, snap) : revealCircleTool(add, false);
+        }
+
         case 'draw':
             return drawTool(sketching);
         case 'rub-out':

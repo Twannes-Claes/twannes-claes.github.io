@@ -1188,6 +1188,22 @@ shows on every screen, over the fog. Whether thick mist blocks sight shows in te
 the map, removed with the eraser. With mist next to it, the fog itself is named **Fog of war**
 everywhere in the UI, so the two never get mixed up.
 
+- **Built.** **Mist** on the edit rail (I) opens a panel: Polygon or Circle, a colour from six
+  swatches (haze, poison, arcane, frost, embers, blood, `mistColors` in `map/fog.ts`) or any
+  other with the ring picker's eyedropper, and a density slider from 20 to 100%, the fog panel's
+  `Slider`. The tool
+  draws with Reveal's own `revealTool` and `revealCircleTool`, whose `Reveal` now also gets the
+  scenario, and adds a `Mist` to `mists` on the scenario (`types.ts`, the scenario validator in
+  `convex/schema.ts`), so it saves with the map and undo takes it back. A circle stops at walls,
+  like a light. `drawMists` in `map/fog.ts` paints the shapes once, blurred, on a small canvas,
+  and every frame lays the fog's own drifting smoke (`fillSmoke`, shared with `drawFog`) cut to
+  them in their colour over a thinner even haze, drawn over the fog of war on every screen. The
+  eraser takes a mist clicked with nothing else under it, once confirmed, or with its middle in
+  the box. Mist
+  **does not block sight**: thick mist hides the map by its look, and blocking sight would mean
+  sight polygons and fog writes that clip at a soft edge; worth it only if the table asks. The UI
+  already says Fog of war everywhere, nothing left that says just "fog".
+
 **29. Fog of war off.** A switch per map, in the map panel: off, the players see the whole map,
 for a town in daylight. Hidden monsters stay hidden.
 

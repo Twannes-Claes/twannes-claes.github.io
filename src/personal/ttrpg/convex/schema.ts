@@ -96,6 +96,16 @@ export const scenarioValidator = v.object({
         }),
     ),
     fogOff: v.optional(v.boolean()),
+    mists: v.optional(
+        v.array(
+            v.object({
+                id: v.string(),
+                points: v.array(v.object({ x: v.number(), y: v.number() })),
+                color: v.string(),
+                density: v.number(),
+            }),
+        ),
+    ),
     spawn: v.object({ x: v.number(), y: v.number() }),
 });
 

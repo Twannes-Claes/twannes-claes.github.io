@@ -17,6 +17,7 @@ import {
     wasSeen,
     type Explored,
     type FogLayers,
+    type MistLook,
 } from './fog.ts';
 import { accent, ground, highlight, tooFar } from './colours.ts';
 import { distance, lerp, midpoint, onMap } from './geometry.ts';
@@ -178,7 +179,7 @@ export interface MapView
      */
     setMode: (mode: 'edit' | 'play') => void;
     /** placing is the library picture the props tool places, see createTool in map/tools.ts. */
-    setTool: (id: ToolId, placing?: PropPicture | null, snap?: number) => void;
+    setTool: (id: ToolId, placing?: PropPicture | null, snap?: number, mist?: MistLook | null) => void;
     /** The path waiting for Move or Cancel, drawn until it is decided. */
     setPending: (move: PendingMove | null) => void;
     /** Frozen, players cannot draw paths; the game master still drags anything. */
@@ -1136,11 +1137,11 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         for (const hit of hits)
             drawHit(context, hit, (time - hit.start) / hitLife, camera.zoom, !calm.matches);
 
-        // The smoke drifts, walking tokens move, fog changes, tokens fade and glide, so they ask for
+        // The smoke and the mist drift, walking tokens move, fog changes, tokens fade and glide, so they ask for
         // the next frame. Reduced motion keeps the smoke still and skips the fades; a walk still
         // plays. Only once: the fog refreshed above may already have asked, and two would draw
         // every frame twice.
-        if ((walking || fading.size > 0 || ringsMoving(time) || mounting.size > 0 || pings.length > 0 || hits.length > 0 || decalsMoving || (fog && !calm.matches)) && frame === 0)
+        if ((walking || fading.size > 0 || ringsMoving(time) || mounting.size > 0 || pings.length > 0 || hits.length > 0 || decalsMoving || ((fog || scenario.mists?.length) && !calm.matches)) && frame === 0)
             frame = requestAnimationFrame(draw);
 
         measure(time, performance.now() - started);
@@ -2075,7 +2076,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
             refreshFog();
             redraw();
         },
-        setTool: (id, placing = null, snap = 1) =>
+        setTool: (id, placing = null, snap = 1, mist = null) =>
         {
             // A ruler or area still out goes with the tool that drew it.
             if (marked || markTimer)
@@ -2087,7 +2088,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
                 drawings: () => drawings,
                 // Without a colour picked the server colours a player's line with their ring, the host's with none.
                 look: () => ({ colour: pen.color ?? tokens.find((token) => token.id === own)?.color ?? highlight, width: pen.width }),
-            });
+            }, mist);
             toolPointerId = null;
             canvas.style.cursor = restCursor();
             redraw();

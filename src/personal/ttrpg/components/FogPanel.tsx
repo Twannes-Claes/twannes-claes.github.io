@@ -23,7 +23,7 @@ interface FogPanelProps
 }
 
 /** One slider of the panel, a row with its name, its value beside it, and what it does on hover. */
-function Slider({
+export function Slider({
     name,
     hint,
     shown,

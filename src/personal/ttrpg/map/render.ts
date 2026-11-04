@@ -5,7 +5,7 @@ import { conditionKind, type ConditionKind } from '../content/conditions.ts';
 
 import { toWorld, type Camera } from './camera.ts';
 import { accent, blood, bloodDark, danger, door as doorColour, faded, ground, heal, highlight, ink, defaultOutside, steel, tempHp } from './colours.ts';
-import { drawFog, type FogLayers, type FogLook } from './fog.ts';
+import { drawFog, drawMists, type FogLayers, type FogLook } from './fog.ts';
 import { distance, type Area } from './geometry.ts';
 import { cellAt, cellCenter, cellCorners, hexRadius } from './grid.ts';
 import { healthState, stateOf } from './health.ts';
@@ -1117,7 +1117,8 @@ function drawSpawn(ctx: CanvasRenderingContext2D, at: Point, radius: number)
 }
 
 /**
- * Draws one frame: the background or a plain floor, the grid, the walls, the tokens and the fog.
+ * Draws one frame: the background or a plain floor, the grid, the walls, the tokens, the fog and
+ * the mist.
  * Everything is drawn in world pixels under one transform, and only the part of the grid on
  * screen is drawn, which keeps a big map cheap when zoomed in.
  */
@@ -1257,5 +1258,8 @@ export function render(
 
     if (fog)
         drawFog(ctx, fog, scenario, time, fogLook);
+
+    // Over the fog of war, so a poison cloud shows where the players have not been.
+    drawMists(ctx, scenario, motion ? time : 0);
 
 }
