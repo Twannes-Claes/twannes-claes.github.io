@@ -2612,6 +2612,7 @@ details[open]::details-content {
     .ttrpg-dice__total,
     .ttrpg-dice__total strong,
     .ttrpg-dice__sum,
+    .ttrpg-hit-log__entry,
     .ttrpg-confirm[open] {
         animation: none;
     }
@@ -3855,26 +3856,255 @@ button.ttrpg-row__main {
 
 /* Whose turn it is in the initiative order, in the purple of their ring on the map. */
 .ttrpg-row--turn {
-    border-radius: 10px;
+    /* A roll being typed in has 8px corners and an 8px inset, see .ttrpg-initiative__roll, which is
+       also the panel's own corner. */
+    border-radius: 16px;
     background: var(--ttrpg-tint);
 }
 
-/* A roll in the initiative order, before the name, wide enough for -99. */
+/* A roll in the initiative order, before the name, wide enough for -99. Just the number, a field
+   only while it is typed in: then the row's height less an even inset, the turn's highlight
+   rounding by its corners plus the inset, so it sits in it neatly. */
 .ttrpg-initiative__roll {
-    width: 3.25rem;
+    align-self: stretch;
+    width: 2.75rem;
     min-height: 32px;
-    /* Room from the edge of the turn's highlight. */
-    margin-inline-start: 0.25rem;
+    margin: 8px 0 8px 8px;
     padding: 0.25rem 0.4rem;
-    border: 1px solid var(--ttrpg-edge);
-    border-radius: 10px;
-    background: var(--ttrpg-well);
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: none;
     color: var(--ttrpg-ink);
     font-family: var(--ttrpg-mono);
-    font-size: 0.875rem;
+    font-size: 1.125rem;
+    font-weight: 600;
     text-align: center;
+    transition:
+        background-color 150ms var(--ttrpg-ease),
+        border-color 150ms var(--ttrpg-ease);
 }
 
+.ttrpg-initiative__roll:focus {
+    border-color: var(--ttrpg-accent);
+    background: var(--ttrpg-well);
+}
+
+/* The roll and the buttons in the middle of the row, whatever is under the name. Only the swatch
+   stays with the name, as in the Monsters panel. */
+.ttrpg-initiative__order .ttrpg-row:has(.ttrpg-chips) {
+    align-items: center;
+}
+
+/* A little wider than the other panels, so HP, temp HP and AC fit on one line under a name and a
+   hit on several tokens on one line. */
+.ttrpg-initiative {
+    width: min(24rem, calc(100% - 32px));
+}
+
+/* Whose turn it is, its roll bold, in the accent on the light theme and the ink on the dark one,
+   where the accent would sink into the row's tint. */
+.ttrpg-row--turn .ttrpg-initiative__roll:not(:focus) {
+    color: var(--ttrpg-ink);
+    font-weight: 700;
+}
+
+.ttrpg[data-theme='light'] .ttrpg-row--turn .ttrpg-initiative__roll:not(:focus) {
+    color: var(--ttrpg-accent);
+}
+
+/* A name in its token's colour, which stands in for the swatch, see inColour in InitiativePanel.tsx. */
+.ttrpg-initiative__name {
+    font-weight: 600;
+}
+
+/* Swapping and taking out together on the right, inset like the roll on the left, plain icons
+   without a background that only darken when hovered. One that cannot move, up on the first row or
+   down on the last, keeps its place but does not show, rather than greyed out. */
+.ttrpg-initiative__tools {
+    display: flex;
+    align-items: center;
+    margin-inline-end: 8px;
+}
+
+.ttrpg-initiative__tools .ttrpg-icon-button {
+    width: 28px;
+    background: none;
+}
+
+.ttrpg-initiative__tools .ttrpg-icon-button:disabled {
+    visibility: hidden;
+}
+
+/* They show on the row the pointer is on, so the order reads as names, or the one a keyboard is
+   on. Not focus from a click, which would keep them up on a row the click just swapped away from
+   under the pointer. Always there on a touch screen, which has no hover. */
+@media (hover: hover) {
+    .ttrpg-initiative__tools {
+        opacity: 0;
+        transition: opacity 150ms var(--ttrpg-ease);
+    }
+
+    .ttrpg-initiative__order .ttrpg-row:is(:hover, :has(:focus-visible)) .ttrpg-initiative__tools {
+        opacity: 1;
+    }
+}
+
+/* The fight's hits in the GM's initiative panel, newest on top, see InitiativePanel.tsx. */
+.ttrpg-hit-log {
+    max-height: 13rem;
+    overflow-y: auto;
+}
+
+/* "No hits yet." and the list stacked in one cell, so the panel is as tall as the taller and never
+   snaps between them: the line waits for the last hit to fold away before it fades in, and fades
+   out as the first hit unfolds over it, see useLeaving in Shell.tsx. */
+.ttrpg-hit-log__stack {
+    display: grid;
+}
+
+.ttrpg-hit-log__stack > * {
+    grid-area: 1 / 1;
+}
+
+.ttrpg-hit-log__empty {
+    animation: ttrpg-fade 200ms var(--ttrpg-ease);
+}
+
+/* Without its animation while a hit folds away, so it starts, and fades in, once it is gone. */
+.ttrpg-hit-log__stack:has(.ttrpg-leaving.ttrpg-hit-log__entry) .ttrpg-hit-log__empty {
+    opacity: 0;
+    animation: none;
+}
+
+/* A new hit unfolds on top and pushes the rest down. Not the ones there when the panel opens,
+   which rise with it. */
+.ttrpg-hit-log__entry--new,
+.ttrpg-hit-log__entry.ttrpg-leaving {
+    overflow: clip;
+    animation: ttrpg-hit-log-in 220ms cubic-bezier(0.4, 0, 0.2, 1);
+    interpolate-size: allow-keywords;
+}
+
+/* An undone one first fades and slides out where it stands, then its space closes and the rest
+   move up. Written forwards from gone, as whatever leaves plays its animation backwards, see
+   useLeaving in Shell.tsx. As long as foldMs in InitiativePanel.tsx. */
+.ttrpg-hit-log__entry.ttrpg-leaving {
+    animation: ttrpg-hit-log-out 420ms linear;
+}
+
+@keyframes ttrpg-hit-log-out {
+    0% {
+        height: 0;
+        opacity: 0;
+        translate: -16px 0;
+        animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    50% {
+        height: auto;
+        opacity: 0;
+        translate: -16px 0;
+        animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+}
+
+/* Shown and gone at once, after the motion rules above, which the earlier reduced motion rules
+   would lose to. */
+@media (prefers-reduced-motion: reduce) {
+    .ttrpg-hit-log__entry--new,
+    .ttrpg-hit-log__entry.ttrpg-leaving,
+    .ttrpg-hit-log__empty {
+        animation: none;
+    }
+}
+
+@keyframes ttrpg-hit-log-in {
+    from {
+        height: 0;
+        opacity: 0;
+        translate: 0 -6px;
+    }
+}
+
+/* How much, with HitSheet's icon, red for damage and green for a heal, where the roll is above. */
+.ttrpg-hit-log__amount {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    align-self: stretch;
+    min-width: 2.75rem;
+    min-height: 32px;
+    margin: 8px 0 8px 8px;
+    padding: 0.25rem 0.4rem;
+    border-radius: 8px;
+    font-family: var(--ttrpg-mono);
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+
+/* Just the icon and the number in their colour, like the rolls above. */
+.ttrpg-hit-log__amount--attack {
+    color: var(--ttrpg-danger);
+}
+
+.ttrpg-hit-log__amount--heal {
+    color: var(--ttrpg-success);
+}
+
+.ttrpg-hit-log__targets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 0.75rem;
+}
+
+.ttrpg-hit-log__target {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+/* Older hits step back, so the one Undo takes is the one that stands out. Counted without one
+   folding away, so the next comes forward as it goes. */
+.ttrpg-hit-log__entry {
+    transition: opacity 220ms var(--ttrpg-ease);
+}
+
+.ttrpg-hit-log__entry:not(.ttrpg-leaving, :nth-child(1 of :not(.ttrpg-leaving))) {
+    opacity: 0.6;
+}
+
+/* Small and quiet beside the line, like the icon buttons, rather than a full button. */
+.ttrpg-hit-log__undo {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    height: 32px;
+    padding: 0 0.7rem;
+    border-radius: 10px;
+    color: var(--ttrpg-muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+        background-color 150ms var(--ttrpg-ease),
+        color 150ms var(--ttrpg-ease);
+}
+
+.ttrpg-hit-log__undo:is(:hover, :focus-visible):not(:disabled) {
+    background: var(--ttrpg-edge);
+    color: var(--ttrpg-ink);
+}
+
+.ttrpg-hit-log__undo:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.ttrpg-hit-log__target svg {
+    color: var(--ttrpg-muted);
+    font-size: 0.75em;
+}
 /* A session's or a music link's name being renamed, in the place of its row. */
 .ttrpg-row__input {
     flex: 1;

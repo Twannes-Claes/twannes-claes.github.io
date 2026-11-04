@@ -19,8 +19,9 @@ interface StatsFormProps
 /**
  * A token's numbers as small chips under its name in a list: HP coloured by how hurt it is, temp HP
  * as a blue +4 and AC behind a shield, as the map shows them, and Passive Perception. Nothing for a token without them.
+ * Brief, without Passive Perception, for the initiative order, where it is no use in a fight.
  */
-export function StatChips({ token }: { token: Token })
+export function StatChips({ token, brief = false }: { token: Token; brief?: boolean })
 {
     if (token.hp === undefined || token.maxHp === undefined)
         return null;
@@ -39,9 +40,11 @@ export function StatChips({ token }: { token: Token })
                 <FontAwesomeIcon icon={faShield} />
                 {token.ac ?? 0}
             </span>
-            <span className="ttrpg-chip" title="Passive Perception">
-                PP {token.perception ?? 0}
-            </span>
+            {!brief && (
+                <span className="ttrpg-chip" title="Passive Perception">
+                    PP {token.perception ?? 0}
+                </span>
+            )}
         </span>
     );
 }

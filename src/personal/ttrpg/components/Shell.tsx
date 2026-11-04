@@ -33,6 +33,8 @@ const popsIn = [
     '.ttrpg-corner',
     '.ttrpg-saved',
     '.ttrpg-music__idle',
+    '.ttrpg-hit-log__entry',
+    '.ttrpg-hit-log__empty',
 ].join(', ');
 
 /**

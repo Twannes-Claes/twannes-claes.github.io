@@ -72,6 +72,34 @@ export function hitOn(token: Pick<Token, 'kind' | 'hp' | 'maxHp' | 'tempHp' | 'd
     return { after, died: zero && !goesDown, downed: zero && goesDown && hp !== 0 };
 }
 
+/** The numbers a hit changes, see hitOn and undoneOn. */
+export interface HitStats
+{
+    hp: number;
+    tempHp: number;
+    conditions?: Condition[];
+}
+
+/**
+ * A token's numbers with a hit taken back, from what it had before and after. Untouched since, it
+ * gets back exactly what it had. Healed, hit or edited since, only the hit's own change is taken
+ * back, kept to 0 and its max, so what came after stays.
+ */
+export function undoneOn(token: Pick<Token, 'hp' | 'maxHp' | 'tempHp' | 'conditions'>, before: HitStats, after: HitStats): HitStats | null
+{
+    const { hp, maxHp, tempHp = 0 } = token;
+
+    if (hp === undefined || maxHp === undefined)
+        return null;
+
+    if (hp === after.hp && tempHp === after.tempHp && JSON.stringify(token.conditions ?? []) === JSON.stringify(after.conditions ?? []))
+        return before;
+
+    const back = Math.min(maxHp, Math.max(0, hp + before.hp - after.hp));
+
+    return { hp: back, tempHp: Math.max(0, tempHp + before.tempHp - after.tempHp), conditions: conditionsAt(token.conditions, back) };
+}
+
 /** How much wider than its token the pool a player goes down in is, so it shows around them. */
 export const downedPool = 1.6;
 

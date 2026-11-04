@@ -9,6 +9,7 @@ import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/s
 import { requireHost, requireSession } from './access';
 import { clearChat } from './chat';
 import { clearRolls } from './dice';
+import { clearHitLog } from './hitLog';
 import { regrid } from './play';
 import { scenarioValidator, systemValidator } from './schema';
 import { refreshSight, tokensOf } from './sight';
@@ -241,6 +242,7 @@ export const remove = mutation({
             await ctx.db.delete('decals', decal._id);
 
         await clearRolls(ctx, sessionId);
+        await clearHitLog(ctx, sessionId);
         await clearChat(ctx, sessionId);
         await ctx.db.delete('sessions', sessionId);
 

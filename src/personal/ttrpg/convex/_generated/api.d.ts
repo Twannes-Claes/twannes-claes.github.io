@@ -13,6 +13,7 @@ import type * as auth from "../auth.js";
 import type * as characters from "../characters.js";
 import type * as chat from "../chat.js";
 import type * as dice from "../dice.js";
+import type * as hitLog from "../hitLog.js";
 import type * as hosts from "../hosts.js";
 import type * as http from "../http.js";
 import type * as limits from "../limits.js";
@@ -37,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   characters: typeof characters;
   chat: typeof chat;
   dice: typeof dice;
+  hitLog: typeof hitLog;
   hosts: typeof hosts;
   http: typeof http;
   limits: typeof limits;

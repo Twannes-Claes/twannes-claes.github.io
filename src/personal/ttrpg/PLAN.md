@@ -1232,6 +1232,40 @@ staged in Edit mid-fight, hidden until shown.
 **32. Hit log and undo.** The GM view lists the fight's hits (who, how much, damage or heal), and
 the GM can undo the last one, for a mistyped number.
 
+- **Built.** A **Hits** section in the GM's Initiative panel, under the order, as the panel is
+  where the fight is run: no new kind of panel, and out of a fight there is no log. One line per
+  hit, a multi-target one too, newest on top: the amount in a red pill with `faBurst` or a green
+  one with `faHeart`, as on `HitSheet`, the targets with their swatches and a skull on one it
+  killed, and "by GM" or the player's name. `play.hit` logs every hit while a fight is on, players'
+  too, in `hitLog` (`convex/hitLog.ts`), with each target's numbers before and after, a killed
+  monster as it stood, a summon sent off and the pool it left; the last 20, like the dice log, and
+  cleared with the fight by End initiative, Start, End session, a map switch and deleting the
+  session. **Undo** sits inline on the newest line, rather than behind a confirm, as it is for a
+  number just mistyped and costs nothing to redo; pressed again it takes back the one before, and
+  so on, newest first, never an older one alone, which could undo what a later hit built on. It takes back exactly what the hit did,
+  on the server, GM only (`hitLog.undo`): the numbers, see `undoneOn` in `map/health.ts`; a
+  killed monster back where it fell and in its place in the order, without a picture of its own,
+  which went with it; a summon off its tray; the blood. A token untouched since gets back exactly
+  what it had, conditions too; one healed, hit or edited since gets back only the hit's own change,
+  kept to 0 and its max, so what came after stays; one removed since stays gone; moving does not
+  matter. The next line's Undo, now under the pointer, stays off until the undone line has folded
+  away, and the server refuses a hit already taken back, so a double press takes back one. A new line unfolds on top. An undone one first fades and slides
+  out where it stands, then its space closes, and No hits yet shares the list's place, so the
+  last one undone eases into it rather than the panel jumping (`useLeaving` in `Shell.tsx`), none with reduced motion; the lines there when the
+  panel opens rise with it. Players see nothing new: the HP and the animation already tell them.
+  The demo logs and undoes in the tab the same way.
+- **Built, the panel restyled.** It looked out of place beside the Monsters panel. A roll is just
+  its number, larger, a field only while it is typed in: then the row's height less an even 8px
+  inset, the turn's highlight rounding by its 8px corners plus the inset. Whose turn it is has its
+  roll in bold, in the accent on the light theme. A name is in its token's colour, a quarter mixed
+  with the ink so it reads on either theme, in place of the swatch. Under it its HP, temp HP and AC
+  as chips, `StatChips` made brief, without Passive Perception, in a panel a little wider than the
+  rest (24rem) so they fit on one line. Swapping and taking out are plain icons inset like the roll,
+  shown on the row under the pointer and always on a touch screen, an arrow that cannot move hidden
+  rather than greyed. A hit's amount is its icon and number in red or green, in the rolls' column,
+  its targets and who hit named in their colours, the GM in the GM colour, Undo a small quiet button, and older hits step back, so the
+  newest stands out.
+
 **33. GM notes.** Pins on the map with a text, on the GM view only, saved with the map: what is in
 the chest, what the statue says.
 

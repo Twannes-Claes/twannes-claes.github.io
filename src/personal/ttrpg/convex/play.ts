@@ -22,6 +22,7 @@ import { requireSession, requireUser } from './access';
 import { saveCharacter } from './characters';
 import { clearChat } from './chat';
 import { clearRolls } from './dice';
+import { clearHitLog, logHit, standing } from './hitLog';
 import { limit, spend } from './limits';
 import { bloodSettingsValidator, conditionValidator, fogSettingsValidator, initiativeValidator, sizeValidator } from './schema';
 import { refreshSight, tokensOf, tokensOn } from './sight';
@@ -155,6 +156,7 @@ async function respawn(ctx: MutationCtx, session: Doc<'sessions'>, scenarioId: s
 
     // A fight stays on the map it was fought on.
     await ctx.db.patch('sessions', session._id, { activeScenarioId: scenarioId, initiative: undefined });
+    await clearHitLog(ctx, session._id);
     await refreshSight(ctx, session._id, scenario);
 }
 
@@ -863,6 +865,7 @@ export const start = mutation({
 
         // Starting again forgives whoever was removed: they still need the password.
         await ctx.db.patch('sessions', sessionId, { live: true, password: secret, frozen: false, kicked: undefined, initiative: undefined, check: undefined });
+        await clearHitLog(ctx, sessionId);
 
         if (session.activeScenarioId !== scenarioId)
             await respawn(ctx, session, scenarioId);
@@ -1287,6 +1290,9 @@ export const setInitiative = mutation({
         await requireSession(ctx, sessionId);
         await ctx.db.patch('sessions', sessionId, { initiative: initiative ? cleanFight(initiative) : undefined });
 
+        if (!initiative)
+            await clearHitLog(ctx, sessionId);
+
         return null;
     },
 });
@@ -1435,6 +1441,7 @@ export const end = mutation({
         await clearDrawings(ctx, sessionId);
         await clearRolls(ctx, sessionId);
         await clearChat(ctx, sessionId);
+        await clearHitLog(ctx, sessionId);
 
         return null;
     },
@@ -1647,6 +1654,7 @@ export const hit = mutation({
 
         const points = Number.isFinite(amount) ? Math.min(9999, Math.max(0, Math.round(amount))) : 0;
         const targets = [];
+        const logged: Doc<'hitLog'>['targets'] = [];
         let room = maxDecals - (await decalsOf(ctx, sessionId)).length;
 
         for (const tokenId of new Set(tokenIds.slice(0, maxTargets)))
@@ -1668,6 +1676,18 @@ export const hit = mutation({
 
             targets.push({ x: token.x, y: token.y, size: token.size, seen, died });
 
+            const entry: Doc<'hitLog'>['targets'][number] = {
+                tokenId,
+                name: token.name,
+                color: token.color,
+                before: after ? { hp: token.hp ?? 0, tempHp: token.tempHp ?? 0, conditions: token.conditions } : undefined,
+                after: after ?? undefined,
+                killed: died && !token.summonOf ? standing(token) : undefined,
+                trayed: died && token.summonOf ? true : undefined,
+            };
+
+            logged.push(entry);
+
             // A summon brought to 0 vanishes off the map, for its player to summon again, see summons.ts.
             if (died && token.summonOf)
             {
@@ -1684,13 +1704,16 @@ export const hit = mutation({
             {
                 const pool = { sessionId, scenarioId, x: token.x, y: token.y, size: token.size, seen };
 
-                await ctx.db.insert('decals', downed ? { ...pool, scale: downedPool } : pool);
+                entry.decalId = await ctx.db.insert('decals', downed ? { ...pool, scale: downedPool } : pool);
             }
 
         }
 
         if (targets.length === 0)
             return null;
+
+        if (session.initiative)
+            await logHit(ctx, { sessionId, by: own ? own.name : 'GM', color: own ? own.color : gmColorOf(session), kind, amount: points, targets: logged });
 
         const doc = await ctx.db
             .query('hits')

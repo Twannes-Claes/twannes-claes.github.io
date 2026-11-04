@@ -1,8 +1,8 @@
-import { faArrowDown, faArrowUp, faDice, faDiceD20, faForwardStep, faPlay, faStop, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faArrowDown, faArrowUp, faBurst, faDice, faDiceD20, faForwardStep, faHeart, faPlay, faRotateLeft, faSkull, faStop, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react';
 
-import type { DiceAsk, DiceRoll, GameSystem, Initiative, Preset, Token } from '../types';
+import type { DiceAsk, DiceRoll, GameSystem, Initiative, LoggedHit, Preset, Token } from '../types';
 
 import { diceName, rollDice } from '../map/dice';
 import { begun, cleanRoll, hasRolled, newFight, nextTurn, swapped, withoutRoll, withRoll } from '../map/initiative';
@@ -11,6 +11,7 @@ import { initiativeBonus } from '../map/presets';
 import { DicePanel } from './DicePanel';
 import { glide, morph, place, readMs, type Placed } from './morph';
 import { Popover } from './Popover';
+import { StatChips } from './StatsForm';
 
 interface InitiativePanelProps
 {
@@ -28,6 +29,10 @@ interface InitiativePanelProps
     /** A roll that failed without the dice to say so. */
     onError: (message: string) => void;
     onChange: (fight: Initiative | null) => void;
+    /** The fight's hits, newest first, see LoggedHit. */
+    hits: LoggedHit[];
+    /** Takes back the newest hit, settling once the log shows it gone. */
+    onUndo: (hitId: string) => Promise<void>;
     onClose: () => void;
 }
 
@@ -41,8 +46,23 @@ interface Throw
     modifier: number;
 }
 
+/**
+ * A name in its token's ring colour instead of a swatch beside it, a quarter mixed with the ink, so
+ * a dark ring still reads on the dark theme and a pale one on the light.
+ */
+function inColour(color: string)
+{
+    return { color: `color-mix(in srgb, ${color} 75%, var(--ttrpg-ink))` };
+}
+
 /** How long a monster's total shows before the dice throw for the next one. */
 const nextMs = 700;
+
+/** How long the panel's rise or a hit unfolding or folding away takes, with room to spare. */
+const settleMs = 500;
+
+/** How long an undone hit takes to fold away, see .ttrpg-hit-log__entry, before the next can go. */
+const foldMs = 420;
 
 /**
  * The GM's initiative, above the play dock: start a fight, and every phone asks for its roll. The
@@ -51,8 +71,13 @@ const nextMs = 700;
  * A token can also be rolled for with the dice, which the panel turns into and back from, like
  * the phone's roll pop-up, see morph.ts.
  */
-export function InitiativePanel({ fight, tokens, system, presets, rolls, onRoll, onError, onChange, onClose }: InitiativePanelProps)
+export function InitiativePanel({ fight, tokens, system, presets, rolls, onRoll, onError, onChange, hits, onUndo, onClose }: InitiativePanelProps)
 {
+    // The hits there when the panel opened show at once; only those after grow in.
+    const [shown] = useState(() => new Set(hits.map((hit) => hit.id)));
+    // Whether an undo is on its way or its line still folding away, so the next line's Undo, now
+    // under the pointer, waits and a double press takes back one.
+    const [undoing, setUndoing] = useState(false);
     // The fight as it is now, for dice that come back after it changed, see apply.
     const latest = useRef(fight);
     const [throwing, setThrowing] = useState<Throw | null>(null);
@@ -63,6 +88,17 @@ export function InitiativePanel({ fight, tokens, system, presets, rolls, onRoll,
     {
         latest.current = fight;
     }, [fight]);
+
+    // Where the panel and its rows were before the last change, to glide from, see glide.
+    const placed = useRef<Placed | null>(null);
+
+    // A change from this panel, measured as things stand right before it, so the glide starts from
+    // where the rows really are: not where the panel's rise or a hit unfolding since left them.
+    const change = (next: Initiative | null) =>
+    {
+        placed.current = place();
+        onChange(next);
+    };
 
     const alive = (id: string) => tokens.some((token) => token.id === id);
     const kindOf = (id: string) => tokens.find((token) => token.id === id)?.kind;
@@ -87,7 +123,7 @@ export function InitiativePanel({ fight, tokens, system, presets, rolls, onRoll,
         const next = entries.reduce((current, { token, roll }) => withRoll(current, token, roll, kindOf, system), latest.current);
 
         latest.current = next;
-        onChange(next);
+        change(next);
     };
 
     // A roll's total as the token's.
@@ -97,8 +133,6 @@ export function InitiativePanel({ fight, tokens, system, presets, rolls, onRoll,
     const queue = useRef<Token[]>([]);
     // The tokens a closed throw for all still waits on, see stopDice.
     const [closing, setClosing] = useState<Token[] | null>(null);
-    // Where the panel and its rows were at the last change, see glide.
-    const placed = useRef<Placed | null>(null);
 
     // Throws hidden for the next token in the queue. A failed throw empties it, leaving the dice
     // open to try by hand.
@@ -180,8 +214,9 @@ export function InitiativePanel({ fight, tokens, system, presets, rolls, onRoll,
         return () => clearTimeout(timer);
     }, [closing, fight]);
 
-    // Each change to the fight glides the rows into their new places, from where they were after
-    // the last one, see glide. Not while the dice show, so the panel coming back starts afresh.
+    // Each change to the fight glides the rows into their new places, from where they were before
+    // it, see change, or for one from a phone after the last, see below. Not while the dice show, so
+    // the panel coming back starts afresh.
     useLayoutEffect(() =>
     {
         const now = throwing ? null : place();
@@ -191,6 +226,20 @@ export function InitiativePanel({ fight, tokens, system, presets, rolls, onRoll,
 
         placed.current = now;
     }, [fight, throwing]);
+
+    // Once the panel has risen, or a hit has unfolded or folded away, where things are, for a change
+    // from a phone, which comes without a press here to measure on. Not during a glide, which
+    // measuring would cut short.
+    useEffect(() =>
+    {
+        const timer = setTimeout(() =>
+        {
+            if (!document.getAnimations().some((motion) => motion.id === 'glide'))
+                placed.current = place() ?? placed.current;
+        }, settleMs);
+
+        return () => clearTimeout(timer);
+    }, [hits]);
 
     if (throwing)
     {
@@ -202,10 +251,10 @@ export function InitiativePanel({ fight, tokens, system, presets, rolls, onRoll,
     if (!fight)
     {
         return (
-            <Popover title="Initiative" className="ttrpg-dock-panel" onClose={onClose}>
+            <Popover title="Initiative" className="ttrpg-dock-panel ttrpg-initiative" onClose={onClose}>
                 <div className="ttrpg-popover__body ttrpg-settings">
                     <p className="ttrpg-empty">Every phone asks for its roll. You type the monsters&apos; here.</p>
-                    <button type="button" className="ttrpg-segment ttrpg-segment--block ttrpg-segment--confirm" onClick={() => onChange(newFight)}>
+                    <button type="button" className="ttrpg-segment ttrpg-segment--block ttrpg-segment--confirm" onClick={() => change(newFight)}>
                         <FontAwesomeIcon icon={faDiceD20} />
                         Start initiative
                     </button>
@@ -223,7 +272,7 @@ export function InitiativePanel({ fight, tokens, system, presets, rolls, onRoll,
         if (roll === (was ?? null))
             return;
 
-        onChange(roll === null ? withoutRoll(fight, token.id, alive) : withRoll(fight, token, roll, kindOf, system));
+        change(roll === null ? withoutRoll(fight, token.id, alive) : withRoll(fight, token, roll, kindOf, system));
     };
 
     const ordered = fight.order.flatMap((entry) =>
@@ -264,10 +313,11 @@ export function InitiativePanel({ fight, tokens, system, presets, rolls, onRoll,
         return (
             <li key={token.id} className="ttrpg-row" data-glide={token.id}>
                 {rollField(token)}
-                <span className="ttrpg-row__main ttrpg-row__main--swatch">
-                    <span className="ttrpg-swatch" style={{ background: token.color }} />
+                <span className="ttrpg-row__main">
                     <span className="ttrpg-row__text">
-                        <span className="ttrpg-row__name">{token.name}</span>
+                        <span className="ttrpg-row__name ttrpg-initiative__name" style={inColour(token.color)}>
+                            {token.name}
+                        </span>
                         <span className="ttrpg-row__detail">{token.kind === 'player' && !fight.begun ? 'No roll yet' : 'Sits out without a roll'}</span>
                     </span>
                 </span>
@@ -290,46 +340,54 @@ export function InitiativePanel({ fight, tokens, system, presets, rolls, onRoll,
     };
 
     return (
-        <Popover title={fight.begun ? `Initiative · Round ${fight.round}` : 'Initiative · Rolling'} className={`ttrpg-dock-panel ttrpg-roll-swap${morphed ? ' ttrpg-roll-swap--still' : ''}`} onClose={onClose}>
+        <Popover title={fight.begun ? `Initiative · Round ${fight.round}` : 'Initiative · Rolling'} className={`ttrpg-dock-panel ttrpg-initiative ttrpg-roll-swap${morphed ? ' ttrpg-roll-swap--still' : ''}`} onClose={onClose}>
             <div className="ttrpg-popover__body">
                 {ordered.length === 0 && <p className="ttrpg-empty" data-glide="empty">No rolls yet.</p>}
-                <ol className="ttrpg-rows">
+                <ol className="ttrpg-rows ttrpg-initiative__order">
                     {ordered.map(({ token, roll }, index) => (
                         <li key={token.id} className={`ttrpg-row${fight.turn === token.id ? ' ttrpg-row--turn' : ''}`} data-glide={token.id}>
                             {rollField(token, roll)}
-                            <span className="ttrpg-row__main ttrpg-row__main--swatch">
-                                <span className="ttrpg-swatch" style={{ background: token.color }} />
-                                <span className="ttrpg-row__name">{token.name}</span>
+                            <span className="ttrpg-row__main">
+                                {/* The name with its HP and AC under it, as in the Monsters panel. */}
+                                <span className="ttrpg-row__text">
+                                    <span className="ttrpg-row__name ttrpg-initiative__name" style={inColour(token.color)}>
+                                        {token.name}
+                                    </span>
+                                    <StatChips token={token} brief />
+                                </span>
                             </span>
-                            <button
-                                type="button"
-                                className="ttrpg-icon-button ttrpg-icon-button--small"
-                                aria-label={`Move ${token.name} up`}
-                                title="Swap with the one above"
-                                disabled={index === 0}
-                                onClick={() => onChange(swapped(fight, token.id, true))}
-                            >
-                                <FontAwesomeIcon icon={faArrowUp} />
-                            </button>
-                            <button
-                                type="button"
-                                className="ttrpg-icon-button ttrpg-icon-button--small"
-                                aria-label={`Move ${token.name} down`}
-                                title="Swap with the one below"
-                                disabled={index === ordered.length - 1}
-                                onClick={() => onChange(swapped(fight, token.id, false))}
-                            >
-                                <FontAwesomeIcon icon={faArrowDown} />
-                            </button>
-                            <button
-                                type="button"
-                                className="ttrpg-icon-button ttrpg-icon-button--small"
-                                aria-label={`Take ${token.name} out`}
-                                title="Take out of the order, back to no roll"
-                                onClick={() => onChange(withoutRoll(fight, token.id, alive))}
-                            >
-                                <FontAwesomeIcon icon={faXmark} />
-                            </button>
+                            {/* One tile on the right, mirroring the roll's on the left. */}
+                            <span className="ttrpg-initiative__tools">
+                                <button
+                                    type="button"
+                                    className="ttrpg-icon-button ttrpg-icon-button--small"
+                                    aria-label={`Move ${token.name} up`}
+                                    title="Swap with the one above"
+                                    disabled={index === 0}
+                                    onClick={() => change(swapped(fight, token.id, true))}
+                                >
+                                    <FontAwesomeIcon icon={faArrowUp} />
+                                </button>
+                                <button
+                                    type="button"
+                                    className="ttrpg-icon-button ttrpg-icon-button--small"
+                                    aria-label={`Move ${token.name} down`}
+                                    title="Swap with the one below"
+                                    disabled={index === ordered.length - 1}
+                                    onClick={() => change(swapped(fight, token.id, false))}
+                                >
+                                    <FontAwesomeIcon icon={faArrowDown} />
+                                </button>
+                                <button
+                                    type="button"
+                                    className="ttrpg-icon-button ttrpg-icon-button--small"
+                                    aria-label={`Take ${token.name} out`}
+                                    title="Take out of the order, back to no roll"
+                                    onClick={() => change(withoutRoll(fight, token.id, alive))}
+                                >
+                                    <FontAwesomeIcon icon={faXmark} />
+                                </button>
+                            </span>
                         </li>
                     ))}
                 </ol>
@@ -361,14 +419,67 @@ export function InitiativePanel({ fight, tokens, system, presets, rolls, onRoll,
                 </div>
             )}
 
+            {/* Always there in a fight, so the last hit undone folds away rather than the section going. */}
+            <div className="ttrpg-popover__body">
+                <h3 className="ttrpg-subhead" data-glide="hits">
+                    Hits
+                </h3>
+                {/* The line and the list in one place, so the panel never jumps between them. */}
+                <div className="ttrpg-hit-log__stack">
+                    {hits.length === 0 && <p className="ttrpg-empty ttrpg-hit-log__empty">No hits yet.</p>}
+                    <ol className="ttrpg-rows ttrpg-hit-log">
+                        {hits.map((hit, index) => (
+                            <li key={hit.id} className={`ttrpg-row ttrpg-hit-log__entry${shown.has(hit.id) ? '' : ' ttrpg-hit-log__entry--new'}`}>
+                                <span className={`ttrpg-hit-log__amount ttrpg-hit-log__amount--${hit.kind}`} title={hit.kind === 'attack' ? 'Damage' : 'Heal'}>
+                                    <FontAwesomeIcon icon={hit.kind === 'attack' ? faBurst : faHeart} />
+                                    {hit.amount}
+                                </span>
+                                <span className="ttrpg-row__main ttrpg-row__text">
+                                    <span className="ttrpg-hit-log__targets">
+                                        {hit.targets.map((target, index) => (
+                                            <span key={index} className="ttrpg-hit-log__target ttrpg-initiative__name" style={inColour(target.color)}>
+                                                {target.name}
+                                                {target.died && <FontAwesomeIcon icon={faSkull} title="Killed" />}
+                                            </span>
+                                        ))}
+                                    </span>
+                                    <span className="ttrpg-row__detail">
+                                        by{' '}
+                                        <span className="ttrpg-initiative__name" style={hit.color ? inColour(hit.color) : undefined}>
+                                            {hit.by}
+                                        </span>
+                                    </span>
+                                </span>
+                                {index === 0 && (
+                                    <button
+                                        type="button"
+                                        className="ttrpg-hit-log__undo"
+                                        title="Take this hit back, for a mistyped number"
+                                        disabled={undoing}
+                                        onClick={() =>
+                                        {
+                                            setUndoing(true);
+                                            void onUndo(hit.id).finally(() => setTimeout(() => setUndoing(false), foldMs));
+                                        }}
+                                    >
+                                        <FontAwesomeIcon icon={faRotateLeft} />
+                                        Undo
+                                    </button>
+                                )}
+                            </li>
+                        ))}
+                    </ol>
+                </div>
+            </div>
+
             <div className="ttrpg-popover__body">
                 <div className="ttrpg-popover__foot">
-                    <button type="button" className="ttrpg-segment ttrpg-segment--block" onClick={() => onChange(null)}>
+                    <button type="button" className="ttrpg-segment ttrpg-segment--block" onClick={() => change(null)}>
                         <FontAwesomeIcon icon={faStop} />
                         End
                     </button>
                     {fight.begun ? (
-                        <button type="button" className="ttrpg-segment ttrpg-segment--block ttrpg-segment--confirm" onClick={() => onChange(nextTurn(fight, alive))}>
+                        <button type="button" className="ttrpg-segment ttrpg-segment--block ttrpg-segment--confirm" onClick={() => change(nextTurn(fight, alive))}>
                             <FontAwesomeIcon icon={faForwardStep} />
                             Next turn
                         </button>
@@ -377,7 +488,7 @@ export function InitiativePanel({ fight, tokens, system, presets, rolls, onRoll,
                             type="button"
                             className="ttrpg-segment ttrpg-segment--block ttrpg-segment--confirm"
                             disabled={ordered.length === 0}
-                            onClick={() => onChange(begun(fight, alive))}
+                            onClick={() => change(begun(fight, alive))}
                         >
                             <FontAwesomeIcon icon={faPlay} />
                             Begin

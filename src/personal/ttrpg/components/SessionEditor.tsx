@@ -4,7 +4,7 @@ import { ConvexError } from 'convex/values';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import type { ChatMessage, ChatSend, Decal, DiceRoll, Draft, Drawing, Live, PictureBytes, Preset, PropPicture, Scenario, SharedMark, Token, Track } from '../types';
+import type { ChatMessage, ChatSend, Decal, DiceRoll, Draft, Drawing, Live, LoggedHit, PictureBytes, Preset, PropPicture, Scenario, SharedMark, Token, Track } from '../types';
 
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
@@ -74,6 +74,7 @@ const noMarks: SharedMark[] = [];
 const noDrawings: Drawing[] = [];
 const noDecals: Decal[] = [];
 const noRolls: DiceRoll[] = [];
+const noHits: LoggedHit[] = [];
 const noChat: ChatMessage[] = [];
 const noPresets: Preset[] = [];
 const noTracks: Track[] = [];
@@ -137,6 +138,8 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const setUpNext = useMutation(api.play.setUpNext);
     const setCheck = useMutation(api.play.setCheck);
     const rolls = useQuery(api.dice.list, following ? { sessionId: id } : 'skip');
+    const hitLog = useQuery(api.hitLog.list, following ? { sessionId: id } : 'skip');
+    const undoHit = useMutation(api.hitLog.undo);
     const roll = useMutation(api.dice.roll);
     const chat = useQuery(api.chat.list, following ? { sessionId: id } : 'skip');
     const sendChat = useMutation(api.chat.send);
@@ -218,6 +221,8 @@ function Session({ sessionId, debug }: SessionEditorProps)
             setSize: (tokenId, size) => friendly(setSize({ tokenId: tokenId as Id<'tokens'>, size })),
             lastHit: lastHit ?? null,
             hit: (tokenIds, kind, amount) => friendly(hit({ sessionId: id, tokenIds: tokenIds as Id<'tokens'>[], kind, amount })),
+            hitLog: hitLog ?? noHits,
+            undoHit: (hitId) => friendly(undoHit({ sessionId: id, hitId: hitId as Id<'hitLog'> })),
             decals: decals ?? noDecals,
             clearDecals: () => friendly(clearDecals({ sessionId: id })),
             fog: fog ?? null,

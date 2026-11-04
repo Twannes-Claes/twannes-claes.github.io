@@ -44,6 +44,65 @@ export const checkValidator = v.object({
 /** A condition on a token, see Condition in types.ts. */
 export const conditionValidator = v.object({ id: v.string(), value: v.optional(v.number()) });
 
+/** A token as stored, see the tokens table. */
+export const tokenValidator = v.object({
+    sessionId: v.id('sessions'),
+    userId: v.optional(v.id('users')),
+    kind: v.union(v.literal('player'), v.literal('npc')),
+    name: v.string(),
+    color: v.string(),
+    size: sizeValidator,
+    speed: v.number(),
+    /** A 256 px picture in Convex storage. */
+    avatar: v.optional(v.string()),
+    /** The stored file behind avatar, deleted when the picture is replaced. */
+    avatarId: v.optional(v.id('_storage')),
+    scenarioId: v.string(),
+    x: v.number(),
+    y: v.number(),
+    path: v.optional(v.array(v.object({ x: v.number(), y: v.number() }))),
+    movedAt: v.optional(v.number()),
+    /** A monster the host keeps off the players' screens, whatever they can see. */
+    hidden: v.optional(v.boolean()),
+    /**
+     * A monster waiting on its map's tray, off the grid, for the host only, see Monster
+     * staging in PLAN.md. Its x and y mean nothing until it is dragged onto the map.
+     */
+    tray: v.optional(v.boolean()),
+    /** Put on the spawn point without room there, in a wall, for the GM to move, see map/spawn.ts. */
+    /** A monster a player can see right now, kept by sight.ts. Others are not sent to players. */
+    inSight: v.optional(v.boolean()),
+    /**
+     * A seen monster walking out of sight counts as seen until then, so phones see it walk
+     * into the fog rather than vanish where it set off, see move in convex/play.ts.
+     */
+    leavingUntil: v.optional(v.number()),
+    /** Only for the host and the token's own player, see withoutNumbers in map/health.ts. */
+    hp: v.optional(v.number()),
+    maxHp: v.optional(v.number()),
+    tempHp: v.optional(v.number()),
+    ac: v.optional(v.number()),
+    /** Passive Perception. */
+    perception: v.optional(v.number()),
+    /** A player's initiative bonus, as they filled it in. */
+    initiative: v.optional(v.number()),
+    /** For everyone to see, kept to the session's list, see cleanConditions. */
+    conditions: v.optional(v.array(conditionValidator)),
+    /** A monster that goes down at 0 HP instead of dying. For the host, like the numbers. */
+    downs: v.optional(v.boolean()),
+    /** The preset a monster was placed from, for its stat block in the GM view. */
+    presetId: v.optional(v.id('presets')),
+    /** The saved character a player joined as, which owns the picture, see characters.ts. */
+    characterId: v.optional(v.id('characters')),
+    /** A summon or companion: the player's token it belongs to, see summons.ts. */
+    summonOf: v.optional(v.id('tokens')),
+    /** The saved companion a summon came from, which owns the picture. */
+    companionId: v.optional(v.id('companions')),
+});
+
+/** A token's numbers a hit changes, before or after it, see hitLog. */
+const hitStatsValidator = v.object({ hp: v.number(), tempHp: v.number(), conditions: v.optional(v.array(conditionValidator)) });
+
 /**
  * A scenario as the editor keeps it, see Scenario in types.ts. The saving and loading calls in
  * components/SessionEditor.tsx only type check while the two match.
@@ -161,60 +220,7 @@ export default defineSchema({
      * Who stands where while a session is played. Players' tokens carry their anonymous user, so a
      * phone that comes back finds its own. Not part of the scenario, so a move never rewrites the map.
      */
-    tokens: defineTable({
-        sessionId: v.id('sessions'),
-        userId: v.optional(v.id('users')),
-        kind: v.union(v.literal('player'), v.literal('npc')),
-        name: v.string(),
-        color: v.string(),
-        size: sizeValidator,
-        speed: v.number(),
-        /** A 256 px picture in Convex storage. */
-        avatar: v.optional(v.string()),
-        /** The stored file behind avatar, deleted when the picture is replaced. */
-        avatarId: v.optional(v.id('_storage')),
-        scenarioId: v.string(),
-        x: v.number(),
-        y: v.number(),
-        path: v.optional(v.array(v.object({ x: v.number(), y: v.number() }))),
-        movedAt: v.optional(v.number()),
-        /** A monster the host keeps off the players' screens, whatever they can see. */
-        hidden: v.optional(v.boolean()),
-        /**
-         * A monster waiting on its map's tray, off the grid, for the host only, see Monster
-         * staging in PLAN.md. Its x and y mean nothing until it is dragged onto the map.
-         */
-        tray: v.optional(v.boolean()),
-        /** Put on the spawn point without room there, in a wall, for the GM to move, see map/spawn.ts. */
-        /** A monster a player can see right now, kept by sight.ts. Others are not sent to players. */
-        inSight: v.optional(v.boolean()),
-        /**
-         * A seen monster walking out of sight counts as seen until then, so phones see it walk
-         * into the fog rather than vanish where it set off, see move in convex/play.ts.
-         */
-        leavingUntil: v.optional(v.number()),
-        /** Only for the host and the token's own player, see withoutNumbers in map/health.ts. */
-        hp: v.optional(v.number()),
-        maxHp: v.optional(v.number()),
-        tempHp: v.optional(v.number()),
-        ac: v.optional(v.number()),
-        /** Passive Perception. */
-        perception: v.optional(v.number()),
-        /** A player's initiative bonus, as they filled it in. */
-        initiative: v.optional(v.number()),
-        /** For everyone to see, kept to the session's list, see cleanConditions. */
-        conditions: v.optional(v.array(conditionValidator)),
-        /** A monster that goes down at 0 HP instead of dying. For the host, like the numbers. */
-        downs: v.optional(v.boolean()),
-        /** The preset a monster was placed from, for its stat block in the GM view. */
-        presetId: v.optional(v.id('presets')),
-        /** The saved character a player joined as, which owns the picture, see characters.ts. */
-        characterId: v.optional(v.id('characters')),
-        /** A summon or companion: the player's token it belongs to, see summons.ts. */
-        summonOf: v.optional(v.id('tokens')),
-        /** The saved companion a summon came from, which owns the picture. */
-        companionId: v.optional(v.id('companions')),
-    })
+    tokens: defineTable(tokenValidator)
         .index('by_sessionId_and_userId', ['sessionId', 'userId'])
         .index('by_sessionId_and_scenarioId', ['sessionId', 'scenarioId'])
         .index('by_avatarId', ['avatarId'])
@@ -261,6 +267,36 @@ export default defineSchema({
          */
         targets: v.array(
             v.object({ x: v.number(), y: v.number(), size: sizeValidator, seen: v.boolean(), died: v.boolean() }),
+        ),
+    }).index('by_sessionId', ['sessionId']),
+    /**
+     * The hits of the fight on, newest last, at most maxHits, for the GM's log and its undo, see
+     * hitLog.ts. Cleared when the fight ends.
+     */
+    hitLog: defineTable({
+        sessionId: v.id('sessions'),
+        /** Who hit: the player's token, or GM. */
+        by: v.string(),
+        /** Their ring colour, or the GM colour, see gmColorOf in play.ts. */
+        color: v.optional(v.string()),
+        kind: v.union(v.literal('attack'), v.literal('heal')),
+        amount: v.number(),
+        /** Each target as the hit left it, with what undo needs to take it back. */
+        targets: v.array(
+            v.object({
+                tokenId: v.id('tokens'),
+                name: v.string(),
+                color: v.string(),
+                /** Missing for a token without numbers, which took nothing. */
+                before: v.optional(hitStatsValidator),
+                after: v.optional(hitStatsValidator),
+                /** A monster it killed, as it stood, to put back. */
+                killed: v.optional(tokenValidator),
+                /** A summon it sent off the map, see hit in play.ts. */
+                trayed: v.optional(v.boolean()),
+                /** The pool of blood it left. */
+                decalId: v.optional(v.id('decals')),
+            }),
         ),
     }).index('by_sessionId', ['sessionId']),
     /**

@@ -249,6 +249,21 @@ export interface SharedHit
 }
 
 /**
+ * A hit in the GM's log of the fight, see convex/hitLog.ts: who hit, how much, and on whom. The
+ * newest can be undone, then the one before it, and so on.
+ */
+export interface LoggedHit
+{
+    id: string;
+    by: string;
+    /** Who hit's ring colour, or the GM colour. */
+    color?: string;
+    kind: HitKind;
+    amount: number;
+    targets: { name: string; color: string; died: boolean }[];
+}
+
+/**
  * A pool of blood on the ground until the game master clears it, see decals in convex/play.ts:
  * where a monster died, or, wider, where a player went down. Decoration only.
  */
@@ -364,6 +379,10 @@ export interface Live
     lastHit: SharedHit | null;
     /** Deals damage to tokens, or heals them, see hit in convex/play.ts. */
     hit: (tokenIds: string[], kind: HitKind, amount: number) => Promise<void>;
+    /** The fight's hits, newest first, see LoggedHit. */
+    hitLog: LoggedHit[];
+    /** Takes back the newest hit, see undo in convex/hitLog.ts. */
+    undoHit: (hitId: string) => Promise<void>;
     /** What killed monsters left on the map being played, see Decal. */
     decals: Decal[];
     /** Clears them off the map being played. */

@@ -29,7 +29,7 @@ import {
     snapPoint,
     wrapOffset,
 } from './grid.ts';
-import { applyHit, cleanStats, healthState, hitOn, mayHurt, withoutNumbers } from './health.ts';
+import { applyHit, cleanStats, healthState, hitOn, mayHurt, undoneOn, withoutNumbers } from './health.ts';
 import {
     begun,
     cleanRoll,
@@ -1011,6 +1011,12 @@ assert.deepEqual(applyHit({ hp: 20, maxHp: 30, tempHp: 5 }, 'attack', 8), { hp: 
 assert.deepEqual(applyHit({ hp: 20, maxHp: 30, tempHp: 5 }, 'attack', 3), { hp: 20, tempHp: 2 });
 assert.deepEqual(applyHit({ hp: 4, maxHp: 30 }, 'attack', 50), { hp: 0, tempHp: 0 });
 assert.deepEqual(applyHit({ hp: 25, maxHp: 30, tempHp: 2 }, 'heal', 10), { hp: 30, tempHp: 2 });
+
+// Undo gives back exactly what a hit took from a token untouched since, and only the hit's own
+// change from one healed since.
+assert.deepEqual(undoneOn({ hp: 0, maxHp: 30, tempHp: 0 }, { hp: 4, tempHp: 2 }, { hp: 0, tempHp: 0 }), { hp: 4, tempHp: 2 });
+assert.deepEqual(undoneOn({ hp: 10, maxHp: 30, tempHp: 0 }, { hp: 25, tempHp: 0 }, { hp: 5, tempHp: 0 }), { hp: 30, tempHp: 0, conditions: undefined });
+assert.equal(undoneOn({ hp: 10, maxHp: 30 }, { hp: 20, tempHp: 0 }, { hp: 10, tempHp: 0 })?.hp, 20);
 
 // A player brought to 0 goes down once, not again while there; a monster dies instead.
 assert.equal(hitOn({ kind: 'player', hp: 5, maxHp: 30 }, 'attack', 9).downed, true);

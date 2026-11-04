@@ -2,7 +2,7 @@ import { faCheck, faDice, faDiceD20, faHatWizard, faPen, faSnowflake, faTriangle
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useEffectEvent, useRef, useState, type DragEvent, type MouseEvent } from 'react';
 
-import type { BloodSettings, ChatMessage, ChatSend, Decal, DiceAsk, DiceRoll, Drawing, FogSettings, GameSystem, GroupCheck, HitKind, Initiative, Live, MonsterControls, MusicControls, PictureBytes, Pen, Ping, Point, Preset, PropPicture, Scenario, SharedHit, Store, Token, Track } from '../types';
+import type { BloodSettings, ChatMessage, ChatSend, Decal, DiceAsk, DiceRoll, Drawing, FogSettings, GameSystem, GroupCheck, HitKind, Initiative, Live, LoggedHit, MonsterControls, MusicControls, PictureBytes, Pen, Ping, Point, Preset, PropPicture, Scenario, SharedHit, Store, Token, Track } from '../types';
 
 import { cleanConditions } from '../content/conditions';
 import { maxPlayers } from '../content/limits';
@@ -14,7 +14,7 @@ import { defaultAccent, ringColours } from '../map/colours';
 import { penWidths } from '../map/drawings';
 import { rollDice } from '../map/dice';
 import { defaultFogSettings, mistColors, type MistLook } from '../map/fog';
-import { cleanStats, conditionsAt, defaultBlood, downedPool, hitOn, mayHurt, withoutNumbers, withoutSaves } from '../map/health';
+import { cleanStats, conditionsAt, defaultBlood, downedPool, hitOn, mayHurt, undoneOn, withoutNumbers, withoutSaves, type HitStats } from '../map/health';
 import { nextTurn } from '../map/initiative';
 import { monsterFrom } from '../map/presets';
 import { newProp } from '../map/props';
@@ -155,6 +155,13 @@ function SaveState({ unsaved, failed }: { unsaved: boolean; failed: boolean })
     );
 }
 
+/** A hit off a live map, with the tokens as they were and the pools it left, for undoHere. */
+interface DemoHit extends LoggedHit
+{
+    struck: { token: Token; after: HitStats | null; died: boolean }[];
+    pools: string[];
+}
+
 interface MapEditorProps
 {
     /** The scenarios it opens with. Empty starts with one blank map. */
@@ -227,6 +234,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const [demoPresets, setDemoPresets] = useState<Preset[]>(() => [demoOgrePreset]);
     // The fight off a live map, with the test players, and whether Up next is on in the demo.
     const [localFight, setLocalFight] = useState<Initiative | null>(null);
+    const [localHits, setLocalHits] = useState<DemoHit[]>([]);
     const [localCheck, setLocalCheck] = useState<GroupCheck | null>(null);
     const [localRolls, setLocalRolls] = useState<DiceRoll[]>([]);
     const [localChat, setLocalChat] = useState<ChatMessage[]>([]);
@@ -708,32 +716,64 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
     };
 
-    // Off a live map, a hit lands here, as the server would land it, see hit in convex/play.ts.
+    // Off a live map, a hit lands here, as the server would land it, see hit in convex/play.ts, and
+    // in a fight it is logged with what undoHere needs.
     const hitHere = (ids: string[], kind: HitKind, amount: number) =>
     {
-        const struck = tokens.filter((token) => ids.includes(token.id));
-        const killed = struck.filter((token) => hitOn(token, kind, amount).died);
+        const struck = tokens.filter((token) => ids.includes(token.id)).map((token) => ({ token, ...hitOn(token, kind, amount) }));
+        const pools = struck.flatMap(({ token: { x, y, size }, died, downed }) =>
+            died ? [{ id: crypto.randomUUID(), x, y, size }] : downed ? [{ id: crypto.randomUUID(), x, y, size, scale: downedPool }] : [],
+        );
 
-        setLocalHit({
-            at: Date.now(),
-            kind,
-            targets: struck.map((token) => ({ x: token.x, y: token.y, size: token.size, died: killed.includes(token) })),
-        });
-        const downed = struck.filter((token) => hitOn(token, kind, amount).downed);
-
-        setLocalDecals((current) => [
-            ...current,
-            ...killed.map(({ x, y, size }) => ({ id: crypto.randomUUID(), x, y, size })),
-            ...downed.map(({ x, y, size }) => ({ id: crypto.randomUUID(), x, y, size, scale: downedPool })),
-        ]);
+        setLocalHit({ at: Date.now(), kind, targets: struck.map(({ token: { x, y, size }, died }) => ({ x, y, size, died })) });
+        setLocalDecals((current) => [...current, ...pools]);
         setTokens((current) =>
             current.flatMap((token) =>
             {
-                const { after, died } = ids.includes(token.id) ? hitOn(token, kind, amount) : { after: null, died: false };
+                const hit = struck.find((entry) => entry.token.id === token.id);
 
-                return died ? [] : [{ ...token, ...after }];
+                return hit?.died ? [] : [{ ...token, ...hit?.after }];
             }),
         );
+
+        if (!localFight)
+            return;
+
+        const logged: DemoHit = {
+            id: crypto.randomUUID(),
+            by: 'GM',
+            color: demoGmColor,
+            kind,
+            amount,
+            targets: struck.map(({ token: { name, color }, died }) => ({ name, color, died })),
+            struck,
+            pools: pools.map((pool) => pool.id),
+        };
+
+        setLocalHits((current) => [logged, ...current].slice(0, 20));
+    };
+
+    // Off a live map, the newest hit taken back, as undo in convex/hitLog.ts does.
+    const undoHere = () =>
+    {
+        const [last, ...rest] = localHits;
+
+        if (!last)
+            return;
+
+        setLocalDecals((current) => current.filter((decal) => !last.pools.includes(decal.id)));
+        setTokens((current) => [
+            ...current.map((token) =>
+            {
+                const hit = last.struck.find((entry) => entry.token.id === token.id);
+                const before: HitStats | null = hit?.after ? { hp: hit.token.hp ?? 0, tempHp: hit.token.tempHp ?? 0, conditions: hit.token.conditions } : null;
+                const back = hit?.after && before ? undoneOn(token, before, hit.after) : null;
+
+                return back ? { ...token, ...back } : token;
+            }),
+            ...last.struck.filter(({ token, died }) => died && !current.some((other) => other.id === token.id)).map(({ token }) => token),
+        ]);
+        setLocalHits(rest);
     };
 
     const decals = liveMap ? liveMap.decals : localDecals;
@@ -764,7 +804,20 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const system = live ? live.system : demoSystem;
     const setSystem = (next: GameSystem) => (live ? fail(live.setSystem(next)) : setDemoSystem(next));
     const fight = liveMap ? liveMap.initiative : localFight;
-    const setFight = (next: Initiative | null) => (liveMap ? fail(liveMap.setInitiative(next)) : setLocalFight(next));
+    const setFight = (next: Initiative | null) =>
+    {
+        if (liveMap)
+            fail(liveMap.setInitiative(next));
+        else
+            setLocalFight(next);
+
+        if (!liveMap && !next)
+            setLocalHits([]);
+
+    };
+
+    const hitLog = liveMap ? liveMap.hitLog : localHits;
+    const undoHit = (id: string) => (liveMap ? liveMap.undoHit(id).catch((reason: Error) => message.error(reason.message)) : Promise.resolve(undoHere()));
     // Off a live map nobody can answer it, but the GM can still try the panel.
     const check = liveMap ? liveMap.check : localCheck;
     const setCheck = (next: { text: string; asked: string[] } | null) => (liveMap ? fail(liveMap.setCheck(next)) : setLocalCheck(next && { ...next, rolls: [] }));
@@ -1557,7 +1610,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
             )}
 
             {mode === 'gm' && !pending && !idle && panel === 'initiative' && (
-                <InitiativePanel fight={fight} tokens={shown} system={system} presets={monsterControls.presets} rolls={rolls} onRoll={roll} onError={message.error} onChange={setFight} onClose={() => setPanel(null)} />
+                <InitiativePanel fight={fight} tokens={shown} system={system} presets={monsterControls.presets} rolls={rolls} onRoll={roll} onError={message.error} onChange={setFight} hits={hitLog} onUndo={undoHit} onClose={() => setPanel(null)} />
             )}
 
             {/* In the Player view, as on the table screen, without the hidden rolls. */}
