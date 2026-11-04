@@ -5,6 +5,7 @@ import {
     faDrawPolygon,
     faEraser,
     faLocationDot,
+    faNoteSticky,
     faRotateLeft,
     faRotateRight,
     faSmog,
@@ -27,6 +28,7 @@ const tools: { id: ToolId; label: string; key: string; icon: IconDefinition }[] 
     { id: 'props', label: 'Props', key: 'p', icon: faTree },
     { id: 'monsters', label: 'Monsters', key: 'm', icon: faDragon },
     { id: 'mist', label: 'Mist', key: 'i', icon: faSmog },
+    { id: 'notes', label: 'Notes', key: 'n', icon: faNoteSticky },
     { id: 'spawn', label: 'Spawn point', key: 's', icon: faLocationDot },
     { id: 'align', label: 'Grid', key: 'g', icon: faBorderAll },
 ];

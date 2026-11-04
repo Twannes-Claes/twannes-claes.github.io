@@ -14,13 +14,15 @@ export interface ScreenSettings
     hideAfter: number;
     /** The frame rate in the corner, as ?debug shows it, see pages/Editor.tsx. */
     frameRate: boolean;
+    /** The notes layer in the GM view, off so its pins do not clutter the map, see NotePins.tsx. */
+    notes: boolean;
 }
 
 export const smallestScale = 0.75;
 export const largestScale = 1.25;
 
 const settingsKey = 'ttrpg-screen';
-const defaults: ScreenSettings = { scale: 1, hideAfter: 3000, frameRate: false };
+const defaults: ScreenSettings = { scale: 1, hideAfter: 3000, frameRate: false, notes: true };
 
 function readSettings(): ScreenSettings
 {

@@ -592,11 +592,13 @@ html:has(.ttrpg[data-theme='light']) {
  * TooltipHost.
  */
 .ttrpg-home,
-.ttrpg-editor > :not(.ttrpg-map),
-.ttrpg-player > :not(.ttrpg-map),
+.ttrpg-editor > :not(.ttrpg-map, .ttrpg-pins),
+.ttrpg-player > :not(.ttrpg-map, .ttrpg-pins),
 .ttrpg-popover,
 .ttrpg-tip,
-.ttrpg-confirm {
+.ttrpg-confirm,
+.ttrpg-pin,
+.ttrpg-note {
     zoom: var(--ttrpg-ui, 1);
 }
 
@@ -4543,4 +4545,149 @@ button.ttrpg-row__main {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.5rem;
+}
+
+/* The GM's note pins, see NotePins.tsx: over the map and moving with it, placed by the camera that
+   MapCanvas.tsx writes into --map-x, --map-y and --map-zoom every frame. Not zoomed itself, as the
+   map is not, only the pins and cards in it. Under the panels, which come after it. */
+.ttrpg-pins {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.ttrpg-pin-at {
+    position: absolute;
+    left: calc(var(--map-x, 0px) + var(--x) * var(--map-zoom, 1) * 1px);
+    top: calc(var(--map-y, 0px) + var(--y) * var(--map-zoom, 1) * 1px);
+}
+
+.ttrpg-pin-at--open,
+.ttrpg-pin-at:hover {
+    z-index: 1;
+}
+
+.ttrpg-pin {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 2px solid color-mix(in srgb, var(--ttrpg-accent) 40%, #fff);
+    border-radius: 50%;
+    background: var(--ttrpg-accent);
+    color: var(--ttrpg-on-accent);
+    font-size: 0.75rem;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 0.45);
+    translate: -50% -50%;
+    pointer-events: auto;
+    cursor: pointer;
+    touch-action: none;
+    transition:
+        opacity 400ms var(--ttrpg-ease),
+        scale 120ms var(--ttrpg-ease);
+}
+
+.ttrpg-pin:hover,
+.ttrpg-pin[aria-expanded='true'] {
+    scale: 1.12;
+}
+
+/* Opened this session: still there and pressed like any other, only quieter. */
+.ttrpg-pin--read {
+    opacity: 0.5;
+}
+
+.ttrpg-pin--read:hover,
+.ttrpg-pin--read[aria-expanded='true'] {
+    opacity: 1;
+}
+
+/* Red under the eraser, like what else it is about to take. */
+.ttrpg-pins__notes--erasing .ttrpg-pin:hover {
+    outline: 2px solid var(--ttrpg-danger);
+    outline-offset: 2px;
+    cursor: pointer;
+}
+
+/* A pin's card, above it. The transparent strip under it carries the mouse from the pin to the
+   card's buttons without the peek closing. */
+.ttrpg-note {
+    position: absolute;
+    bottom: 22px;
+    left: 0;
+    display: grid;
+    gap: 0.5rem;
+    width: 18rem;
+    padding: 0.75rem 0.75rem 0.75rem 1rem;
+    translate: -50% 0;
+    transform-origin: 50% 100%;
+    pointer-events: auto;
+    animation: ttrpg-pop 160ms var(--ttrpg-ease);
+}
+
+.ttrpg-note::after {
+    content: '';
+    position: absolute;
+    inset: 100% 0 -16px;
+}
+
+.ttrpg-note__head {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.ttrpg-note__head h2 {
+    flex: 1;
+    margin: 0;
+    padding-top: 0.3rem;
+    font-size: 1rem;
+    overflow-wrap: anywhere;
+}
+
+.ttrpg-note__text {
+    max-height: 16rem;
+    margin: 0;
+    overflow-y: auto;
+    color: var(--ttrpg-muted);
+    font-size: 0.875rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.ttrpg-note__form {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.ttrpg-note__form :is(input, textarea) {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--ttrpg-edge);
+    border-radius: 10px;
+    background: var(--ttrpg-well);
+    color: var(--ttrpg-ink);
+    font: inherit;
+    font-size: 0.875rem;
+}
+
+.ttrpg-note__form textarea {
+    resize: vertical;
+}
+
+.ttrpg-note__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ttrpg-pin,
+    .ttrpg-note {
+        transition: none;
+        animation: none;
+    }
 }

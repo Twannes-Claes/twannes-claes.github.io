@@ -428,6 +428,9 @@ export interface Live
     /** Players' whispers to each other stay between them. */
     privateWhispers: boolean;
     setPrivateWhispers: (secret: boolean) => Promise<void>;
+    /** The notes the GM opened this session, drawn paler, see readNote in convex/play.ts. */
+    notesRead: string[];
+    readNote: (noteId: string) => Promise<void>;
     system: GameSystem;
     setSystem: (system: GameSystem) => Promise<void>;
     /** The fight on the map being played, null while there is none. */
@@ -693,6 +696,22 @@ export interface Scenario
     fogOff?: boolean;
     /** Drawn in order, so the last one is on top. */
     mists?: Mist[];
+    notes?: Note[];
     /** Where players appear when they join or the scenario changes. */
     spawn: Point;
+}
+
+/**
+ * A GM's note pinned to the map, like what is in the chest. Saved with the scenario, but never
+ * sent to a player: play.scenario in convex/play.ts takes them off, and the Player view does not
+ * draw them, see NotePins.tsx.
+ */
+export interface Note
+{
+    id: string;
+    /** Where the pin stands, in world pixels. */
+    x: number;
+    y: number;
+    title: string;
+    text: string;
 }

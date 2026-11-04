@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useRef } from 'react';
+import { useEffect, useEffectEvent, useRef, type ReactNode } from 'react';
 
 import type { BloodSettings, Decal, Draft, Drawing, FogSettings, GameSystem, Mark, Pen, Ping, Point, PropPicture, Scenario, SharedFog, SharedHit, SharedMark, Token } from '../types';
 
@@ -127,6 +127,10 @@ interface MapCanvasProps
     onTrayDrop?: (tokenId: string, at: Point, stack: boolean) => void;
     /** Hears a prop picture dragged from the library and let go over the map, and whether Alt was held to place it freely. */
     onPropDrop?: (pictureId: string, at: Point, free: boolean) => void;
+    /** Hears a press with the notes tool, where a note would be pinned. */
+    onNote?: (at: Point) => void;
+    /** What lies over the map and moves with it, like the note pins, see .ttrpg-pins. */
+    overlay?: ReactNode;
 }
 
 /** What a preset tile carries while it is dragged, its id. */
@@ -192,10 +196,13 @@ export function MapCanvas({
     onPropDrop,
     onTokenMenu,
     onPropMenu,
+    onNote,
+    overlay,
 }: MapCanvasProps)
 {
     const canvas = useRef<HTMLCanvasElement>(null);
     const view = useRef<MapView | null>(null);
+    const layer = useRef<HTMLDivElement>(null);
     // The view is made once, so it calls the latest handlers through these rather than the first.
     const tokenMoved = useEffectEvent((id: string, to: Point) => onTokenMove?.(id, to));
     const monstersErased = useEffectEvent((ids: string[]) => onMonstersErase?.(ids));
@@ -204,6 +211,7 @@ export function MapCanvas({
     const carryChanged = useEffectEvent((id: string | null) => onCarry?.(id));
     const measured = useEffectEvent((stats: FrameStats) => onStats?.(stats));
     const viewed = useEffectEvent((center: Point) => onView?.(center));
+    const noted = useEffectEvent((at: Point) => onNote?.(at));
     const toolCancelled = useEffectEvent(() => onToolCancel?.());
     const pathCancelled = useEffectEvent(() => onPathCancel?.());
     const explored = useEffectEvent((fog: SharedFog, forget?: boolean) => onExplored?.(fog, forget));
@@ -243,6 +251,14 @@ export function MapCanvas({
             onCarry: (id) => carryChanged(id),
             onStats: (stats) => measured(stats),
             onView: (center) => viewed(center),
+            // Straight onto the layer, as a render every frame would be far too slow.
+            onCamera: (camera) =>
+            {
+                layer.current?.style.setProperty('--map-x', `${camera.x}px`);
+                layer.current?.style.setProperty('--map-y', `${camera.y}px`);
+                layer.current?.style.setProperty('--map-zoom', String(camera.zoom));
+            },
+            onNote: (at) => noted(at),
             onToolCancel: () => toolCancelled(),
             onPathCancel: () => pathCancelled(),
             onExplored: (fog, forget) => explored(fog, forget),
@@ -480,6 +496,9 @@ export function MapCanvas({
                     }
                 }}
             />
+            <div ref={layer} className="ttrpg-pins">
+                {overlay}
+            </div>
             {/* The demo's picture is free to use with attribution, so the public demo credits its
                 maker. Sessions are played in private, so the example session and its copies
                 show the map alone. */}

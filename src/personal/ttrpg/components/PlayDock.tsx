@@ -13,6 +13,7 @@ import {
     faCircle,
     faListCheck,
     faMusic,
+    faNoteSticky,
     faObjectGroup,
     faSnowflake,
 } from '@fortawesome/free-solid-svg-icons';
@@ -61,6 +62,9 @@ interface PlayDockProps
     /** Opens or closes the fog: how it looks, and resetting it, see FogPanel.tsx. */
     onFog: () => void;
     fogOpen: boolean;
+    /** Whether this screen shows the GM's note pins, see NotePins.tsx. */
+    notesShown: boolean;
+    onNotesShown: (shown: boolean) => void;
     /** Starts picking targets for an attack or a heal, see HitSheet.tsx. */
     onAttack: () => void;
     /** Clears what killed monsters left on the map. Only while there is some, see Decal. */
@@ -107,6 +111,8 @@ export function PlayDock({
     monstersOpen = false,
     onFog,
     fogOpen,
+    notesShown,
+    onNotesShown,
     onAttack,
     onClearDecals,
     onInitiative,
@@ -286,6 +292,17 @@ export function PlayDock({
                     onClick={onFog}
                 >
                     <FontAwesomeIcon icon={faCloud} />
+                </button>
+                {/* The notes layer, on or off on this screen. Notes are pinned in Edit. */}
+                <button
+                    type="button"
+                    className="ttrpg-segment"
+                    aria-pressed={notesShown}
+                    aria-label="Notes layer"
+                    title={notesShown ? 'Hide the notes layer, so its pins do not clutter the map' : 'Show the notes layer'}
+                    onClick={() => onNotesShown(!notesShown)}
+                >
+                    <FontAwesomeIcon icon={faNoteSticky} />
                 </button>
                 {onClearDecals && (
                     <button

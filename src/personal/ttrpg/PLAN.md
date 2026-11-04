@@ -1269,6 +1269,25 @@ the GM can undo the last one, for a mistyped number.
 **33. GM notes.** Pins on the map with a text, on the GM view only, saved with the map: what is in
 the chest, what the statue says.
 
+- **Built.** **Notes** on the edit rail (N): a press on the ground opens a card to write a title
+  and a text, and Save, or Ctrl+Enter, pins it; a press on a token still drags it. Notes are only
+  pinned in Edit. A pin is a small round one with a note icon in the accent colour. A mouse over it
+  peeks at its card, with Keep open, Edit and Delete. A press on the pin, or Keep open, keeps the
+  card open, which the pin button shows pressed, without the card popping in again. It stays while
+  the map is panned, until a press on the pin again, Keep open or Esc closes it. A drag moves it. The eraser takes one with a press, and Delete
+  does too, both after a confirm, one step to undo; the eraser's box leaves notes alone, as a box
+  could sweep up one unseen. In the GM view the pins are a **Notes layer**, switched on and off by
+  the Notes icon in the dock, beside the fog of war, as there is no layer list, and kept per screen
+  with the screen settings (`useScreenSettings.ts`). The editor always shows every note. A note opened in the GM view of a live session turns its pin
+  paler, fading, until the session starts or ends again: `notesRead` on the session (`readNote` in
+  `convex/play.ts`), so a reload or a second GM screen agrees. Opened in Edit, before going live or
+  in the demo, a note is not read. The notes are `notes` on the scenario, so they save and undo with
+  the map, and **never reach a player**: `play.scenario`, the only query that gives a scenario to
+  anyone but its host, takes them off, and the Player view does not draw them. The pins are
+  buttons over the canvas (`components/NotePins.tsx`), placed by the camera `MapCanvas.tsx` writes
+  into CSS each frame, so hover, focus and the card's pop come from the page rather than the
+  renderer.
+
 **34. Concentration and height.** Concentration as a condition in 5e, and a height on a token, like
 30 ft up for a flying one, shown as a small badge and counted by the ruler.
 

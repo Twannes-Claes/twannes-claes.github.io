@@ -165,6 +165,8 @@ export const scenarioValidator = v.object({
             }),
         ),
     ),
+    /** Only ever for the host: play.scenario takes them off before a player gets the map. */
+    notes: v.optional(v.array(v.object({ id: v.string(), x: v.number(), y: v.number(), title: v.string(), text: v.string() }))),
     spawn: v.object({ x: v.number(), y: v.number() }),
 });
 
@@ -215,6 +217,8 @@ export default defineSchema({
         gmColor: v.optional(v.string()),
         /** Players' whispers to each other stay between them, the GM does not see them. */
         privateWhispers: v.optional(v.boolean()),
+        /** The notes the host opened while live, drawn paler, cleared by Start and End session. */
+        notesRead: v.optional(v.array(v.string())),
     }).index('by_ownerId', ['ownerId']),
     /**
      * Who stands where while a session is played. Players' tokens carry their anonymous user, so a

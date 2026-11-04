@@ -40,6 +40,7 @@ export type ToolId =
     | 'hide-circle'
     | 'mist'
     | 'mist-circle'
+    | 'notes'
     | 'draw'
     | 'rub-out';
 
@@ -631,6 +632,28 @@ function spawnTool(change: Change): MapTool
                 dot(ctx, hover, 8 / zoom, faded(highlight, 0.6));
 
         },
+    };
+}
+
+/**
+ * The notes tool: a press on the ground hands the spot to the page, which asks for the note's
+ * title and text before it adds one, see NotePins.tsx. A press on a token still drags it.
+ */
+function noteTool(place: (at: Point) => void): MapTool
+{
+    return {
+        cursor: 'crosshair',
+        down: (pointer) =>
+        {
+            if (pointer.onToken)
+                return false;
+
+            place(pointer.world);
+
+            return true;
+        },
+        move: () => {},
+        draw: () => {},
     };
 }
 
@@ -1753,7 +1776,8 @@ function movablePropTool(doors: MapTool, change: Change): MapTool
  * picture the props tool places with each click, null to select and edit placed props. reveal
  * hears what Reveal uncovers or hides, which changes what was seen, not the scenario. snap is
  * how many points per cell side walls snap to, 0 for none. share hears the ruler and the area
- * tool as they are dragged. mist is how the mist tool's next area looks.
+ * tool as they are dragged. mist is how the mist tool's next area looks. note hears where the notes
+ * tool pins one.
  */
 export function createTool(
     id: ToolId,
@@ -1765,6 +1789,7 @@ export function createTool(
     eraseMonsters: EraseMonsters = () => {},
     sketching: Sketching = noSketching,
     mist: MistLook | null = null,
+    note: (at: Point) => void = () => {},
 ): MapTool | null
 {
     switch (id)
@@ -1821,6 +1846,8 @@ export function createTool(
             return id === 'mist' ? revealTool(add, false, snap) : revealCircleTool(add, false);
         }
 
+        case 'notes':
+            return noteTool(note);
         case 'draw':
             return drawTool(sketching);
         case 'rub-out':

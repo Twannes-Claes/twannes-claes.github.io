@@ -133,6 +133,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const setSecretSaves = useMutation(api.play.setSecretSaves);
     const setGmColor = useMutation(api.play.setGmColor);
     const setPrivateWhispers = useMutation(api.play.setPrivateWhispers);
+    const readNote = useMutation(api.play.readNote);
     const setSystem = useMutation(api.sessions.setSystem);
     const setInitiative = useMutation(api.play.setInitiative);
     const setUpNext = useMutation(api.play.setUpNext);
@@ -247,6 +248,8 @@ function Session({ sessionId, debug }: SessionEditorProps)
             setGmColor: (color) => friendly(setGmColor({ sessionId: id, color })),
             privateWhispers: status.privateWhispers,
             setPrivateWhispers: (secret) => friendly(setPrivateWhispers({ sessionId: id, secret })),
+            notesRead: status.notesRead,
+            readNote: (noteId) => friendly(readNote({ sessionId: id, noteId })),
             system: status.system,
             setSystem: (system) => friendly(setSystem({ sessionId: id, system })),
             initiative: status.initiative,

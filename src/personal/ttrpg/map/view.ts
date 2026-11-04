@@ -125,6 +125,10 @@ export interface MapViewOptions
     onStats?: (stats: FrameStats) => void;
     /** Every frame drawn: the world point in the middle of the screen, where monsters are added. */
     onView?: (center: Point) => void;
+    /** Every frame drawn: where the map sits, for what the page lays over it, like the note pins. */
+    onCamera?: (camera: Camera) => void;
+    /** A press with the notes tool, where a note would be pinned, see noteTool in map/tools.ts. */
+    onNote?: (at: Point) => void;
     /** A right click with nothing half done: the page puts the tool away, see MapTool.cancel. */
     onToolCancel?: () => void;
     /** The path waiting for its Move or Cancel was dropped, by a right click or a new path. */
@@ -1058,6 +1062,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
         render(context, scene, camera, viewport);
         options.onView?.(toWorld(camera, { x: viewport.width / 2, y: viewport.height / 2 }));
+        options.onCamera?.(camera);
 
         const scale = viewport.dpr * camera.zoom;
 
@@ -2088,7 +2093,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
                 drawings: () => drawings,
                 // Without a colour picked the server colours a player's line with their ring, the host's with none.
                 look: () => ({ colour: pen.color ?? tokens.find((token) => token.id === own)?.color ?? highlight, width: pen.width }),
-            }, mist);
+            }, mist, (at) => options.onNote?.(at));
             toolPointerId = null;
             canvas.style.cursor = restCursor();
             redraw();

@@ -62,6 +62,7 @@ import { useIdle, useWakeLock } from './useScreen';
 import { WallPanel, type WallKind } from './WallPanel';
 import { RingPicker } from './RingPicker';
 import { MistPanel } from './MistPanel';
+import { NotePins } from './NotePins';
 
 /**
  * Both play modes show the map in play. The GM view dims the fog and shows every monster, with
@@ -208,6 +209,8 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const [wallKind, setWallKind] = useState<WallKind>('wall');
     const [mistCircle, setMistCircle] = useState(false);
     const [mistLook, setMistLook] = useState<MistLook>({ color: mistColors[0], density: 0.6 });
+    // Where the notes tool pressed, while the new note's words are written.
+    const [noteDraft, setNoteDraft] = useState<Point | null>(null);
     const [pending, setPending] = useState<PendingMove | null>(null);
     const [frozen, setFrozen] = useState(false);
     const [playTool, setPlayTool] = useState<PlayTool>('open-doors');
@@ -790,6 +793,9 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const gmColor = live ? live.gmColor : demoGmColor;
     const setGmColor = (color: string) => (live ? fail(live.setGmColor(color)) : setDemoGmColor(color));
     const privateWhispers = live ? live.privateWhispers : demoPrivateWhispers;
+    // Read only means seen at the table: opened in the GM view of a live session, see readNote in convex/play.ts.
+    const notesRead = live && live.live ? live.notesRead : [];
+    const showNotes = (shown: boolean) => setScreen((current) => ({ ...current, notes: shown }));
     const setPrivateWhispers = (secret: boolean) => (live ? fail(live.setPrivateWhispers(secret)) : setDemoPrivateWhispers(secret));
 
     const setBlood = (change: Partial<BloodSettings>) =>
@@ -1141,7 +1147,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const removeBackground = () =>
     {
         updateScenario(active.id, (scenario) => ({ ...scenario, background: null }));
-        message.done('Background removed. Ctrl+Z brings it back.');
+        message.done('Background removed.');
     };
 
     // A dropped .dd2vtt imports, a dropped picture becomes a map.
@@ -1228,6 +1234,24 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 onSelect={setSelected}
                 onTokenMenu={menuOpens ? (id, at) => setMenu({ id, at }) : undefined}
                 onPropMenu={propMenuOpens ? (id, at) => setPropMenu({ id, at }) : undefined}
+                onNote={setNoteDraft}
+                // Never in the Player view, which shows the table what the players see.
+                overlay={
+                    mode === 'players'
+                        ? undefined
+                        : (
+                            <NotePins
+                                // The editor shows every note; only the GM view can switch the layer off.
+                                notes={mode === 'edit' || screen.notes ? (active.notes ?? []) : []}
+                                read={notesRead}
+                                onRead={live && live.live && mode === 'gm' ? (id) => fail(live.readNote(id)) : undefined}
+                                erasing={mode === 'edit' && tool === 'erase'}
+                                draft={noteDraft}
+                                onDraftDone={(done) => setNoteDraft((current) => (current === done ? null : current))}
+                                onChange={(update) => updateScenario(active.id, (scenario) => ({ ...scenario, notes: update(scenario.notes ?? []) }))}
+                            />
+                        )
+                }
             />
 
             <div
@@ -1509,6 +1533,14 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                     {tool === 'walls' && (
                         <WallPanel kind={wallKind} onKind={setWallKind} snap={wallSnap} onSnap={setWallSnap} />
                     )}
+                    {tool === 'notes' && (
+                        <section className="ttrpg-panel ttrpg-properties ttrpg-settings" aria-label="Notes">
+                            <h2>Notes</h2>
+                            <ul className="ttrpg-keys" aria-label="Keys">
+                                <li>Click the map to pin a note. Only you see them, never the players.</li>
+                            </ul>
+                        </section>
+                    )}
                     {tool === 'mist' && <MistPanel circle={mistCircle} onCircle={setMistCircle} look={mistLook} onLook={setMistLook} />}
                     {tool === 'align' && (
                         <GridPanel
@@ -1551,6 +1583,8 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                         onMonsters={() => togglePanel('monsters')}
                         monstersOpen={panel === 'monsters'}
                         onFog={() => togglePanel('fog')}
+                        notesShown={screen.notes}
+                        onNotesShown={showNotes}
                         fogOpen={panel === 'fog'}
                         onAttack={startTargets}
                         onClearDecals={blood.ground && decals.length > 0 ? clearDecals : undefined}

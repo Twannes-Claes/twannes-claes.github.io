@@ -248,13 +248,15 @@ export const status = query({
                     ? { text: session.check.text, rolled: session.check.rolls.some((entry) => entry.tokenId === mine._id) }
                     : null,
             password: host ? (session.password ?? '') : null,
+            notesRead: host ? (session.notesRead ?? []) : [],
         };
     },
 });
 
 /**
  * The map being played, for players. Their host has it open in the editor already. Without the
- * props the GM hides, so the dev tools on a phone show nothing the table does not.
+ * props the GM hides, so the dev tools on a phone show nothing the table does not, and without the
+ * GM's notes, which only the host ever gets, see Note in types.ts.
  */
 export const scenario = query({
     args: { sessionId: v.id('sessions') },
@@ -263,7 +265,7 @@ export const scenario = query({
         const session = await memberOf(ctx, sessionId);
         const scenario = session && session.activeScenarioId ? await scenarioOf(ctx, sessionId, session.activeScenarioId) : null;
 
-        return scenario && { ...scenario, props: scenario.props.filter((prop) => prop.hidden !== true) };
+        return scenario && { ...scenario, notes: undefined, props: scenario.props.filter((prop) => prop.hidden !== true) };
     },
 });
 
@@ -864,7 +866,7 @@ export const start = mutation({
             throw new ConvexError('Keep the password under 50 characters.');
 
         // Starting again forgives whoever was removed: they still need the password.
-        await ctx.db.patch('sessions', sessionId, { live: true, password: secret, frozen: false, kicked: undefined, initiative: undefined, check: undefined });
+        await ctx.db.patch('sessions', sessionId, { live: true, password: secret, frozen: false, kicked: undefined, initiative: undefined, check: undefined, notesRead: undefined });
         await clearHitLog(ctx, sessionId);
 
         if (session.activeScenarioId !== scenarioId)
@@ -1230,6 +1232,25 @@ export const setGmColor = mutation({
     },
 });
 
+/**
+ * The host opened a note in the GM view while the session is live, so its pin turns pale on every
+ * GM screen until the session starts or ends again. Outside a live session no note is read.
+ */
+export const readNote = mutation({
+    args: { sessionId: v.id('sessions'), noteId: v.string() },
+    handler: async (ctx, { sessionId, noteId }) =>
+    {
+        const session = await requireSession(ctx, sessionId);
+        const read = session.notesRead ?? [];
+
+        // ponytail: past 500 notes opened in one session the rest stay at full strength.
+        if (session.live === true && !read.includes(noteId) && read.length < 500 && noteId.length <= 64)
+            await ctx.db.patch('sessions', sessionId, { notesRead: [...read, noteId] });
+
+        return null;
+    },
+});
+
 /** The host leaves players' whispers to each other between them, or sees them again. */
 export const setPrivateWhispers = mutation({
     args: { sessionId: v.id('sessions'), secret: v.boolean() },
@@ -1430,7 +1451,7 @@ export const end = mutation({
         for (const player of players)
             await dropToken(ctx, player);
 
-        await ctx.db.patch('sessions', sessionId, { live: false, frozen: false, initiative: undefined, check: undefined });
+        await ctx.db.patch('sessions', sessionId, { live: false, frozen: false, initiative: undefined, check: undefined, notesRead: undefined });
 
         const scenario = session.activeScenarioId ? await scenarioOf(ctx, sessionId, session.activeScenarioId) : null;
 
