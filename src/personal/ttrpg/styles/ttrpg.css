@@ -1560,7 +1560,7 @@ html:has(.ttrpg[data-theme='light']) {
     width: 9px;
     height: 9px;
     border-radius: 50%;
-    background: #d9534f;
+    background: var(--ttrpg-accent);
     box-shadow: 0 0 0 2px var(--ttrpg-bg);
 }
 
