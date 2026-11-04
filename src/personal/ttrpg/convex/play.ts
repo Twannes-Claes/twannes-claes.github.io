@@ -4,7 +4,7 @@ import { ConvexError, v } from 'convex/values';
 import type { Decal, Draft, Drawing, Grid, PlayerFight, Point, Scenario, SharedHit, SharedMark, Token } from '../types';
 import { cleanConditions, isSave } from '../content/conditions';
 import { maxPlayers } from '../content/limits';
-import { colourPattern } from '../map/colours';
+import { colourPattern, defaultAccent } from '../map/colours';
 import { maxDrawingPoints, maxDrawings, penWidths } from '../map/drawings';
 import { distance } from '../map/geometry';
 import { cleanStats, conditionsAt, downedPool, hitOn, mayHurt, withoutNumbers, withoutSaves } from '../map/health';
@@ -20,6 +20,7 @@ import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireSession, requireUser } from './access';
 import { saveCharacter } from './characters';
+import { clearChat } from './chat';
 import { clearRolls } from './dice';
 import { limit, spend } from './limits';
 import { bloodSettingsValidator, conditionValidator, fogSettingsValidator, initiativeValidator, sizeValidator } from './schema';
@@ -231,6 +232,8 @@ export const status = query({
             fogLook: session.fogLook ?? null,
             blood: session.blood ?? null,
             secretSaves: session.secretSaves === true,
+            gmColor: gmColorOf(session),
+            privateWhispers: session.privateWhispers === true,
             system: session.system ?? '5e',
             upNext: session.upNext === true,
             // The whole fight only for the GM view; everyone else hears only what concerns them.
@@ -1202,6 +1205,40 @@ export const setFogLook = mutation({
     },
 });
 
+/** The GM's colour on every screen, as players have their ring, see gmColor in the schema. */
+export function gmColorOf(session: Doc<'sessions'>)
+{
+    return session.gmColor ?? defaultAccent;
+}
+
+/** The host picks their colour at the table. */
+export const setGmColor = mutation({
+    args: { sessionId: v.id('sessions'), color: v.string() },
+    handler: async (ctx, { sessionId, color }) =>
+    {
+        await requireSession(ctx, sessionId);
+
+        if (!colourPattern.test(color))
+            throw new ConvexError('That is not a colour.');
+
+        await ctx.db.patch('sessions', sessionId, { gmColor: color });
+
+        return null;
+    },
+});
+
+/** The host leaves players' whispers to each other between them, or sees them again. */
+export const setPrivateWhispers = mutation({
+    args: { sessionId: v.id('sessions'), secret: v.boolean() },
+    handler: async (ctx, { sessionId, secret }) =>
+    {
+        await requireSession(ctx, sessionId);
+        await ctx.db.patch('sessions', sessionId, { privateWhispers: secret });
+
+        return null;
+    },
+});
+
 /** The host keeps death saves off the players' screens, or shows them again. */
 export const setSecretSaves = mutation({
     args: { sessionId: v.id('sessions'), secret: v.boolean() },
@@ -1397,6 +1434,7 @@ export const end = mutation({
 
         await clearDrawings(ctx, sessionId);
         await clearRolls(ctx, sessionId);
+        await clearChat(ctx, sessionId);
 
         return null;
     },
@@ -1476,7 +1514,7 @@ export const sendPing = mutation({
             .withIndex('by_sessionId', (q) => q.eq('sessionId', sessionId))
             .unique();
         const at = Date.now();
-        const ping = { sessionId, scenarioId, x, y, at, ...(mine ? { color: mine.color } : {}) };
+        const ping = { sessionId, scenarioId, x, y, at, color: mine ? mine.color : gmColorOf(session) };
 
         if (!doc)
             await ctx.db.insert('pings', ping);
@@ -1894,7 +1932,7 @@ export const mark = mutation({
             scenarioId: session.activeScenarioId,
             userId,
             ...mark,
-            color: token?.color,
+            color: token?.color ?? gmColorOf(session),
             at: Date.now(),
         };
 
@@ -2000,7 +2038,7 @@ export const drawLine = mutation({
         for (const old of own.slice(0, Math.max(0, own.length - maxDrawings + 1)))
             await ctx.db.delete('drawings', old._id);
 
-        const color = pen.color !== undefined && colourPattern.test(pen.color) ? pen.color : token?.color;
+        const color = pen.color !== undefined && colourPattern.test(pen.color) ? pen.color : (token?.color ?? gmColorOf(session));
         const width = Number.isFinite(pen.width) ? Math.min(Math.max(pen.width, penWidths.min), penWidths.max) : penWidths.start;
 
         await ctx.db.insert('drawings', { sessionId, scenarioId: session.activeScenarioId, userId, key, color, width, points });

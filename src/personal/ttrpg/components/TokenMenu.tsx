@@ -314,3 +314,27 @@ export function PropMenu({ prop, name, at, onChange, onRemove, onClose }: PropMe
         document.querySelector('.ttrpg') ?? document.body,
     );
 }
+
+/** The GM view's right-click menu on a chat message, at the pointer: deleting it. */
+export function MessageMenu({ at, onDelete, onClose }: { at: Point; onDelete: () => void; onClose: () => void })
+{
+    const card = useMenuAt(at, onClose);
+
+    return createPortal(
+        <section ref={card} className="ttrpg-panel ttrpg-popover ttrpg-token-menu ttrpg-message-menu" aria-label="Message" onContextMenu={(event) => event.preventDefault()}>
+            <button
+                type="button"
+                className="ttrpg-message-menu__item"
+                onClick={() =>
+                {
+                    onDelete();
+                    onClose();
+                }}
+            >
+                <FontAwesomeIcon icon={faTrash} />
+                Delete message
+            </button>
+        </section>,
+        document.querySelector('.ttrpg') ?? document.body,
+    );
+}

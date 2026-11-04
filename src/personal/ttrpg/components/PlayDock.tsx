@@ -22,6 +22,7 @@ import type { Pen, Scenario } from '../types';
 
 import { highlight } from '../map/colours';
 
+import { ChatButton } from './ChatPanel';
 import { DrawPicker } from './DrawPicker';
 import { AttackButton } from './HitSheet';
 import { RulerPicker } from './RulerPicker';
@@ -78,6 +79,10 @@ interface PlayDockProps
     /** Opens or closes the dice, see DicePanel.tsx. */
     onDice?: () => void;
     diceOpen?: boolean;
+    /** Opens or closes the chat, see ChatPanel.tsx, with a dot while something is unread. */
+    onChat?: () => void;
+    chatOpen?: boolean;
+    chatUnread?: boolean;
 }
 
 /**
@@ -113,6 +118,9 @@ export function PlayDock({
     musicOpen,
     onDice,
     diceOpen = false,
+    onChat,
+    chatOpen = false,
+    chatUnread = false,
 }: PlayDockProps)
 {
     const { fullscreen, toggle } = useFullscreen();
@@ -247,6 +255,7 @@ export function PlayDock({
                         <FontAwesomeIcon icon={faDice} />
                     </button>
                 )}
+                {onChat && <ChatButton open={chatOpen} unread={chatUnread} onClick={onChat} />}
             </div>
             {onMonsters && (
                 <div className="ttrpg-dock__group">

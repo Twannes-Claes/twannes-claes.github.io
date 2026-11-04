@@ -37,7 +37,23 @@ const propSide = 2048;
 /** Sends a host's picture to Convex storage, to a one-time address from convex/pictures.ts. */
 export async function upload(blob: Blob): Promise<Id<'_storage'>>
 {
-    const address = await client.mutation(api.pictures.uploadUrl, {});
+    return post(await client.mutation(api.pictures.uploadUrl, {}), blob);
+}
+
+/** A player's picture for the chat: shrunk enough to fill a phone, see uploadUrl in convex/chat.ts. */
+export async function uploadChatPicture(sessionId: Id<'sessions'>, picture: File): Promise<Id<'_storage'>>
+{
+    const { blob } = await toWebp(picture, 1600).catch(() =>
+    {
+        throw new ConvexError('That picture could not be read. Pick another one.');
+    });
+
+    return post(await client.mutation(api.chat.uploadUrl, { sessionId }), blob);
+}
+
+/** Sends a file to a one-time upload address from Convex. */
+async function post(address: string, blob: Blob): Promise<Id<'_storage'>>
+{
     const response = await fetch(address, {
         method: 'POST',
         headers: { 'Content-Type': blob.type },

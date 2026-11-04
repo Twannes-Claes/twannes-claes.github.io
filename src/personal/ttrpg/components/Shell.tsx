@@ -8,6 +8,17 @@ import { ConfirmHost } from './Confirm';
 import { TooltipHost } from './Tooltip';
 import { useLook } from './useLook';
 
+/**
+ * The mouse pointer: an arrow in the accent with a white edge, so it shows on any map and in
+ * either theme. Built from the accent, so it follows the one picked, see styles/ttrpg.css.
+ */
+function cursorOf(accent: string)
+{
+    const arrow = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M3 2 L3 19 L7.5 14.8 L10.5 21.5 L14 20 L11 13.4 L17 13.2 Z" fill="${accent}" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+
+    return `url("data:image/svg+xml,${encodeURIComponent(arrow)}") 3 2, auto`;
+}
+
 /** What pops in, each with an animation of its own in styles/ttrpg.css. */
 const popsIn = [
     '.ttrpg-pop__menu',
@@ -102,7 +113,7 @@ export function Shell({ title, home = '/ttrpg', children }: ShellProps)
     useLeaving(root);
 
     return (
-        <div ref={root} className="ttrpg" data-theme={theme} style={{ '--ttrpg-accent': accent } as CSSProperties}>
+        <div ref={root} className="ttrpg" data-theme={theme} style={{ '--ttrpg-accent': accent, '--ttrpg-cursor': cursorOf(accent) } as CSSProperties}>
             <Head>
                 <title>{`${title} | TTRPG`}</title>
                 <meta name="robots" content="noindex, nofollow" />

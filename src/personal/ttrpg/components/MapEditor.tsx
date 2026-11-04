@@ -2,7 +2,7 @@ import { faCheck, faDice, faDiceD20, faHatWizard, faPen, faSnowflake, faTriangle
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useEffectEvent, useRef, useState, type DragEvent, type MouseEvent } from 'react';
 
-import type { BloodSettings, Decal, DiceAsk, DiceRoll, Drawing, FogSettings, GameSystem, GroupCheck, HitKind, Initiative, Live, MonsterControls, MusicControls, PictureBytes, Pen, Ping, Point, Preset, PropPicture, Scenario, SharedHit, Store, Token, Track } from '../types';
+import type { BloodSettings, ChatMessage, ChatSend, Decal, DiceAsk, DiceRoll, Drawing, FogSettings, GameSystem, GroupCheck, HitKind, Initiative, Live, MonsterControls, MusicControls, PictureBytes, Pen, Ping, Point, Preset, PropPicture, Scenario, SharedHit, Store, Token, Track } from '../types';
 
 import { cleanConditions } from '../content/conditions';
 import { maxPlayers } from '../content/limits';
@@ -10,7 +10,7 @@ import { blankScenario, demoTokens } from '../content/scenarios';
 import { videoId } from '../content/music';
 import { demoOgrePreset } from '../content/statBlocks';
 import { gameSystems } from '../content/systems';
-import { highlight, ringColours } from '../map/colours';
+import { defaultAccent, ringColours } from '../map/colours';
 import { penWidths } from '../map/drawings';
 import { rollDice } from '../map/dice';
 import { defaultFogSettings } from '../map/fog';
@@ -34,6 +34,7 @@ import { FogPanel } from './FogPanel';
 import { AttackButton, HitSheet } from './HitSheet';
 import { GridPanel } from './GridPanel';
 import { CheckPanel } from './CheckPanel';
+import { ChatButton, ChatPanel } from './ChatPanel';
 import { DicePanel } from './DicePanel';
 import { InitiativePanel } from './InitiativePanel';
 import { LiveControls, Players } from './LiveControls';
@@ -55,9 +56,11 @@ import { Tray } from './Tray';
 import { ToolRail } from './ToolRail';
 import { useHistory } from './useHistory';
 import { useMessage } from './useMessage';
+import { useUnread } from './useUnread';
 import { useScreenSettings } from './useScreenSettings';
 import { useIdle, useWakeLock } from './useScreen';
 import { WallPanel, type WallKind } from './WallPanel';
+import { RingPicker } from './RingPicker';
 
 /**
  * Both play modes show the map in play. The GM view dims the fog and shows every monster, with
@@ -199,7 +202,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const [frozen, setFrozen] = useState(false);
     const [playTool, setPlayTool] = useState<PlayTool>('open-doors');
     // The one panel open above the play dock.
-    const [panel, setPanel] = useState<'monsters' | 'fog' | 'initiative' | 'check' | 'music' | 'dice' | null>(null);
+    const [panel, setPanel] = useState<'monsters' | 'fog' | 'initiative' | 'check' | 'music' | 'dice' | 'chat' | null>(null);
     // The music panel stays once opened, so it plays on in Edit and while closed.
     const [musicOpened, setMusicOpened] = useState(false);
     // The demo's music, kept in this tab.
@@ -214,6 +217,8 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     // Which blood shows: the session's when it is saved, this tab's in the demo.
     const [demoBlood, setDemoBlood] = useState(defaultBlood);
     const [demoSecretSaves, setDemoSecretSaves] = useState(false);
+    const [demoGmColor, setDemoGmColor] = useState(defaultAccent);
+    const [demoPrivateWhispers, setDemoPrivateWhispers] = useState(false);
     const [demoSystem, setDemoSystem] = useState<GameSystem>('5e');
     // The demo's monster presets, kept in this tab, starting with the ogre on its map.
     const [demoPresets, setDemoPresets] = useState<Preset[]>(() => [demoOgrePreset]);
@@ -221,6 +226,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const [localFight, setLocalFight] = useState<Initiative | null>(null);
     const [localCheck, setLocalCheck] = useState<GroupCheck | null>(null);
     const [localRolls, setLocalRolls] = useState<DiceRoll[]>([]);
+    const [localChat, setLocalChat] = useState<ChatMessage[]>([]);
     const [demoUpNext, setDemoUpNext] = useState(false);
     // The lines drawn off a live map, in this tab, each on the map it was drawn on.
     const [pen, setPen] = useState<Pen>({ width: penWidths.start });
@@ -431,6 +437,8 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
         return Promise.resolve();
     };
+
+    const deleteChat = (id: string) => (chatting ? fail(chatting.deleteChat(id)) : setLocalChat((current) => current.filter((message) => message.id !== id)));
 
     // The demo's presets and monsters, done here in the tab the way the server does them for a
     // saved session, and never sent anywhere, so all of it can be tried without an account.
@@ -736,6 +744,10 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const blood = live ? (live.blood ?? defaultBlood) : demoBlood;
     const secretSaves = live ? live.secretSaves : demoSecretSaves;
     const setSecretSaves = (secret: boolean) => (live ? fail(live.setSecretSaves(secret)) : setDemoSecretSaves(secret));
+    const gmColor = live ? live.gmColor : demoGmColor;
+    const setGmColor = (color: string) => (live ? fail(live.setGmColor(color)) : setDemoGmColor(color));
+    const privateWhispers = live ? live.privateWhispers : demoPrivateWhispers;
+    const setPrivateWhispers = (secret: boolean) => (live ? fail(live.setPrivateWhispers(secret)) : setDemoPrivateWhispers(secret));
 
     const setBlood = (change: Partial<BloodSettings>) =>
     {
@@ -765,6 +777,24 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
         setLocalRolls((current) => [{ id: crypto.randomUUID(), name: 'GM', ...ask, ...rolled }, ...current].slice(0, 20));
 
         return Promise.resolve(rolled);
+    };
+
+    // The chat is the session's whichever map is open. Off a live session it stays in this tab, to
+    // try the panel, and a handout's picture with it.
+    const chatting = live?.live ? live : null;
+    const chat = chatting ? chatting.chat : localChat;
+    const chatUnread = useUnread(chat, panel === 'chat');
+    const sendChat = (message: ChatSend) =>
+    {
+        if (chatting)
+            return chatting.sendChat(message);
+
+        const to = message.to ? tokens.find((token) => token.id === message.to) : undefined;
+        const picture = message.handout && message.picture ? URL.createObjectURL(message.picture) : undefined;
+
+        setLocalChat((current) => [...current, { id: crypto.randomUUID(), name: 'GM', color: gmColor, byGm: true, text: message.text.trim(), to: message.to, toName: to?.name, toColor: to?.color, handout: message.handout === true, picture, mine: true }].slice(-50));
+
+        return Promise.resolve();
     };
 
     const upNext = live ? live.upNext : demoUpNext;
@@ -843,7 +873,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 ? () => kickPlayer(liveMap, menuToken.id, menuToken.name, message.done, message.error)
                 : () => removeTestPlayer(menuToken.id);
 
-    const togglePanel = (next: 'monsters' | 'fog' | 'initiative' | 'check' | 'music' | 'dice') => setPanel((open) => (open === next ? null : next));
+    const togglePanel = (next: 'monsters' | 'fog' | 'initiative' | 'check' | 'music' | 'dice' | 'chat') => setPanel((open) => (open === next ? null : next));
 
     const fogSettings = fogDraft ?? (live ? (live.fogLook ?? defaultFogSettings) : demoFog);
 
@@ -1121,7 +1151,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 onMark={liveMap ? (next) => void liveMap.mark(next).catch(() => undefined) : undefined}
                 drawings={drawings}
                 onDrawLine={drawLine}
-                pen={pen}
+                pen={{ ...pen, color: pen.color ?? gmColor }}
                 onEraseDrawings={eraseDrawings}
                 fogSettings={fogSettings}
                 fogSource={liveMap ? 'live' : 'preview'}
@@ -1298,6 +1328,24 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                                     </button>
                                 </div>
                             </section>
+                            <section className="ttrpg-shortcuts" aria-label="Whispers">
+                                <h3 className="ttrpg-subhead">Whispers</h3>
+                                <div className="ttrpg-settings__choices">
+                                    <button
+                                        type="button"
+                                        className="ttrpg-segment"
+                                        aria-pressed={!privateWhispers}
+                                        title="You see the players' whispers to each other in your chat"
+                                        onClick={() => setPrivateWhispers(!privateWhispers)}
+                                    >
+                                        You see players' whispers
+                                    </button>
+                                </div>
+                            </section>
+                            <section className="ttrpg-shortcuts" aria-label="GM colour" title="Your chat, pings, rulers and lines, the same on every screen">
+                                <h3 className="ttrpg-subhead">GM colour</h3>
+                                <RingPicker value={gmColor} onChange={setGmColor} label="GM colour" />
+                            </section>
                         </>
                     }
                 />
@@ -1452,6 +1500,9 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                         checkOpen={panel === 'check'}
                         onDice={() => togglePanel('dice')}
                         diceOpen={panel === 'dice'}
+                        onChat={() => togglePanel('chat')}
+                        chatOpen={panel === 'chat'}
+                        chatUnread={chatUnread}
                         onMusic={() =>
                         {
                             setMusicOpened(true);
@@ -1475,13 +1526,14 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                         onSketch={(next) => setPlayTool(next ?? 'open-doors')}
                         pen={pen}
                         onPen={setPen}
-                        colour={highlight}
+                        colour={gmColor}
                         start
                     />
                     <AttackButton onClick={startTargets} />
                     <button type="button" className="ttrpg-segment" aria-pressed={panel === 'dice'} aria-expanded={panel === 'dice'} aria-label="Dice" title="Roll dice" onClick={() => togglePanel('dice')}>
                         <FontAwesomeIcon icon={faDice} />
                     </button>
+                    <ChatButton open={panel === 'chat'} unread={chatUnread} onClick={() => togglePanel('chat')} />
                 </div>
             )}
 
@@ -1507,6 +1559,18 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                     onRoll={roll}
                     system={system}
                     host={mode === 'gm'}
+                    onClose={() => setPanel(null)}
+                />
+            )}
+
+            {/* The Player view, like the table screen, has only what is for everyone. */}
+            {mode !== 'edit' && !pending && !idle && panel === 'chat' && (
+                <ChatPanel
+                    messages={mode === 'gm' ? chat : chat.filter((message) => !message.to && !message.toGm)}
+                    onSend={sendChat}
+                    host={mode === 'gm'}
+                    onDelete={mode === 'gm' ? deleteChat : undefined}
+                    players={mode === 'gm' ? shown.filter((token) => token.kind === 'player' && !token.summonOf) : []}
                     onClose={() => setPanel(null)}
                 />
             )}

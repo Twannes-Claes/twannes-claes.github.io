@@ -1306,7 +1306,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     const held = (id: string) => dragging?.group.some((member) => member.id === id) === true;
 
     /** The cursor at rest: the tool's, an arrow for the Select tool, or the stylesheet's grab hand. */
-    const restCursor = () => (tool ? tool.cursor : selection ? 'default' : '');
+    const restCursor = () => (tool ? tool.cursor : '');
 
     /** What a route costs: counted per cell on a grid, by length without one. */
     const routeFeet = (current: Scenario, { cells, points }: Route) =>

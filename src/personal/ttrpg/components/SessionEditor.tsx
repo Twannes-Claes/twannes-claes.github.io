@@ -4,12 +4,12 @@ import { ConvexError } from 'convex/values';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import type { Decal, DiceRoll, Draft, Drawing, Live, PictureBytes, Preset, PropPicture, Scenario, SharedMark, Token, Track } from '../types';
+import type { ChatMessage, ChatSend, Decal, DiceRoll, Draft, Drawing, Live, PictureBytes, Preset, PropPicture, Scenario, SharedMark, Token, Track } from '../types';
 
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
 import { explain, sessionStore, upload } from '../services/backend';
-import { toAvatar } from '../services/images';
+import { toAvatar, toWebp } from '../services/images';
 
 import { Backend } from './Backend';
 import { Loading } from './Feedback';
@@ -55,6 +55,18 @@ function presetPicture(picture: Blob | null): Promise<Id<'_storage'> | undefined
     });
 }
 
+/** A handout's picture, shrunk like a prop, sharp enough full screen on a phone, and uploaded. */
+function handoutPicture(picture: File | undefined): Promise<Id<'_storage'> | undefined>
+{
+    if (!picture)
+        return Promise.resolve(undefined);
+
+    return toWebp(picture, 2048).then(({ blob }) => upload(blob), () =>
+    {
+        throw new ConvexError('That picture could not be read. Pick another one.');
+    });
+}
+
 /** Before the first tokens arrive, so the map gets the same empty list each time. */
 const noTokens: Token[] = [];
 const noDrafts: Draft[] = [];
@@ -62,6 +74,7 @@ const noMarks: SharedMark[] = [];
 const noDrawings: Drawing[] = [];
 const noDecals: Decal[] = [];
 const noRolls: DiceRoll[] = [];
+const noChat: ChatMessage[] = [];
 const noPresets: Preset[] = [];
 const noTracks: Track[] = [];
 const noMonsters: Live['monsters'] = [];
@@ -117,12 +130,17 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const setFogLook = useMutation(api.play.setFogLook);
     const setBlood = useMutation(api.play.setBlood);
     const setSecretSaves = useMutation(api.play.setSecretSaves);
+    const setGmColor = useMutation(api.play.setGmColor);
+    const setPrivateWhispers = useMutation(api.play.setPrivateWhispers);
     const setSystem = useMutation(api.sessions.setSystem);
     const setInitiative = useMutation(api.play.setInitiative);
     const setUpNext = useMutation(api.play.setUpNext);
     const setCheck = useMutation(api.play.setCheck);
     const rolls = useQuery(api.dice.list, following ? { sessionId: id } : 'skip');
     const roll = useMutation(api.dice.roll);
+    const chat = useQuery(api.chat.list, following ? { sessionId: id } : 'skip');
+    const sendChat = useMutation(api.chat.send);
+    const removeChat = useMutation(api.chat.remove);
     const startSession = useMutation(api.play.start);
     const endSession = useMutation(api.play.end);
     const freezeSession = useMutation(api.play.freeze);
@@ -220,6 +238,10 @@ function Session({ sessionId, debug }: SessionEditorProps)
             setBlood: (blood) => friendly(setBlood({ sessionId: id, blood })),
             secretSaves: status.secretSaves,
             setSecretSaves: (secret) => friendly(setSecretSaves({ sessionId: id, secret })),
+            gmColor: status.gmColor,
+            setGmColor: (color) => friendly(setGmColor({ sessionId: id, color })),
+            privateWhispers: status.privateWhispers,
+            setPrivateWhispers: (secret) => friendly(setPrivateWhispers({ sessionId: id, secret })),
             system: status.system,
             setSystem: (system) => friendly(setSystem({ sessionId: id, system })),
             initiative: status.initiative,
@@ -232,6 +254,19 @@ function Session({ sessionId, debug }: SessionEditorProps)
                 {
                     throw new Error(explain(reason, 'That did not work. Check the connection and try again.'));
                 }),
+            chat: chat ?? noChat,
+            deleteChat: (messageId) => friendly(removeChat({ messageId: messageId as Id<'messages'> })),
+            sendChat: ({ text, to, handout, picture }: ChatSend) =>
+                friendly(
+                    handoutPicture(picture)
+                        .then((storageId) => sendChat({ sessionId: id, text, to: to as Id<'tokens'> | undefined, handout, storageId }))
+                        .then((sent) =>
+                        {
+                            if (!sent)
+                                throw new ConvexError('That file is not a picture, or it is too big.');
+
+                        }),
+                ),
             upNext: status.upNext,
             setUpNext: (on) => friendly(setUpNext({ sessionId: id, upNext: on })),
             presets: presets ?? noPresets,

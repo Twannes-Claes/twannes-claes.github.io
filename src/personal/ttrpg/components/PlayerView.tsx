@@ -16,7 +16,7 @@ import { useConvex, useMutation, useQuery } from 'convex/react';
 import { ConvexError } from 'convex/values';
 import { useActionState, useEffect, useState, type ReactNode } from 'react';
 
-import type { BloodSettings, DiceAsk, FogSettings, GameSystem, HitKind, Pen, PlayerCheck, PlayerFight, Scenario } from '../types';
+import type { BloodSettings, ChatSend, DiceAsk, FogSettings, GameSystem, HitKind, Pen, PlayerCheck, PlayerFight, Scenario } from '../types';
 
 import { api } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
@@ -29,12 +29,13 @@ import { stuckAt } from '../map/spawn';
 import type { FrameStats, PendingMove } from '../map/view';
 import { confirmAction } from '../services/confirm';
 import { buzz } from '../services/haptics';
-import { explain, uploadAvatar } from '../services/backend';
+import { explain, uploadAvatar, uploadChatPicture } from '../services/backend';
 import { toAvatar } from '../services/images';
 import { sendDoor } from '../services/tableChannel';
 
 import { Backend } from './Backend';
 import { CharacterList, PieceForm } from './CharacterList';
+import { ChatButton, ChatPanel } from './ChatPanel';
 import { ConditionPicker } from './ConditionPicker';
 import { DicePanel } from './DicePanel';
 import { DrawPicker, type Sketch } from './DrawPicker';
@@ -48,6 +49,7 @@ import { Settings } from './Settings';
 import { StatsForm } from './StatsForm';
 import { SummonList } from './SummonList';
 import { useMessage } from './useMessage';
+import { useUnread } from './useUnread';
 import { useFullscreen, useIdle, useWakeLock } from './useScreen';
 import { useScreenSettings } from './useScreenSettings';
 
@@ -403,6 +405,10 @@ function Table({ sessionId, mine, frozen, fogLook, blood, secretSaves, system, f
     const rolls = useQuery(api.dice.list, { sessionId, asPlayer: onTable });
     const rollDice = useMutation(api.dice.roll);
     const [diceOpen, setDiceOpen] = useState(false);
+    const chat = useQuery(api.chat.list, { sessionId, asPlayer: onTable });
+    const sendChat = useMutation(api.chat.send);
+    const [chatOpen, setChatOpen] = useState(false);
+    const chatUnread = useUnread(chat, chatOpen, !onTable);
     const endTurn = useMutation(api.play.endTurn);
     const authToken = useAuthToken();
     const [pending, setPending] = useState<PendingMove | null>(null);
@@ -504,6 +510,23 @@ function Table({ sessionId, mine, frozen, fogLook, blood, secretSaves, system, f
         {
             throw new Error(explain(reason, 'That roll did not go through. Try again.'));
         });
+
+    // A player's picture is uploaded first, then sent like a line. Never a handout, see convex/chat.ts.
+    const sendMessage = ({ text, to, toGm, picture }: ChatSend) =>
+        (picture ? uploadChatPicture(sessionId, picture) : Promise.resolve(undefined))
+            .then((storageId) => sendChat({ sessionId, text, to: to as Id<'tokens'> | undefined, toGm, storageId }))
+            .then((sent) =>
+            {
+                if (!sent)
+                    throw new ConvexError('That file is not a picture, or it is too big.');
+            })
+            .then(
+                () => undefined,
+                (reason: unknown) =>
+                {
+                    throw new Error(explain(reason, 'That message did not go through. Try again.'));
+                },
+            );
 
     const sendCheck = (roll: number) =>
         rollCheck({ sessionId, roll }).then(
@@ -630,9 +653,23 @@ function Table({ sessionId, mine, frozen, fogLook, blood, secretSaves, system, f
                     />
                     {/* Frozen, or waiting for their turn, players cannot attack, see play.hit. */}
                     <AttackButton onClick={startTargets} disabled={held && !onTable} />
-                    <button type="button" className="ttrpg-segment" aria-pressed={diceOpen} aria-expanded={diceOpen} aria-label="Dice" title="Roll dice" onClick={() => setDiceOpen(!diceOpen)}>
+                    <button type="button" className="ttrpg-segment" aria-pressed={diceOpen} aria-expanded={diceOpen} aria-label="Dice" title="Roll dice" onClick={() =>
+                    {
+                        setDiceOpen(!diceOpen);
+                        setChatOpen(false);
+                    }}
+                    >
                         <FontAwesomeIcon icon={faDice} />
                     </button>
+                    <ChatButton
+                        open={chatOpen}
+                        unread={chatUnread}
+                        onClick={() =>
+                        {
+                            setChatOpen(!chatOpen);
+                            setDiceOpen(false);
+                        }}
+                    />
                     {myTurn && (
                         <button
                             type="button"
@@ -652,6 +689,17 @@ function Table({ sessionId, mine, frozen, fogLook, blood, secretSaves, system, f
 
             {diceOpen && !pending && !targets && !rolling && !checking && (
                 <DicePanel rolls={rolls ?? []} onRoll={sendDice} system={system} phone own={ownColour} onClose={() => setDiceOpen(false)} />
+            )}
+
+            {chatOpen && !pending && !targets && !rolling && !checking && (
+                <ChatPanel
+                    messages={chat ?? []}
+                    onSend={sendMessage}
+                    players={mine ? (tokens ?? []).filter((token) => token.kind === 'player' && !token.summonOf && token.id !== mine) : []}
+                    own={mine ?? undefined}
+                    phone={!onTable}
+                    onClose={() => setChatOpen(false)}
+                />
             )}
 
             {/* Keyed on the text, so a new check starts with an empty field. */}

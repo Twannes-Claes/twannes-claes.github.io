@@ -7,6 +7,7 @@ import { sameCells } from '../map/grid';
 import type { Id } from './_generated/dataModel';
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireHost, requireSession } from './access';
+import { clearChat } from './chat';
 import { clearRolls } from './dice';
 import { regrid } from './play';
 import { scenarioValidator, systemValidator } from './schema';
@@ -240,6 +241,7 @@ export const remove = mutation({
             await ctx.db.delete('decals', decal._id);
 
         await clearRolls(ctx, sessionId);
+        await clearChat(ctx, sessionId);
         await ctx.db.delete('sessions', sessionId);
 
         return null;

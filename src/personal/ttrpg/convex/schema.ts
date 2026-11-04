@@ -142,6 +142,10 @@ export default defineSchema({
         check: v.optional(checkValidator),
         /** Whoever comes after the current turn hears so, see Up next in PLAN.md. */
         upNext: v.optional(v.boolean()),
+        /** The GM's colour on every screen: their chat, pings, rulers and lines. Missing is the app's purple. */
+        gmColor: v.optional(v.string()),
+        /** Players' whispers to each other stay between them, the GM does not see them. */
+        privateWhispers: v.optional(v.boolean()),
     }).index('by_ownerId', ['ownerId']),
     /**
      * Who stands where while a session is played. Players' tokens carry their anonymous user, so a
@@ -339,6 +343,28 @@ export default defineSchema({
         dice: v.array(v.number()),
         total: v.number(),
     }).index('by_sessionId', ['sessionId']),
+    /** The table chat, whispers and handouts of a session, see ChatMessage in types.ts and chat.ts. */
+    messages: defineTable({
+        sessionId: v.id('sessions'),
+        /** Who sent it, so their own show as theirs. */
+        userId: v.id('users'),
+        /** The player's token, or GM. */
+        name: v.string(),
+        color: v.optional(v.string()),
+        text: v.string(),
+        /** The player's token in a whisper or a handout for one player, which only the two see. */
+        to: v.optional(v.id('tokens')),
+        /** A player's whisper to the GM. */
+        toGm: v.optional(v.boolean()),
+        toName: v.optional(v.string()),
+        toColor: v.optional(v.string()),
+        handout: v.boolean(),
+        /** A handout's picture, deleted with it. */
+        storageId: v.optional(v.id('_storage')),
+        picture: v.optional(v.string()),
+    })
+        .index('by_sessionId_and_handout', ['sessionId', 'handout'])
+        .index('by_storageId', ['storageId']),
     /** How often each player did something lately, so a script cannot spam it, see limits.ts. */
     limits: defineTable({
         userId: v.id('users'),

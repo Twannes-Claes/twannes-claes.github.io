@@ -403,6 +403,12 @@ export interface Live
     /** Death saves only the game master sees, see isSave in content/conditions.ts. */
     secretSaves: boolean;
     setSecretSaves: (secret: boolean) => Promise<void>;
+    /** The GM's colour on every screen, see gmColorOf in convex/play.ts. */
+    gmColor: string;
+    setGmColor: (color: string) => Promise<void>;
+    /** Players' whispers to each other stay between them. */
+    privateWhispers: boolean;
+    setPrivateWhispers: (secret: boolean) => Promise<void>;
     system: GameSystem;
     setSystem: (system: GameSystem) => Promise<void>;
     /** The fight on the map being played, null while there is none. */
@@ -417,6 +423,12 @@ export interface Live
     rolls: DiceRoll[];
     /** Gives the dice and the total, like convex/dice.ts. */
     roll: (ask: DiceAsk) => Promise<Pick<DiceRoll, 'dice' | 'total'>>;
+    /** The session's chat, oldest first, every whisper and handout too. */
+    chat: ChatMessage[];
+    /** Sends a message or a handout, see convex/chat.ts. Fails with the message to show. */
+    sendChat: (message: ChatSend) => Promise<void>;
+    /** The GM takes a message out of the chat. */
+    deleteChat: (id: string) => Promise<void>;
     /** Whoever comes after the current turn hears so. */
     upNext: boolean;
     setUpNext: (on: boolean) => Promise<void>;
@@ -508,6 +520,40 @@ export interface DiceRoll extends DiceAsk
     color?: string;
     dice: number[];
     total: number;
+}
+
+/** A line of the table chat, a whisper or a handout, as one screen may see it, see convex/chat.ts. */
+export interface ChatMessage
+{
+    id: string;
+    /** The player's token, or GM. */
+    name: string;
+    /** The player's ring colour. Missing for the GM. */
+    color?: string;
+    text: string;
+    /** The player's token in a whisper, or a handout for one player. Missing for everyone. */
+    to?: string;
+    /** A player's whisper to the GM. */
+    toGm?: boolean;
+    toName?: string;
+    /** That player's ring colour, or the GM's for a whisper to the GM. */
+    toColor?: string;
+    handout: boolean;
+    picture?: string;
+    /** Sent by the GM. */
+    byGm: boolean;
+    /** Sent from this account. */
+    mine: boolean;
+}
+
+/** What the chat sends: to everyone, or a whisper to one player's token or the GM. Handouts are the GM's. */
+export interface ChatSend
+{
+    text: string;
+    to?: string;
+    toGm?: boolean;
+    handout?: boolean;
+    picture?: File;
 }
 
 /** A group check as a phone hears of it: what to roll, and whether it has. */

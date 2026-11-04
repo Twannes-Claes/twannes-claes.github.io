@@ -24,7 +24,7 @@ const maxPictureBytes = 15 * 1024 * 1024;
 export const pictureTypes = ['image/webp', 'image/png', 'image/jpeg'];
 
 /**
- * Whether a stored file already belongs to a prop, a map, a token or a preset. A storage id is part
+ * Whether a stored file already belongs to a prop, a map, a token, a preset or a handout. A storage id is part
  * of the file's public address, so without this a host could register someone else's file as their
  * own and then delete it.
  */
@@ -54,8 +54,12 @@ async function claimed(ctx: QueryCtx, storageId: Id<'_storage'>): Promise<boolea
         .query('companions')
         .withIndex('by_avatarId', (q) => q.eq('avatarId', storageId))
         .first();
+    const handout = await ctx.db
+        .query('messages')
+        .withIndex('by_storageId', (q) => q.eq('storageId', storageId))
+        .first();
 
-    return prop !== null || map !== null || avatar !== null || preset !== null || character !== null || companion !== null;
+    return prop !== null || map !== null || avatar !== null || preset !== null || character !== null || companion !== null || handout !== null;
 }
 
 /**
@@ -94,7 +98,7 @@ export async function storedPicture(
  * When sweep runs after an upload address is made. The address lasts an hour, and the file is
  * registered seconds after it arrives, so by then anything sent with it is either kept or left.
  */
-const sweepDelay = 75 * 60 * 1000;
+export const sweepDelay = 75 * 60 * 1000;
 
 /** How old an unclaimed file must be for sweep to delete it, so a registration on its way lands. */
 const sweepGrace = 10 * 60 * 1000;

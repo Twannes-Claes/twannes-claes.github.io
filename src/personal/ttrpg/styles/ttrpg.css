@@ -60,8 +60,20 @@ html:has(.ttrpg[data-theme='light']) {
     position: relative;
     min-height: 100svh;
     color: var(--ttrpg-ink);
+    /* The text cursor in every field in the accent, lightened by the ink so it shows in both themes. */
+    caret-color: color-mix(in srgb, var(--ttrpg-accent) 60%, var(--ttrpg-ink));
+    /* The arrow in the accent, see cursorOf in Shell.tsx. Inherited, so a button or a tool that
+       sets its own keeps it. */
+    cursor: var(--ttrpg-cursor);
     font-family: 'Onest Variable', ui-sans-serif, system-ui, sans-serif;
     line-height: 1.5;
+}
+
+/* Text fields keep the system I-beam, so the caret stays easy to place. */
+.ttrpg input:not([type='range'], [type='color'], [type='checkbox'], [type='radio'], [type='file']),
+.ttrpg textarea,
+.ttrpg [contenteditable='true'] {
+    cursor: text;
 }
 
 /* A floating panel over the map, the one surface every toolbar and dialog uses. */
@@ -1051,7 +1063,7 @@ html:has(.ttrpg[data-theme='light']) {
 
 .ttrpg-picks__quick button:disabled {
     opacity: 0.4;
-    cursor: default;
+    cursor: var(--ttrpg-cursor);
 }
 
 .ttrpg-pick {
@@ -1156,6 +1168,445 @@ html:has(.ttrpg[data-theme='light']) {
 /* The log scrolls on its own, so the form and the tray stay put. */
 .ttrpg-dice__log {
     max-height: 13rem;
+}
+
+/* The chat, see ChatPanel.tsx: bubbles, the screen's own on the right in the accent. Its log
+   scrolls on its own, like the dice log. */
+/* Held to the panel's width, or a long word or the field would widen it. */
+.ttrpg-chat .ttrpg-popover__scroll {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.ttrpg-chat__log {
+    height: 16rem;
+}
+
+/* At the bottom, like any chat. The log's fixed height would otherwise stretch every row. */
+.ttrpg-chat__lines {
+    display: grid;
+    align-content: end;
+    gap: 6px;
+}
+
+.ttrpg-chat__line {
+    display: grid;
+    justify-items: start;
+    gap: 2px;
+    max-width: 85%;
+}
+
+.ttrpg-chat__line--mine {
+    justify-self: end;
+    justify-items: end;
+}
+
+.ttrpg-chat__name {
+    margin-top: 10px;
+    padding: 0 0.6rem;
+    color: color-mix(in srgb, var(--ttrpg-who) 60%, var(--ttrpg-ink));
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+/* In the sender's colour, see who in ChatPanel.tsx, darkened so white text reads on any ring. */
+.ttrpg-chat__bubble {
+    padding: 0.5rem 0.85rem;
+    border-radius: 16px 16px 16px 4px;
+    background: color-mix(in srgb, var(--ttrpg-who) 70%, #000);
+    color: #fff;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.ttrpg-chat__line--mine .ttrpg-chat__bubble {
+    border-radius: 16px 16px 4px;
+}
+
+/* Only the GM and one player see a whisper: a bubble in the sender's colour, hushed in italics,
+   with both ends named above it in their own colours. */
+.ttrpg-chat__ends {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.ttrpg-chat__ends svg {
+    font-size: 0.7em;
+    opacity: 0.75;
+}
+
+.ttrpg-chat__end {
+    color: color-mix(in srgb, var(--ttrpg-to) 60%, var(--ttrpg-ink));
+}
+
+/* Hushed: the sender's colour faded into the panel, in the theme's ink, like a lowered voice. */
+.ttrpg-chat__line--whisper .ttrpg-chat__bubble {
+    background: color-mix(in srgb, var(--ttrpg-who) 30%, transparent);
+    color: var(--ttrpg-ink);
+    font-style: italic;
+}
+
+/* A handout in the chat: its picture as large as a photo in any chat, or a letter's label. */
+.ttrpg-chat__handout {
+    display: grid;
+    gap: 0.35rem;
+    padding: 0.35rem;
+    text-align: left;
+    cursor: zoom-in;
+}
+
+.ttrpg-chat__handout img {
+    max-width: 100%;
+    max-height: 10rem;
+    border-radius: 12px;
+    object-fit: cover;
+}
+
+.ttrpg-chat__letter {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.2rem 0.4rem 0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+/* A letter keeps its lines but shows only its start until opened. A margin rather than padding,
+   which would show a sliver of the next line. */
+.ttrpg-chat__caption {
+    display: -webkit-box;
+    margin: 0 0.4rem 0.2rem;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+}
+
+/* Two choices side by side, like a switch: the chat or its handouts, a picture or a letter. */
+.ttrpg-chat__tabs {
+    display: flex;
+    flex: 1;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 999px;
+    background: var(--ttrpg-well);
+}
+
+.ttrpg-chat__tabs--top {
+    flex: none;
+    margin: 0 12px 6px;
+}
+
+.ttrpg-chat__tabs button {
+    display: inline-flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.7rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ttrpg-muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.ttrpg-chat__tabs button[aria-pressed='true'] {
+    background: var(--ttrpg-accent);
+    color: var(--ttrpg-on-accent);
+}
+
+.ttrpg-chat__count {
+    min-width: 1.2rem;
+    padding: 0 0.3rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, currentColor 20%, transparent);
+    font-size: 0.7rem;
+}
+
+/* Every handout, newest first, as cards two to a row: the picture, or the letter's start on a
+   sheet of paper, then what it is and who it is for. */
+.ttrpg-chat__shelf {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.ttrpg-chat__item {
+    display: grid;
+    width: 100%;
+    overflow: hidden;
+    padding: 0;
+    border: 1px solid var(--ttrpg-edge);
+    border-radius: 12px;
+    background: var(--ttrpg-well);
+    color: var(--ttrpg-ink);
+    text-align: left;
+    cursor: zoom-in;
+    transition:
+        border-color 0.15s,
+        transform 0.15s;
+}
+
+.ttrpg-chat__item:hover {
+    border-color: var(--ttrpg-accent);
+    transform: translateY(-1px);
+}
+
+.ttrpg-chat__thumb {
+    display: block;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+}
+
+/* A letter's first lines, small on paper, like the note itself lying on the table. Paper colours
+   rather than the theme's, so it reads the same in light and dark. */
+.ttrpg-chat__note {
+    display: -webkit-box;
+    overflow: hidden;
+    padding: 0.55rem 0.65rem;
+    background:
+        radial-gradient(circle at 20% 15%, rgb(255 255 255 / 0.35), transparent 60%),
+        linear-gradient(160deg, #f4ead2, #e3d3ad);
+    box-shadow: inset 0 0 18px rgb(120 90 40 / 0.25);
+    color: #3b3024;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 0.7rem;
+    font-style: italic;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 6;
+}
+
+.ttrpg-chat__about {
+    display: grid;
+    gap: 2px;
+    padding: 0.4rem 0.55rem 0.5rem;
+}
+
+.ttrpg-chat__about strong,
+.ttrpg-chat__about small {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.ttrpg-chat__about strong {
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.ttrpg-chat__about small {
+    color: var(--ttrpg-muted);
+    font-size: 0.7rem;
+}
+
+.ttrpg-chat__about svg {
+    flex: none;
+    font-size: 0.85em;
+    opacity: 0.7;
+}
+
+.ttrpg-chat__form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+}
+
+/* Who it goes to, small above the field, as most go to everyone. */
+.ttrpg-chat__to {
+    justify-self: start;
+    padding: 0.2rem 0.4rem;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ttrpg-muted);
+    font-size: 0.8rem;
+}
+
+/* The field and its buttons on one line, like any chat. */
+.ttrpg-chat__compose {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* A player's picture picked to send, over the line, with a way to take it off. */
+.ttrpg-chat__attached {
+    position: relative;
+    justify-self: start;
+}
+
+.ttrpg-chat__attached img {
+    display: block;
+    max-width: 8rem;
+    max-height: 6rem;
+    border-radius: 10px;
+}
+
+.ttrpg-chat__attached button {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: rgb(0 0 0 / 0.6);
+    color: #fff;
+}
+
+/* The GM's handout, written in its own card rather than the chat's one line. */
+.ttrpg-chat__new {
+    display: grid;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid var(--ttrpg-edge);
+    border-radius: 23px;
+}
+
+.ttrpg-chat__new-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.ttrpg-chat__new-head > button {
+    margin-left: auto;
+}
+
+/* Where the picture goes, a dashed box until one is picked, then the picture itself. */
+.ttrpg-chat__drop {
+    display: grid;
+    place-items: center;
+    gap: 6px;
+    padding: 14px;
+    border: 1px dashed var(--ttrpg-edge);
+    border-radius: 12px;
+    color: var(--ttrpg-muted);
+    font-size: 0.8rem;
+    text-align: center;
+    cursor: pointer;
+}
+
+.ttrpg-chat__drop:hover {
+    color: var(--ttrpg-ink);
+}
+
+.ttrpg-chat__drop svg {
+    font-size: 1.5rem;
+}
+
+.ttrpg-chat__drop img {
+    max-width: 100%;
+    max-height: 8rem;
+    border-radius: 8px;
+}
+
+/* Width 0 and grown, as a field's own width would push the send button out. */
+.ttrpg-chat__compose input,
+.ttrpg-chat__new input,
+.ttrpg-chat__new textarea {
+    flex: 1;
+    width: 0;
+    min-height: 40px;
+    padding: 0.5rem 0.9rem;
+    border: 1px solid var(--ttrpg-edge);
+    border-radius: 20px;
+    background: var(--ttrpg-well);
+    color: var(--ttrpg-ink);
+    font-size: 0.875rem;
+}
+
+.ttrpg-chat__new input {
+    width: 100%;
+}
+
+.ttrpg-chat__new textarea {
+    width: 100%;
+    border-radius: 12px;
+    resize: none;
+}
+
+/* A phone zooms in on a field under 16px when it gets focus. */
+@media (pointer: coarse) {
+    .ttrpg-chat__compose input,
+    .ttrpg-chat__new input,
+    .ttrpg-chat__new textarea {
+        font-size: 1rem;
+    }
+}
+
+.ttrpg-chat__send:not(:disabled) {
+    background: var(--ttrpg-accent);
+    color: var(--ttrpg-on-accent);
+}
+
+.ttrpg-chat__button {
+    position: relative;
+}
+
+/* Something unread, see useUnread in ChatPanel.tsx. */
+.ttrpg-chat__dot {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #d9534f;
+    box-shadow: 0 0 0 2px var(--ttrpg-bg);
+}
+
+/* A handout full screen, on the whole screen rather than the panel, closed by a tap. */
+.ttrpg-handout {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    padding: max(16px, env(safe-area-inset-top)) 16px;
+    border: 0;
+    background: transparent;
+    cursor: zoom-out;
+}
+
+.ttrpg-handout::backdrop {
+    background: rgb(0 0 0 / 0.85);
+}
+
+.ttrpg-handout img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+/* A letter full screen: a sheet of paper on the table, in paper colours whatever the theme. */
+.ttrpg-handout__text {
+    width: min(34rem, 100%);
+    max-height: 100%;
+    overflow: auto;
+    padding: 2.25rem 2.5rem;
+    border-radius: 4px;
+    background:
+        radial-gradient(circle at 15% 10%, rgb(255 255 255 / 0.4), transparent 55%),
+        linear-gradient(160deg, #f6eed8, #e3d3ad);
+    box-shadow:
+        inset 0 0 40px rgb(120 90 40 / 0.3),
+        0 18px 50px rgb(0 0 0 / 0.55);
+    color: #3b3024;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 1.15rem;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    cursor: var(--ttrpg-cursor);
 }
 
 /* The newest roll's dice, see Tray in DicePanel.tsx, in a dice tray: a raised rim, lit along its
@@ -2294,7 +2745,8 @@ details[open]::details-content {
     margin-top: 4px;
     padding: 4px;
     border: 1px solid var(--ttrpg-edge);
-    border-radius: 12px;
+    /* The options' 8px plus the 4px around them and the border. */
+    border-radius: 13px;
     background: var(--ttrpg-bg);
     box-shadow: 0 16px 40px rgb(0 0 0 / 0.5);
 }
@@ -2635,7 +3087,7 @@ details[open]::details-content {
     align-items: center;
     padding: 2px;
     border: 1px solid var(--ttrpg-edge);
-    border-radius: 12px;
+    border-radius: 13px;
     background: var(--ttrpg-well);
 }
 
@@ -3171,10 +3623,11 @@ button.ttrpg-row__main {
 
 /* A row that opens has its card's frame while closed too, unseen, so opening only colours it in
    and nothing in the row moves. The buttons at the end keep clear of the border. */
+/* Rounded by the buttons' 10px plus the 4px beside them and the border, so the curves nest. */
 .ttrpg-row:has(> button.ttrpg-row__main[aria-expanded]) {
     padding-right: 4px;
     border: 1px solid transparent;
-    border-radius: 12px;
+    border-radius: 15px;
     transition:
         background-color 150ms var(--ttrpg-ease),
         border-color 150ms var(--ttrpg-ease);
@@ -3189,6 +3642,11 @@ button.ttrpg-row__main {
 
 .ttrpg-row--open > button.ttrpg-row__main {
     background: none;
+}
+
+/* Against the row's border, so its curve is the row's less the border. */
+.ttrpg-row:has(> button.ttrpg-row__main[aria-expanded]) > .ttrpg-row__main {
+    border-radius: 14px;
 }
 
 /* An opened monster or player: tabs for what to change, and the one picked, see RowEditor.tsx. */
@@ -3528,18 +3986,19 @@ button.ttrpg-row__main {
     cursor: pointer;
 }
 
-.ttrpg-preset__ring input::-webkit-color-swatch-wrapper {
+/* A colour field's swatch: the field's 10px less its 3px padding and border, so the curves nest. */
+.ttrpg input[type='color']::-webkit-color-swatch-wrapper {
     padding: 0;
 }
 
-.ttrpg-preset__ring input::-webkit-color-swatch {
+.ttrpg input[type='color']::-webkit-color-swatch {
     border: 0;
-    border-radius: 7px;
+    border-radius: 6px;
 }
 
-.ttrpg-preset__ring input::-moz-color-swatch {
+.ttrpg input[type='color']::-moz-color-swatch {
     border: 0;
-    border-radius: 7px;
+    border-radius: 6px;
 }
 
 .ttrpg-preset__panes {
@@ -3626,6 +4085,32 @@ button.ttrpg-row__main {
     max-height: calc(100dvh / var(--ttrpg-ui, 1) - 32px);
     translate: none;
     animation: ttrpg-menu-in 120ms var(--ttrpg-ease);
+}
+
+/* The right-click menu on a chat message, see MessageMenu: as small as its one item. */
+/* Rounded by the item's 8px plus the 4px around it and the border, so the two curves run alongside. */
+.ttrpg-message-menu {
+    width: auto;
+    padding: 4px;
+    border-radius: 13px;
+}
+
+.ttrpg-message-menu__item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.75rem;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: color-mix(in srgb, var(--ttrpg-accent) 45%, var(--ttrpg-ink));
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.ttrpg-message-menu__item:hover,
+.ttrpg-message-menu__item:focus-visible {
+    background: color-mix(in srgb, var(--ttrpg-accent) 25%, transparent);
 }
 
 @keyframes ttrpg-menu-in {

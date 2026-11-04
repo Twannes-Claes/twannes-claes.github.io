@@ -1155,6 +1155,33 @@ last 50 messages per session, like the dice log, rate limited in `convex/limits.
 their pictures by End session. An unread dot on the button and a short buzz on a phone. Rolls stay
 in the dice log.
 
+- **Built.** A chat button beside the dice on the phones, the table screen and the GM view's dock
+  and Player view opens `components/ChatPanel.tsx`: bubbles, this screen's own on the right, in
+  the sender's colour on every screen, a player's ring or the GM colour, and
+  one line to write on, with the sender's name over a run of theirs, You for this screen's own. A
+  whisper is hushed, the sender's colour faded into the panel and in italics, under "You → Brom",
+  each name in its own colour. A small select over the line whispers: a player to the GM or another
+  player, the GM to one player. The GM sees every whisper, the players' to each other too unless
+  the table setting Whispers keeps those between them (`privateWhispers` on the session), and
+  deletes any message by right-clicking it (`remove` in `convex/chat.ts`). A player sends a
+  picture too, with a line or alone, through the picture button by the line: shrunk to 1600 px,
+  uploaded to `chat.uploadUrl`, ten every ten minutes (`picture` in `convex/limits.ts`), and kept
+  with the chat's 50 messages, not on the Handouts tab. The GM's quill swaps the line for a New handout card: Picture or Letter, then
+  only that one's field (a picture with a caption, or a letter), and Send to whoever is picked.
+  The picture is shrunk to 2048 px and uploaded like a prop. In the chat a handout shows its
+  picture or a letter's label, and opens full screen in a `<dialog>`. A Chat and Handouts switch
+  over the log shows every handout on its own, newest first, with who it is for. A player who joins
+  again on a new sign-in still sees their own lines on the right, known by their character. The GM
+  colour is a table setting (`gmColor` on the session, `gmColorOf` in `convex/play.ts`), picked
+  like a ring and the app's purple until then: the GM's chat, pings, rulers and default pen, the
+  same on every screen. Each screen's own accent stays for its buttons and panels.
+  `convex/chat.ts` keeps the last 50 messages and, apart from them, the last 30 handouts in the
+  `messages` table, deleting a dropped handout's picture, and filters whispers and one player's
+  handouts on the server: a player gets only those they sent or got, the table screen and the Player view only
+  what is for everyone. Sends are 30 a minute (`chat` in `convex/limits.ts`). `useUnread` puts a
+  dot on the button for what came in while the panel was closed and buzzes a phone. End session
+  and deleting the session clear it, pictures too. The demo chats in the tab.
+
 **28. Mist.** Areas of mist the GM puts on the map, drawn like Reveal's polygon or circle, with a
 colour and a density: grey haze, green poison, purple arcane. It drifts like the fog's smoke and
 shows on every screen, over the fog. Whether thick mist blocks sight shows in testing. Saved with

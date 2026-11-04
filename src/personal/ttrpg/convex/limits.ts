@@ -18,6 +18,10 @@ const rates = {
     hit: { max: 60, window: minute },
     /** Dice rolls, see dice.ts. */
     roll: { max: 30, window: minute },
+    /** Chat messages and handouts, see chat.ts. */
+    chat: { max: 30, window: minute },
+    /** A player's pictures in the chat, on top of chat: each one is stored, see chat.uploadUrl. */
+    picture: { max: 10, window: 10 * minute },
     /** Paths, rulers and lines, sent every 150 ms while dragging, see view.ts. */
     drag: { max: 600, window: minute },
 };
