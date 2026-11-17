@@ -153,5 +153,7 @@ export function cleanStats(stats: Stats): Stats
         perception: clean(stats.perception, statLimits.perception),
         // Optional, left out when not given, and below zero too for a clumsy character.
         ...(stats.initiative === undefined || !Number.isFinite(stats.initiative) ? {} : { initiative: clean(stats.initiative, 30, -20) }),
+        // Left out on the ground, so a token at 0 shows no badge.
+        ...(clean(stats.elevation ?? 0, 9999) > 0 ? { elevation: clean(stats.elevation ?? 0, 9999) } : {}),
     };
 }

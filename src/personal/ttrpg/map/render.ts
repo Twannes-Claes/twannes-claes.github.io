@@ -1,10 +1,10 @@
-import { faEyeSlash, faShield, faSkull, type IconDefinition } from '@fortawesome/free-solid-svg-icons';
+import { faArrowUp, faEyeSlash, faShield, faSkull, type IconDefinition } from '@fortawesome/free-solid-svg-icons';
 
 import type { Cell, CreatureSize, Decal, Grid, HealthState, Point, Scenario, Token } from '../types';
 import { conditionKind, type ConditionKind } from '../content/conditions.ts';
 
 import { toWorld, type Camera } from './camera.ts';
-import { accent, blood, bloodDark, danger, door as doorColour, faded, ground, heal, highlight, ink, defaultOutside, steel, tempHp } from './colours.ts';
+import { accent, blood, bloodDark, danger, door as doorColour, faded, ground, heal, highlight, ink, defaultOutside, lift, steel, tempHp } from './colours.ts';
 import { drawFog, drawMists, type FogLayers, type FogLook } from './fog.ts';
 import { distance, type Area } from './geometry.ts';
 import { cellAt, cellCenter, cellCorners, hexRadius } from './grid.ts';
@@ -905,6 +905,8 @@ function drawToken(
     if (token.stuck)
         drawStuck(ctx, token, radius, token.stuck);
 
+    drawElevation(ctx, token, base);
+
     // Every value over every badge, so the next badge down never covers one.
     const badges = conditionBadges(token, base);
 
@@ -914,6 +916,66 @@ function drawToken(
     for (const badge of badges)
         drawBadgeValue(ctx, badge);
 
+}
+
+/**
+ * A token's elevation on a small plate set into the top of its ring, in the look of the HP plate
+ * under it in the token's colour: the page's tooltip shadow, an edge like its ring on a wash of
+ * it, the arrow in that colour lifted, the feet in ink. Sized by the token like its condition badges, which are drawn over it where they meet. Drawn again over a
+ * target's or a picked token's ring, see map/view.ts, without its shadow, which is there already.
+ * Nothing on the ground.
+ */
+export function drawElevation(ctx: CanvasRenderingContext2D, { x, y, elevation, color }: Token, radius: number, shadow = true)
+{
+    if (!elevation)
+        return;
+
+    const fontSize = radius * 0.21;
+    const iconSize = fontSize * 0.85;
+    const height = fontSize * 1.75;
+    const pad = fontSize * 0.55;
+    const gap = fontSize * 0.3;
+    const feet = String(elevation);
+    const unit = ' ft';
+
+    ctx.font = `600 ${fontSize}px 'JetBrains Mono Variable', ui-monospace, monospace`;
+
+    const feetWidth = ctx.measureText(feet).width;
+    const width = pad + iconSize + gap + feetWidth + ctx.measureText(unit).width + pad;
+    const left = x - width / 2;
+    const middle = y - radius;
+    const top = middle - height / 2;
+    const plate = new Path2D();
+
+    plate.roundRect(left, top, width, height, height * 0.3);
+
+    ctx.save();
+
+    if (shadow)
+    {
+        ctx.shadowColor = 'rgb(0 0 0 / 0.5)';
+        ctx.shadowBlur = height * 0.6;
+        ctx.shadowOffsetY = height * 0.2;
+    }
+
+    ctx.fillStyle = ground;
+    ctx.fill(plate);
+    ctx.restore();
+
+    ctx.fillStyle = faded(color, 0.35);
+    ctx.fill(plate);
+    ctx.lineWidth = radius * 0.03;
+    ctx.strokeStyle = color;
+    ctx.stroke(plate);
+
+    ctx.fillStyle = lift(color);
+    drawIcon(ctx, faArrowUp, { x: left + pad + iconSize / 2, y: middle }, iconSize);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = ink;
+    ctx.fillText(feet, left + pad + iconSize + gap, middle + fontSize * 0.05);
+    ctx.fillStyle = faded(ink, 0.6);
+    ctx.fillText(unit, left + pad + iconSize + gap + feetWidth, middle + fontSize * 0.05);
 }
 
 /** A token across a wall, see stuckAt in map/spawn.ts: a red dashed ring for the GM to see, faded by amount. */

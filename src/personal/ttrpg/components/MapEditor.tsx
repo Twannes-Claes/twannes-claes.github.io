@@ -515,7 +515,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
             return Promise.resolve();
         },
-        setStats: (id, stats) => changeToken(id, (token) => ({ ...token, ...cleanStats(stats) })),
+        setStats: (id, stats) => changeToken(id, (token) => ({ ...token, ...cleanStats(stats), elevation: cleanStats(stats).elevation })),
         setConditions: (id, conditions) => changeToken(id, (token) => ({ ...token, conditions: cleanConditions(demoSystem, conditions) })),
         setSize: (id, size) => changeToken(id, (token) => ({ ...token, size, ...resizedSpot(active, token, size, shown) })),
     };
@@ -541,7 +541,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
 
     // The test players off a live map, changed here in the tab.
     const testPlayers: Pick<Live, 'setStats' | 'setConditions' | 'setSize'> = {
-        setStats: (id, stats) => changeToken(id, (token) => ({ ...token, ...cleanStats(stats), initiative: cleanStats(stats).initiative, conditions: conditionsAt(token.conditions, cleanStats(stats).hp) })),
+        setStats: (id, stats) => changeToken(id, (token) => ({ ...token, ...cleanStats(stats), initiative: cleanStats(stats).initiative, elevation: cleanStats(stats).elevation, conditions: conditionsAt(token.conditions, cleanStats(stats).hp) })),
         setConditions: (id, conditions) => changeToken(id, (token) => ({ ...token, conditions })),
         setSize: (id, size) => changeToken(id, (token) => ({ ...token, size, ...resizedSpot(active, token, size, shown) })),
     };

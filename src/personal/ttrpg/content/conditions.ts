@@ -8,6 +8,7 @@ import {
     faBed,
     faBolt,
     faBrain,
+    faBullseye,
     faCircleQuestion,
     faCloud,
     faCrosshairs,
@@ -66,6 +67,7 @@ const pf2eMax = 9;
 const dnd5e: ConditionKind[] = [
     { id: 'blinded', name: 'Blinded', icon: faEyeSlash },
     { id: 'charmed', name: 'Charmed', icon: faHeart },
+    { id: 'concentration', name: 'Concentration', icon: faBullseye },
     { id: 'deafened', name: 'Deafened', icon: faEarDeaf },
     { id: 'exhaustion', name: 'Exhaustion', icon: faBatteryQuarter, max: 6 },
     { id: 'frightened', name: 'Frightened', icon: faGhost },

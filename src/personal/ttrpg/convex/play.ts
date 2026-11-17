@@ -314,7 +314,7 @@ export const tokens = query({
 /** A token as the host's screen gets it, everything but its storage and bookkeeping. */
 export function tokenOf(doc: Doc<'tokens'>): Token
 {
-    const { kind, name, color, size, speed, avatar, x, y, path, movedAt, hidden, tray, conditions } = doc;
+    const { kind, name, color, size, speed, avatar, x, y, path, movedAt, hidden, tray, conditions, elevation } = doc;
     const { hp, maxHp, tempHp, ac, perception, initiative, downs, presetId } = doc;
 
     return {
@@ -338,6 +338,7 @@ export function tokenOf(doc: Doc<'tokens'>): Token
         perception,
         initiative,
         conditions,
+        elevation,
         downs,
         presetId,
         summonOf: doc.summonOf,
@@ -373,6 +374,7 @@ export const setStats = mutation({
         ac: v.number(),
         perception: v.number(),
         initiative: v.optional(v.number()),
+        elevation: v.optional(v.number()),
     },
     handler: async (ctx, { tokenId, ...stats }) =>
     {
@@ -389,8 +391,8 @@ export const setStats = mutation({
 
         const clean = cleanStats(stats);
 
-        // An initiative bonus left out is cleared, as the player emptied the field.
-        await ctx.db.patch('tokens', tokenId, { ...clean, initiative: clean.initiative, conditions: conditionsAt(token.conditions, clean.hp) });
+        // An initiative bonus or a height left out is cleared, as the field was emptied.
+        await ctx.db.patch('tokens', tokenId, { ...clean, initiative: clean.initiative, elevation: clean.elevation, conditions: conditionsAt(token.conditions, clean.hp) });
 
         return null;
     },
@@ -1927,7 +1929,7 @@ export const marks = query({
 
         return docs
             .filter((doc) => doc.scenarioId === session.activeScenarioId && (asPlayer === true || doc.userId !== userId))
-            .map(({ _id, kind, from, to, color }) => ({ id: _id, kind, from, to, color }));
+            .map(({ _id, kind, from, to, rise, color }) => ({ id: _id, kind, from, to, rise, color }));
     },
 });
 
@@ -1944,6 +1946,7 @@ export const mark = mutation({
                 kind: v.union(v.literal('ruler'), v.literal('area'), v.literal('cone')),
                 from: v.object({ x: v.number(), y: v.number() }),
                 to: v.object({ x: v.number(), y: v.number() }),
+                rise: v.optional(v.number()),
             }),
             v.null(),
         ),
@@ -1976,6 +1979,7 @@ export const mark = mutation({
             scenarioId: session.activeScenarioId,
             userId,
             ...mark,
+            rise: mark.rise === undefined || !Number.isFinite(mark.rise) ? undefined : Math.min(9999, Math.abs(Math.round(mark.rise))),
             color: token?.color ?? gmColorOf(session),
             at: Date.now(),
         };

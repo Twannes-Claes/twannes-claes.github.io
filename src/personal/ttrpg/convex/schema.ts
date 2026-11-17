@@ -88,6 +88,8 @@ export const tokenValidator = v.object({
     initiative: v.optional(v.number()),
     /** For everyone to see, kept to the session's list, see cleanConditions. */
     conditions: v.optional(v.array(conditionValidator)),
+    /** Feet off the ground, for everyone to see, like the conditions. */
+    elevation: v.optional(v.number()),
     /** A monster that goes down at 0 HP instead of dying. For the host, like the numbers. */
     downs: v.optional(v.boolean()),
     /** The preset a monster was placed from, for its stat block in the GM view. */
@@ -348,6 +350,7 @@ export default defineSchema({
         kind: v.union(v.literal('ruler'), v.literal('area'), v.literal('cone')),
         from: v.object({ x: v.number(), y: v.number() }),
         to: v.object({ x: v.number(), y: v.number() }),
+        rise: v.optional(v.number()),
         /** The player's ring colour. Missing for the host, drawn in the GM's colour. */
         color: v.optional(v.string()),
         /** The last change, so one left by a closed phone still goes, see dropMark. */

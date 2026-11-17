@@ -27,6 +27,7 @@ import {
     badgeName,
     conditionBadgeAt,
     drawnAcross,
+    drawElevation,
     drawHealth,
     drawHit,
     drawPill,
@@ -1093,9 +1094,11 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         {
             for (const token of scene.tokens)
             {
-                if (targets.includes(token.id))
-                    drawTarget(context, token, shownRadius(scenario.grid, token), camera.zoom);
+                if (!targets.includes(token.id))
+                    continue;
 
+                drawTarget(context, token, shownRadius(scenario.grid, token), camera.zoom);
+                drawElevation(context, token, shownRadius(scenario.grid, token), false);
             }
         }
 
@@ -1103,9 +1106,11 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         {
             for (const token of scene.tokens)
             {
-                if (selection.includes(token.id))
-                    drawSelected(context, token, shownRadius(scenario.grid, token), camera.zoom);
+                if (!selection.includes(token.id))
+                    continue;
 
+                drawSelected(context, token, shownRadius(scenario.grid, token), camera.zoom);
+                drawElevation(context, token, shownRadius(scenario.grid, token), false);
             }
         }
 
@@ -1417,18 +1422,24 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         );
     };
 
-    const toolPointer = (event: PointerEvent, current: Scenario): ToolPointer => ({
-        world: toWorld(camera, local(event)),
-        free: event.altKey,
-        straight: event.shiftKey,
-        zoom: camera.zoom,
-        scenario: current,
-        seen: (point) => peek || seenGround(point),
-        monsters: tokens.filter((token) => token.kind === 'npc'),
-        system,
-        touch: event.pointerType !== 'mouse',
-        onToken: tokenAt(local(event), current) !== undefined,
-    });
+    const toolPointer = (event: PointerEvent, current: Scenario): ToolPointer =>
+    {
+        const under = tokenAt(local(event), current);
+
+        return {
+            world: toWorld(camera, local(event)),
+            free: event.altKey,
+            straight: event.shiftKey,
+            zoom: camera.zoom,
+            scenario: current,
+            seen: (point) => peek || seenGround(point),
+            monsters: tokens.filter((token) => token.kind === 'npc'),
+            system,
+            touch: event.pointerType !== 'mouse',
+            onToken: under !== undefined,
+            elevation: under?.elevation,
+        };
+    };
 
     /**
      * A tool's change shows at once, before the page passes the scenario back, so a quick

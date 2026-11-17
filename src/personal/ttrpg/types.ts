@@ -143,6 +143,8 @@ export interface Token
     state?: HealthState;
     /** What it suffers from, for everyone to see, see Condition. */
     conditions?: Condition[];
+    /** Feet off the ground, like a flying one, for everyone to see. The ruler counts it, see withRise. */
+    elevation?: number;
     /** A monster that goes down at 0 HP like a player instead of dying. Only for the GM. */
     downs?: boolean;
     /** The preset a monster was placed from, for its stat block, see Preset. */
@@ -199,6 +201,8 @@ export interface Mark
     kind: 'ruler' | 'area' | 'cone';
     from: Point;
     to: Point;
+    /** A ruler between tokens at different heights: the feet between them, see withRise. */
+    rise?: number;
 }
 
 /** Another screen's mark, in its player's ring colour, or the GM's without one. */
@@ -287,6 +291,8 @@ export interface Stats
     perception: number;
     /** A player's initiative bonus, which they may leave out. */
     initiative?: number;
+    /** Feet off the ground, left out on the ground, see Token. */
+    elevation?: number;
 }
 
 /** A stored picture: where it loads from, and its size in pixels. */

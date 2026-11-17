@@ -40,7 +40,7 @@ import {
     withoutRoll,
     withRoll,
 } from './initiative.ts';
-import { extendPath, pathBlocked, pathFeet } from './path.ts';
+import { extendPath, pathBlocked, pathFeet, withRise } from './path.ts';
 import { initiativeBonus } from './presets.ts';
 import { placedSize, propAt, snapCenter, snapSize } from './props.ts';
 import {
@@ -178,6 +178,10 @@ assert.equal(pathFeet(base, diagonal(3)), 20);
 assert.equal(pathFeet(base, diagonal(4)), 30);
 // With equal diagonals, every diagonal is one cell.
 assert.equal(pathFeet({ ...base, diagonals: 'equal' }, diagonal(4)), 20);
+// Height is a third direction: 30 ft up and 20 ft across is 30 plus every second of 4 cells.
+assert.equal(withRise(base, 20, 30), 40);
+assert.equal(withRise({ ...base, diagonals: 'equal' }, 20, 30), 30);
+assert.equal(withRise({ ...base, type: 'none' }, 30, 40), 50);
 // Diagonal, straight, diagonal: the straight step does not reset the count.
 assert.equal(
     pathFeet(base, [

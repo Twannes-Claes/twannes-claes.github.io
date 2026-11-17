@@ -70,6 +70,7 @@ export function StatsForm({ token, onSave }: StatsFormProps)
             perception: number('perception'),
             // Empty leaves it out, as a monster's comes from its stat block.
             ...(initiative === '' ? {} : { initiative: Number(initiative) }),
+            elevation: number('elevation'),
         }))
             .then(() => '')
             .catch((reason: Error) => reason.message);
@@ -78,7 +79,7 @@ export function StatsForm({ token, onSave }: StatsFormProps)
     return (
         // Keyed on the numbers, so a change from elsewhere, like a hit, fills the fields anew.
         <form
-            key={[token.hp, token.maxHp, token.tempHp, token.ac, token.perception, token.initiative].join()}
+            key={[token.hp, token.maxHp, token.tempHp, token.ac, token.perception, token.initiative, token.elevation].join()}
             action={save}
             className="ttrpg-stats-form ttrpg-settings"
         >
@@ -108,6 +109,10 @@ export function StatsForm({ token, onSave }: StatsFormProps)
                     <input name="initiative" type="number" inputMode="numeric" min={-20} max={30} placeholder="+0" defaultValue={token.initiative} />
                 </label>
             )}
+            <label title="Feet off the ground">
+                Elevation
+                <input name="elevation" type="number" inputMode="numeric" min={0} max={9999} step={5} placeholder="0" defaultValue={token.elevation} />
+            </label>
             {failure && (
                 <p className="ttrpg-error" role="alert">
                     {failure}

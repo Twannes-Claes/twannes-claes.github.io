@@ -69,6 +69,29 @@ export function pathFeet(grid: Grid, path: Cell[]): number
     return feet;
 }
 
+/**
+ * Feet between two tokens at different heights, from the feet across the ground and the feet
+ * between their heights. The rise counts as a third direction on the grid: in feet along the
+ * longer of the two, plus every second cell of the shorter on alternating diagonals, none on
+ * equal diagonals or a hex grid, as a diagonal step there is one cell. Without a grid, a straight
+ * line through the air.
+ */
+export function withRise(grid: Grid, across: number, rise: number): number
+{
+    if (!rise)
+        return across;
+
+    if (grid.type === 'none')
+        return Math.round(Math.hypot(across, rise));
+
+    const step = grid.feetPerCell;
+    const cells = Math.round(rise / step) * step;
+    const long = Math.max(across, cells);
+    const short = Math.min(across, cells);
+
+    return grid.type === 'square' && grid.diagonals !== 'equal' ? long + Math.floor(short / step / 2) * step : long;
+}
+
 /** Feet along a free line, for a scenario without a grid, scaled by the grid's size. */
 export function lineFeet(grid: Grid, points: Point[]): number
 {

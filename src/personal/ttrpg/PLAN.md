@@ -533,6 +533,12 @@ and counted with the same 5, 10 diagonal rule. Its pop-out, like Reveal's, also 
 grid corner in whole cells. Both show on every screen while they are dragged, in the player's ring
 colour or the GM's, see 12.
 
+From or to a token off the ground, the ruler counts the height between the two ends as a third
+direction on the grid: the longer of the two in feet, plus every second cell of the shorter with
+the 5, 10 diagonals, nothing more with equal diagonals or on a hex grid. 20 ft across to a token
+30 ft up is 40 ft. Without a grid it is a straight line through the air. See `withRise` in
+`map/path.ts`.
+
 ---
 
 ## 11. Playing a session
@@ -1290,6 +1296,17 @@ the chest, what the statue says.
 
 **34. Concentration and height.** Concentration as a condition in 5e, and a height on a token, like
 30 ft up for a flying one, shown as a small badge and counted by the ruler.
+
+- **Built.** **Concentration** is in the 5e list, and so in Other's, with a bullseye badge; it goes
+  on and off like any condition. **Elevation** is `elevation` on the token, in feet, left out on the
+  ground, and a field in Numbers under Initiative (`components/StatsForm.tsx`), so whoever sets a
+  token's numbers sets it: the GM on any token, a player on their own and their summons'. It saves
+  with them (`play.setStats`, `cleanStats`), but every screen gets it, like the conditions. The
+  token wears it on a small plate set into the top of its ring, in the ring colour, an up arrow
+  and `30 ft` (`drawElevation` in `map/render.ts`). The ruler takes the height of the token
+  under the press and under the pointer, and shares the difference as the mark's `rise`, so every
+  screen counts the same feet, even where a hidden monster is not drawn; the rule is under Measuring
+  in 10. Movement. The demo keeps it on its tokens like the numbers.
 
 #### Rulers and effects
 

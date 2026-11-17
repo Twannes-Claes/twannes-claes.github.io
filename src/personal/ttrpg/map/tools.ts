@@ -5,7 +5,7 @@ import { drawingsAt, drawLine, extendLine, maxDrawingPoints, penWidths } from '.
 import { boxOf, closestOnSegment, distance, distanceToSegment, onMap, segmentsTouch, type Area } from './geometry.ts';
 import type { MistLook } from './fog.ts';
 import { cellAt, cellCenter, cellLine, nearestCorner, snapPoint } from './grid.ts';
-import { lineFeet, pathFeet } from './path.ts';
+import { lineFeet, pathFeet, withRise } from './path.ts';
 import { fromLocal, newProp, propAt, propCorners, propHandles, snapCenter, snapSize } from './props.ts';
 import { drawPill, drawRoute, tokenRadius } from './render.ts';
 import { insidePolygon, sightSegments, visibilityPolygon } from './visibility.ts';
@@ -94,6 +94,8 @@ export interface ToolPointer
     touch?: boolean;
     /** A token is under the pointer, which a press drags before a prop under it. */
     onToken?: boolean;
+    /** That token's height, which the ruler counts, see withRise. */
+    elevation?: number;
 }
 
 /** Hears the monsters the erase tool took, once the GM said yes, see eraseTool. */
@@ -693,7 +695,7 @@ export function drawMark(ctx: CanvasRenderingContext2D, mark: Mark, zoom: number
         const { points, feet } = measure(scenario, mark.from, mark.to);
 
         drawRoute(ctx, points, zoom, colour);
-        label(`${feet} ft`, mark.to);
+        label(`${withRise(scenario.grid, feet, mark.rise ?? 0)} ft`, mark.to);
 
         return;
     }
@@ -793,13 +795,24 @@ function markTool(share: ShareMark, start: (pointer: ToolPointer) => Mark, updat
     };
 }
 
-/** The ruler: drag from one spot to another to see how far it is. */
+/**
+ * The ruler: drag from one spot to another to see how far it is, through the air from or to a
+ * token off the ground.
+ */
 function measureTool(share: ShareMark): MapTool
 {
+    // The height of the token it started on.
+    let base = 0;
+
     return markTool(
         share,
-        ({ world }) => ({ kind: 'ruler', from: world, to: world }),
-        (mark, { world }) => ({ ...mark, to: world }),
+        ({ world, elevation = 0 }) =>
+        {
+            base = elevation;
+
+            return { kind: 'ruler', from: world, to: world };
+        },
+        (mark, { world, elevation = 0 }) => ({ ...mark, to: world, rise: Math.abs(elevation - base) || undefined }),
     );
 }
 
