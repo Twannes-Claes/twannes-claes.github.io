@@ -19,6 +19,13 @@ function cursorOf(accent: string)
     return `url("data:image/svg+xml,${encodeURIComponent(arrow)}") 3 2, auto`;
 }
 
+/** Medieval's fonts, fetched the first time it is picked so Modern never loads them. */
+function loadMedievalFonts()
+{
+    void import('@fontsource-variable/alegreya');
+    void import('@fontsource-variable/cinzel');
+}
+
 /** What pops in, each with an animation of its own in styles/ttrpg.css. */
 const popsIn = [
     '.ttrpg-pop__menu',
@@ -110,12 +117,19 @@ export function Shell({ title, home = '/ttrpg', children }: ShellProps)
 {
     const root = useRef<HTMLDivElement>(null);
 
-    const { theme, accent } = useLook();
+    const { theme, style, accent } = useLook();
 
     useLeaving(root);
 
+    useEffect(() =>
+    {
+        if (style === 'medieval')
+            loadMedievalFonts();
+
+    }, [style]);
+
     return (
-        <div ref={root} className="ttrpg" data-theme={theme} style={{ '--ttrpg-accent': accent, '--ttrpg-cursor': cursorOf(accent) } as CSSProperties}>
+        <div ref={root} className="ttrpg" data-theme={theme} data-style={style} style={{ '--ttrpg-accent': accent, '--ttrpg-cursor': cursorOf(accent) } as CSSProperties}>
             <Head>
                 <title>{`${title} | TTRPG`}</title>
                 <meta name="robots" content="noindex, nofollow" />

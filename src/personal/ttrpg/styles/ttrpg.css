@@ -7,7 +7,8 @@
    screen. Each screen can pick light and its own accent, see components/useLook.ts.
    Everything is scoped under .ttrpg, because after a visit here this file stays
    loaded when the router moves on to a portfolio page. Onest and JetBrains Mono
-   are already loaded by main.tsx for the whole site.
+   are already loaded by main.tsx for the whole site. A style other than Modern is
+   one block of the same properties under a data-style, like Medieval at the end.
 --------------------------------------------------------------------------- */
 
 /* Also on the root while a TTRPG page is up, so the area around the page and
@@ -28,7 +29,17 @@ html:has(.ttrpg) {
     --ttrpg-edge: color-mix(in srgb, var(--ttrpg-ink) 12%, transparent);
     /* Sunk into a panel: fields, checkboxes, picture tiles. */
     --ttrpg-well: rgb(0 0 0 / 0.25);
+    --ttrpg-font: 'Onest Variable', ui-sans-serif, system-ui, sans-serif;
     --ttrpg-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+    /* What a style lays over its panels and dialogs, and their edge. */
+    --ttrpg-texture: none;
+    --ttrpg-border: 1px solid var(--ttrpg-edge);
+    /* Panel headings. */
+    --ttrpg-heading-font: var(--ttrpg-font);
+    --ttrpg-heading: var(--ttrpg-muted);
+    /* What is picked or on: a solid accent here, a style can give it its own fill. */
+    --ttrpg-pressed: var(--ttrpg-accent);
+    --ttrpg-pressed-shadow: none;
     --ttrpg-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 
     background: var(--ttrpg-bg);
@@ -65,7 +76,7 @@ html:has(.ttrpg[data-theme='light']) {
     /* The arrow in the accent, see cursorOf in Shell.tsx. Inherited, so a button or a tool that
        sets its own keeps it. */
     cursor: var(--ttrpg-cursor);
-    font-family: 'Onest Variable', ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--ttrpg-font);
     line-height: 1.5;
 }
 
@@ -79,7 +90,8 @@ html:has(.ttrpg[data-theme='light']) {
 /* A floating panel over the map, the one surface every toolbar and dialog uses. */
 .ttrpg-panel {
     background: var(--ttrpg-panel);
-    border: 1px solid var(--ttrpg-edge);
+    background-image: var(--ttrpg-texture);
+    border: var(--ttrpg-border);
     border-radius: 16px;
     box-shadow: 0 12px 32px rgb(0 0 0 / 0.35);
     backdrop-filter: blur(12px);
@@ -427,7 +439,8 @@ html:has(.ttrpg[data-theme='light']) {
 .ttrpg-segment[aria-current='true'],
 .ttrpg-segment[aria-selected='true'],
 .ttrpg-icon-button[aria-pressed='true'] {
-    background: var(--ttrpg-accent);
+    background: var(--ttrpg-pressed);
+    box-shadow: var(--ttrpg-pressed-shadow);
     color: var(--ttrpg-on-accent);
 }
 
@@ -455,7 +468,8 @@ html:has(.ttrpg[data-theme='light']) {
 
 .ttrpg-segment--confirm:is(:hover, :focus-visible):not(:disabled),
 .ttrpg-button--confirm:is(:hover, :focus-visible):not(:disabled) {
-    background: var(--ttrpg-accent);
+    background: var(--ttrpg-pressed);
+    box-shadow: var(--ttrpg-pressed-shadow);
     color: var(--ttrpg-on-accent);
     filter: none;
 }
@@ -478,7 +492,8 @@ html:has(.ttrpg[data-theme='light']) {
 .ttrpg-card h2,
 .ttrpg-popover__header h2,
 .ttrpg-subhead {
-    color: var(--ttrpg-muted);
+    color: var(--ttrpg-heading);
+    font-family: var(--ttrpg-heading-font);
     font-size: 0.75rem;
     font-weight: 600;
     letter-spacing: 0.08em;
@@ -1318,7 +1333,8 @@ html:has(.ttrpg[data-theme='light']) {
 }
 
 .ttrpg-chat__tabs button[aria-pressed='true'] {
-    background: var(--ttrpg-accent);
+    background: var(--ttrpg-pressed);
+    box-shadow: var(--ttrpg-pressed-shadow);
     color: var(--ttrpg-on-accent);
 }
 
@@ -1546,7 +1562,8 @@ html:has(.ttrpg[data-theme='light']) {
 }
 
 .ttrpg-chat__send:not(:disabled) {
-    background: var(--ttrpg-accent);
+    background: var(--ttrpg-pressed);
+    box-shadow: var(--ttrpg-pressed-shadow);
     color: var(--ttrpg-on-accent);
 }
 
@@ -2751,7 +2768,8 @@ details[open]::details-content {
 }
 
 .ttrpg-scenarios__maps button[aria-current='true'] {
-    background: var(--ttrpg-accent);
+    background: var(--ttrpg-pressed);
+    box-shadow: var(--ttrpg-pressed-shadow);
     color: var(--ttrpg-on-accent);
     font-weight: 600;
 }
@@ -3120,7 +3138,8 @@ details[open]::details-content {
 
 .ttrpg-condition > .ttrpg-segment[aria-pressed='true'] {
     border-color: transparent;
-    background: var(--ttrpg-accent);
+    background: var(--ttrpg-pressed);
+    box-shadow: var(--ttrpg-pressed-shadow);
 }
 
 .ttrpg-condition > .ttrpg-segment[aria-pressed='true'] > svg {
@@ -4161,9 +4180,10 @@ button.ttrpg-row__main {
     width: min(26rem, calc(100% - 32px));
     margin: auto;
     padding: 0;
-    border: 1px solid var(--ttrpg-edge);
+    border: var(--ttrpg-border);
     border-radius: 16px;
     background: var(--ttrpg-bg);
+    background-image: var(--ttrpg-texture);
     color: var(--ttrpg-ink);
     box-shadow: 0 24px 64px rgb(0 0 0 / 0.5);
 }
@@ -4749,4 +4769,88 @@ button.ttrpg-row__main {
         transition: none;
         animation: none;
     }
+}
+
+/* ---------------------------------------------------------------------------
+   Medieval
+
+   Parchment and iron-gall ink, an iron double rule round every panel, headings
+   rubricated in wax-seal red. Dark is ink-stained leather with parchment words,
+   light is the parchment itself. The fonts are loaded by Shell.tsx only once
+   this style is picked, so the fallbacks carry the first moment.
+--------------------------------------------------------------------------- */
+
+.ttrpg[data-style='medieval'],
+html:has(.ttrpg[data-style='medieval']) {
+    --ttrpg-bg: #1c1813;
+    --ttrpg-ink: #ecdfc0;
+    --ttrpg-danger: #d6604a;
+    --ttrpg-panel: color-mix(in srgb, var(--ttrpg-bg) 90%, transparent);
+    --ttrpg-edge: color-mix(in srgb, #a08158 45%, transparent);
+    --ttrpg-font: 'Alegreya Variable', Georgia, serif;
+    --ttrpg-heading-font: 'Cinzel Variable', Georgia, serif;
+    --ttrpg-heading: #d97a5f;
+    /* The frame round panels, echoed as the rim of what is pressed. */
+    --ttrpg-iron: color-mix(in srgb, #a08158 70%, transparent);
+    --ttrpg-border: 3px double var(--ttrpg-iron);
+    /* SVG noise with no size of its own, so it is drawn once at the panel's size: a tile
+       repeated at a fractional pixel ratio leaves seams. */
+    --ttrpg-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 0.24 0 0 0 0 0.15 0 0 0 0 0.06 0 0 0 0.22 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+    /* Grain, broad stains and the edges aged darker. */
+    --ttrpg-texture:
+        radial-gradient(ellipse at center, transparent 50%, rgb(40 22 6 / 0.28)),
+        var(--ttrpg-grain),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.22 0 0 0 0 0.08 0 0 0 0.5 -0.18'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23s)'/%3E%3C/svg%3E");
+    /* Picked is matte wax in the accent, pressed into the page. */
+    --ttrpg-pressed: var(--ttrpg-grain), color-mix(in srgb, var(--ttrpg-accent) 88%, #000);
+    --ttrpg-pressed-shadow: inset 0 1px 3px rgb(0 0 0 / 0.45), inset 0 0 0 1px var(--ttrpg-iron);
+}
+
+.ttrpg[data-style='medieval'][data-theme='light'],
+html:has(.ttrpg[data-style='medieval'][data-theme='light']) {
+    --ttrpg-bg: #eee0bf;
+    --ttrpg-ink: #2b2016;
+    --ttrpg-danger: #9b2418;
+    --ttrpg-edge: color-mix(in srgb, #5c4a36 35%, transparent);
+    --ttrpg-heading: #9b2418;
+    --ttrpg-iron: #4a3a2a;
+    --ttrpg-border: 4px double var(--ttrpg-iron);
+}
+
+/* Small capitals carved rather than shouted, so Cinzel stays readable at panel size. */
+.ttrpg[data-style='medieval']
+    :is(
+        .ttrpg-properties h2,
+        .ttrpg-scenarios h2,
+        .ttrpg-card h2,
+        .ttrpg-popover__header h2,
+        .ttrpg-subhead
+    ) {
+    font-size: 0.8rem;
+    letter-spacing: 0.12em;
+}
+
+.ttrpg[data-style='medieval'] .ttrpg-button {
+    letter-spacing: 0.02em;
+}
+
+/* An engraved groove, and a wax handle ringed in ink. */
+.ttrpg[data-style='medieval'] input[type='range']::-webkit-slider-runnable-track {
+    background: linear-gradient(to right, var(--ttrpg-accent) var(--fill, 0%), rgb(0 0 0 / 0.3) 0);
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.5);
+}
+
+.ttrpg[data-style='medieval'] input[type='range']::-moz-range-track {
+    background: linear-gradient(to right, var(--ttrpg-accent) var(--fill, 0%), rgb(0 0 0 / 0.3) 0);
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.5);
+}
+
+.ttrpg[data-style='medieval'] input[type='range']::-webkit-slider-thumb {
+    background: var(--ttrpg-pressed);
+    box-shadow: 0 0 0 2px var(--ttrpg-ink);
+}
+
+.ttrpg[data-style='medieval'] input[type='range']::-moz-range-thumb {
+    background: var(--ttrpg-pressed);
+    box-shadow: 0 0 0 2px var(--ttrpg-ink);
 }

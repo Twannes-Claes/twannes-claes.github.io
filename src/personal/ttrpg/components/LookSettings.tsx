@@ -19,6 +19,17 @@ export function LookSettings()
                     </button>
                 </div>
             </section>
+            <section className="ttrpg-shortcuts" aria-label="Style">
+                <h3 className="ttrpg-subhead">Style</h3>
+                <div className="ttrpg-settings__choices">
+                    <button type="button" className="ttrpg-segment" aria-pressed={look.style === 'modern'} onClick={() => look.setStyle('modern')}>
+                        Modern
+                    </button>
+                    <button type="button" className="ttrpg-segment" aria-pressed={look.style === 'medieval'} onClick={() => look.setStyle('medieval')}>
+                        Medieval
+                    </button>
+                </div>
+            </section>
             <section className="ttrpg-shortcuts" aria-label="Accent colour">
                 <h3 className="ttrpg-subhead">Accent colour</h3>
                 <RingPicker value={look.accent} onChange={look.setAccent} label="Accent colour" />

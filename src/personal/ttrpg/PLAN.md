@@ -1346,6 +1346,14 @@ and Forest, each its own fonts, panel textures, borders and colours under a `dat
 app's root in `styles/ttrpg.css`. Fonts free to use and imported by the app's pages. Optional, and
 one style first to see if it is worth the rest.
 
+- **Built.** Medieval only. Style in Look, Modern or Medieval, kept per screen by
+  `components/useLook.ts` and put on the app's root as `data-style` by `components/Shell.tsx`. In
+  `styles/ttrpg.css` it is one block of custom properties: parchment and iron-gall ink colours for
+  Dark and Light, Alegreya for words and Cinzel for headings in wax-seal red, an iron double rule
+  round panels and dialogs, and grain and stains from SVG noise. The fonts load only when it is
+  picked. The ring accent, the map, the fog and the tokens are untouched. Fantasy and Forest wait
+  until Medieval has been tried.
+
 **38. Lights.** The `.dd2vtt` light sources, for dark dungeons: outside every light the map stays
 dark even where a player sees. No darkvision or vision ranges, see Dropped.
 

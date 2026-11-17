@@ -25,6 +25,8 @@
         "@3d-dice/dice-box-threejs": "^0.0.12",
         "@auth/core": "^0.41.3",
         "@convex-dev/auth": "^0.0.96",
+        "@fontsource-variable/alegreya": "^5.3.0",
+        "@fontsource-variable/cinzel": "^5.3.0",
         "@fortawesome/fontawesome-svg-core": "6.7.2",
         "@fortawesome/free-brands-svg-icons": "6.7.2",
         "@fortawesome/free-regular-svg-icons": "6.7.2",

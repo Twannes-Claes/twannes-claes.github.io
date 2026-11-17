@@ -3,14 +3,17 @@ import { useSyncExternalStore } from 'react';
 import { colourPattern, defaultAccent, paintAccent } from '../map/colours';
 
 /*
- * How the app looks on this screen, dark or light and the accent colour, picked by each
- * person for their own phone or screen and kept in their browser, never on the server. Shell.tsx
+ * How the app looks on this screen, dark or light, the style and the accent colour, picked by
+ * each person for their own phone or screen and kept in their browser, never on the server. Shell.tsx
  * puts it on the app's root and styles/ttrpg.css does the rest. Changed in LookSettings.tsx.
  */
 
 export type Theme = 'dark' | 'light';
+/** Modern is the default. Another style is one more block in styles/ttrpg.css. */
+export type Style = 'modern' | 'medieval';
 
 const themeKey = 'ttrpg-theme';
+const styleKey = 'ttrpg-style';
 const accentKey = 'ttrpg-accent';
 /** What was picked this visit, so a pick holds even when storage is blocked. */
 const picked: Record<string, string> = {};
@@ -69,6 +72,11 @@ function readTheme(): Theme
     return read(themeKey) === 'light' ? 'light' : 'dark';
 }
 
+function readStyle(): Style
+{
+    return read(styleKey) === 'medieval' ? 'medieval' : 'modern';
+}
+
 /** Six-digit hex only, as map/colours.ts lifts it and adds see-through to it. */
 function readColour(key: string, fallback: string): string
 {
@@ -83,16 +91,19 @@ const readAccent = () => readColour(accentKey, defaultAccent);
 if (typeof window !== 'undefined')
     paintAccent(readAccent());
 
-/** This screen's theme and accent. The prerender has no storage, so it shows the default look. */
+/** This screen's theme, style and accent. The prerender has no storage, so it shows the default look. */
 export function useLook()
 {
     const theme = useSyncExternalStore(subscribe, readTheme, () => 'dark' as Theme);
+    const style = useSyncExternalStore(subscribe, readStyle, () => 'modern' as Style);
     const accent = useSyncExternalStore(subscribe, readAccent, () => defaultAccent);
 
     return {
         theme,
+        style,
         accent,
         setTheme: (next: Theme) => write(themeKey, next),
+        setStyle: (next: Style) => write(styleKey, next),
         setAccent: (next: string) => write(accentKey, next),
     };
 }
