@@ -4611,6 +4611,22 @@ button.ttrpg-row__main {
     z-index: 1;
 }
 
+/* The spell effects under a ruler or area just drawn, see SpellPicker.tsx. Clear of its end. */
+.ttrpg-spells {
+    position: absolute;
+    top: 16px;
+    display: flex;
+    gap: 2px;
+    padding: 4px;
+    translate: -50% 0;
+    pointer-events: auto;
+    animation: ttrpg-rise 150ms var(--ttrpg-ease);
+}
+
+.ttrpg-spells .ttrpg-segment {
+    padding: 0.5rem 0.65rem;
+}
+
 .ttrpg-pin {
     position: absolute;
     display: grid;

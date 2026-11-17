@@ -377,6 +377,8 @@ function Table({ sessionId, mine, frozen, fogLook, blood, secretSaves, system, f
     const tokens = useQuery(api.play.tokens, { sessionId, asPlayer: onTable });
     const fog = useQuery(api.play.fog, { sessionId });
     const ping = useQuery(api.play.ping, { sessionId });
+    const spell = useQuery(api.play.spell, { sessionId });
+    const cast = useMutation(api.play.cast);
     const lastHit = useQuery(api.play.lastHit, { sessionId, asPlayer: onTable });
     const decals = useQuery(api.play.decals, { sessionId, asPlayer: onTable });
     const hit = useMutation(api.play.hit);
@@ -818,6 +820,11 @@ function Table({ sessionId, mine, frozen, fogLook, blood, secretSaves, system, f
                         // Only a preview for the table: the move itself still checks and says what failed.
                     })}
                 ping={ping}
+                spell={spell}
+                onCast={({ kind, from, to }, element) =>
+                    void cast({ sessionId, kind, from, to, element }).catch((reason: unknown) =>
+                        message.error(explain(reason, 'That spell did not go through. Try again.')),
+                    )}
                 onPing={(at) =>
                     void sendPing({ sessionId, ...at }).catch((reason: unknown) =>
                         message.error(explain(reason, 'That ping did not go through. Try again.')),

@@ -209,6 +209,14 @@ export const remove = mutation({
         if (ping)
             await ctx.db.delete('pings', ping._id);
 
+        const cast = await ctx.db
+            .query('casts')
+            .withIndex('by_sessionId', (q) => q.eq('sessionId', sessionId))
+            .unique();
+
+        if (cast)
+            await ctx.db.delete('casts', cast._id);
+
         const hit = await ctx.db
             .query('hits')
             .withIndex('by_sessionId', (q) => q.eq('sessionId', sessionId))

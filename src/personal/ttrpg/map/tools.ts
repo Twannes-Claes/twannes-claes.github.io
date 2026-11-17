@@ -56,8 +56,11 @@ export type Change = (next: Scenario, final?: boolean) => void;
  */
 export type Reveal = (polygon: Point[], hide: boolean, scenario: Scenario) => void;
 
-/** Hears a ruler or an area as it is dragged, to show on every screen, and null once let go. */
-export type ShareMark = (mark: Mark | null) => void;
+/**
+ * Hears a ruler or an area as it is dragged, to show on every screen, and null once let go, with
+ * the mark as it was let go, which a spell effect can be cast in, see onDrawn in map/view.ts.
+ */
+export type ShareMark = (mark: Mark | null, left?: Mark) => void;
 
 /** What the draw tool and its eraser work with, see map/drawings.ts. */
 export interface Sketching
@@ -678,6 +681,9 @@ export function measure(scenario: Scenario, a: Point, b: Point): { points: Point
 /** How far above a finger its feet show while it drags a ruler or a path, in screen pixels. */
 export const fingerGap = 50;
 
+/** How far a cone opens to each side: a quarter turn in all in Pathfinder, as wide as it is long in 5e. */
+export const coneSpread = (system: GameSystem) => (system === 'pf2e' ? Math.PI / 4 : Math.atan(0.5));
+
 /**
  * A ruler or an area of effect, in its colour: the line through the cells with its feet, or the
  * circle or cone with its reach in feet. A cone has a rounded end and follows the system: as wide
@@ -711,8 +717,7 @@ export function drawMark(ctx: CanvasRenderingContext2D, mark: Mark, zoom: number
     else
     {
         const angle = Math.atan2(to.y - from.y, to.x - from.x);
-        // To each side: a quarter turn in all in Pathfinder, as wide as it is long in 5e.
-        const spread = system === 'pf2e' ? Math.PI / 4 : Math.atan(0.5);
+        const spread = coneSpread(system);
 
         ctx.moveTo(from.x, from.y);
         ctx.arc(from.x, from.y, reach, angle - spread, angle + spread);
@@ -746,14 +751,14 @@ function markTool(share: ShareMark, start: (pointer: ToolPointer) => Mark, updat
     // Where a finger dragging it is now, which the feet follow; none with a mouse.
     let finger: Point | undefined;
 
-    const drop = () =>
+    const drop = (left?: Mark) =>
     {
         const had = mark !== null;
 
         mark = null;
 
         if (had)
-            share(null);
+            share(null, left);
 
         return had;
     };
@@ -784,8 +789,8 @@ function markTool(share: ShareMark, start: (pointer: ToolPointer) => Mark, updat
 
             mark = next;
         },
-        up: () => void drop(),
-        cancel: drop,
+        up: () => void drop(mark ?? undefined),
+        cancel: () => drop(),
         draw: (ctx, zoom, scenario) =>
         {
             if (mark)

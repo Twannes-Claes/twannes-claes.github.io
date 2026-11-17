@@ -112,6 +112,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const tokens = useQuery(api.play.tokens, following ? { sessionId: id } : 'skip');
     const fog = useQuery(api.play.fog, following ? { sessionId: id } : 'skip');
     const ping = useQuery(api.play.ping, following ? { sessionId: id } : 'skip');
+    const spell = useQuery(api.play.spell, following ? { sessionId: id } : 'skip');
     const lastHit = useQuery(api.play.lastHit, following ? { sessionId: id } : 'skip');
     const decals = useQuery(api.play.decals, following ? { sessionId: id } : 'skip');
     const drafts = useQuery(api.play.drafts, following ? { sessionId: id } : 'skip');
@@ -160,6 +161,7 @@ function Session({ sessionId, debug }: SessionEditorProps)
     const hit = useMutation(api.play.hit);
     const clearDecals = useMutation(api.play.clearDecals);
     const sendPing = useMutation(api.play.sendPing);
+    const castSpell = useMutation(api.play.cast);
     const draw = useMutation(api.play.draw);
     const mark = useMutation(api.play.mark);
     const drawLine = useMutation(api.play.drawLine);
@@ -231,6 +233,8 @@ function Session({ sessionId, debug }: SessionEditorProps)
             resetFog: () => friendly(resetFog({ sessionId: id })),
             ping,
             sendPing: (at) => friendly(sendPing({ sessionId: id, ...at })),
+            spell,
+            cast: ({ kind, from, to }, element) => friendly(castSpell({ sessionId: id, kind, from, to, element })),
             drafts: drafts ?? noDrafts,
             draw: (tokenId, points, feet) => friendly(draw({ tokenId: tokenId as Id<'tokens'>, points, feet })),
             marks: marks ?? noMarks,

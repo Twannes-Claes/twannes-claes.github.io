@@ -2,7 +2,7 @@ import { faCheck, faDice, faDiceD20, faHatWizard, faPen, faSnowflake, faTriangle
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useEffectEvent, useRef, useState, type DragEvent, type MouseEvent } from 'react';
 
-import type { BloodSettings, ChatMessage, ChatSend, Decal, DiceAsk, DiceRoll, Drawing, FogSettings, GameSystem, GroupCheck, HitKind, Initiative, Live, LoggedHit, MonsterControls, MusicControls, PictureBytes, Pen, Ping, Point, Preset, PropPicture, Scenario, SharedHit, Store, Token, Track } from '../types';
+import type { BloodSettings, ChatMessage, ChatSend, Decal, DiceAsk, DiceRoll, Drawing, FogSettings, GameSystem, GroupCheck, HitKind, Initiative, Live, LoggedHit, MonsterControls, MusicControls, PictureBytes, Pen, Ping, Point, Preset, PropPicture, Scenario, SharedHit, Spell, Store, Token, Track } from '../types';
 
 import { cleanConditions } from '../content/conditions';
 import { maxPlayers } from '../content/limits';
@@ -225,6 +225,7 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
     const [demoFog, setDemoFog] = useState<FogSettings>(defaultFogSettings);
     // Pings and hits off a live map stay on this screen.
     const [localPing, setLocalPing] = useState<Ping | null>(null);
+    const [localSpell, setLocalSpell] = useState<Spell | null>(null);
     const [localHit, setLocalHit] = useState<SharedHit | null>(null);
     const [localDecals, setLocalDecals] = useState<Decal[]>([]);
     // Which blood shows: the session's when it is saved, this tab's in the demo.
@@ -1210,6 +1211,8 @@ export function MapEditor({ initial, library: initialLibrary, otherBytes = 0, ba
                 onExplored={liveMap ? (fog, forget) => fail(liveMap.saveFog(fog, forget)) : undefined}
                 ping={liveMap ? liveMap.ping : localPing}
                 onPing={(at) => (liveMap ? fail(liveMap.sendPing(at)) : setLocalPing({ ...at, at: Date.now() }))}
+                spell={liveMap ? liveMap.spell : localSpell}
+                onCast={(drawn, element) => (liveMap ? fail(liveMap.cast(drawn, element)) : setLocalSpell({ ...drawn, element, at: Date.now() }))}
                 drafts={liveMap ? liveMap.drafts : undefined}
                 onDraft={liveMap ? (id, points, feet) => fail(liveMap.draw(id, points, feet)) : undefined}
                 marks={liveMap ? liveMap.marks : undefined}

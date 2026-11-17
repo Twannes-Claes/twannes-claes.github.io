@@ -1,6 +1,6 @@
-import { useEffect, useEffectEvent, useRef, type ReactNode } from 'react';
+import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react';
 
-import type { BloodSettings, Decal, Draft, Drawing, FogSettings, GameSystem, Mark, Pen, Ping, Point, PropPicture, Scenario, SharedFog, SharedHit, SharedMark, Token } from '../types';
+import type { BloodSettings, Decal, Draft, Drawing, FogSettings, GameSystem, Mark, Pen, Ping, Point, PropPicture, Scenario, SharedFog, SharedHit, SharedMark, Spell, SpellElement, Token } from '../types';
 
 import { demoCredit, demoScenario } from '../content/scenarios';
 import { penWidths } from '../map/drawings';
@@ -11,6 +11,7 @@ import type { ToolId } from '../map/tools';
 import { createMapView, type FrameStats, type MapView, type PendingMove } from '../map/view';
 
 import { carrying } from './carry';
+import { SpellPicker } from './SpellPicker';
 
 /** One empty list for screens without drafts, so its effect does not run on every render. */
 const noDrafts: Draft[] = [];
@@ -82,6 +83,10 @@ interface MapCanvasProps
     marks?: SharedMark[];
     /** Hears this screen's ruler or area as it is dragged, to share, see onMark in map/view.ts. */
     onMark?: (mark: Mark | null) => void;
+    /** The last spell effect on this map. Each new one plays, like a ping, see Spell. */
+    spell?: Spell | null;
+    /** A spell effect picked for this screen's ruler or area once let go, see SpellPicker.tsx. */
+    onCast?: (mark: Mark, element: SpellElement) => void;
     /** The lines drawn on the map, see Drawing. */
     drawings?: Drawing[];
     /** Hears this screen's line as it is drawn, see onDrawLine in map/view.ts. */
@@ -175,6 +180,8 @@ export function MapCanvas({
     onDraft,
     marks = noMarks,
     onMark,
+    spell,
+    onCast,
     drawings = noDrawings,
     onDrawLine,
     pen = defaultPen,
@@ -237,6 +244,9 @@ export function MapCanvas({
     // The last ping and hit seen, to tell a new one from the one already there.
     const lastPing = useRef<Ping | null | undefined>(undefined);
     const lastHit = useRef<SharedHit | null | undefined>(undefined);
+    const lastSpell = useRef<Spell | null | undefined>(undefined);
+    // This screen's ruler or area kept once let go, which the spell picker sits on, see onDrawn in map/view.ts.
+    const [drawn, setDrawn] = useState<Mark | null>(null);
 
     useEffect(() =>
     {
@@ -265,6 +275,7 @@ export function MapCanvas({
             onPing: (at) => pinged(at),
             onDraft: (id, points, feet) => drafted(id, points, feet),
             onMark: (mark) => markedOut(mark),
+            onDrawn: (mark) => setDrawn(mark),
             onDrawLine: (key, points, used) => lineDrawn(key, points, used),
             onEraseDrawings: (ids) => drawingsErased(ids),
             onTarget: (id) => targeted(id),
@@ -295,6 +306,7 @@ export function MapCanvas({
     {
         lastPing.current = undefined;
         lastHit.current = undefined;
+        lastSpell.current = undefined;
     }, [scenario.id]);
 
     useEffect(() =>
@@ -339,6 +351,7 @@ export function MapCanvas({
         view.current?.setFogSource(fogSource);
         lastPing.current = undefined;
         lastHit.current = undefined;
+        lastSpell.current = undefined;
     }, [fogSource]);
 
     useEffect(() =>
@@ -367,6 +380,17 @@ export function MapCanvas({
 
         lastHit.current = hit;
     }, [hit]);
+
+    useEffect(() =>
+    {
+        if (spell === undefined)
+            return;
+
+        if (lastSpell.current !== undefined && spell && spell.at !== lastSpell.current?.at)
+            view.current?.cast(spell);
+
+        lastSpell.current = spell;
+    }, [spell]);
 
     useEffect(() =>
     {
@@ -498,6 +522,16 @@ export function MapCanvas({
             />
             <div ref={layer} className="ttrpg-pins">
                 {overlay}
+                {onCast && drawn && (
+                    <SpellPicker
+                        mark={drawn}
+                        onCast={(element) =>
+                        {
+                            onCast(drawn, element);
+                            view.current?.forgetDrawn();
+                        }}
+                    />
+                )}
             </div>
             {/* The demo's picture is free to use with attribution, so the public demo credits its
                 maker. Sessions are played in private, so the example session and its copies

@@ -854,8 +854,8 @@ Built into play mode neatly, it should look and feel good.
   Player views. While a ruler is dragged it goes to every screen, like a live path: one row per
   person in `marks` (`play.mark`, `play.marks`), at most every 150 ms, gone when let go or after a
   minute without a change. A ruler drawn in the Player view's own window stays on it, as that
-  window runs as the host and would get it back as the GM's. Cones, lines and cubes can join the
-  pop-out the same way, see 16.
+  window runs as the host and would get it back as the GM's. The cone joined the pop-out the
+  same way, see 16.
 - **Select tool in Edit, built** (B, `components/SelectPanel.tsx`): click a token, Shift+click to
   add or take one off, drag a box on empty ground, Ctrl+A for all, Esc for none, each picked one
   ringed (`setSelection` in `map/view.ts`). Dragging a picked token moves them all, onto the grid
@@ -1310,11 +1310,34 @@ the chest, what the statue says.
 
 #### Rulers and effects
 
-**35. Line and cube rulers.** A line with a width (a lightning bolt, 5 ft wide) and a cube join
-Line, Circle and Cone in the ruler's pop-out (10, 16).
-
 **36. Spell effects.** After a ruler area is drawn, pick an element (fire, frost, lightning, acid,
 radiant) and it plays there on every screen, drawn in code, a few seconds long.
+
+- **Built.** A Line, Circle or Cone let go stays on the screen that drew it, with a row of five
+  elements at its far end (`components/SpellPicker.tsx`), until the next press, another tool or a
+  pick. A pick plays the effect in that shape on every screen for three seconds, a line one cell
+  wide (`drawSpell` in `map/spells.ts`):
+    - **Fire** bursts white-hot and billows outwards, filling the shape, then burns down.
+    - **Frost** lands in a blast of cold, a flash and a ring rushing out with ice racing after it
+      into a cracked, streaked sheet, cold mist curling over it the whole time.
+    - **Lightning** strikes forking bolts, each on its own beat, shooting out and dimming, with
+      crackle flickering over the area, arcs crawling along the edge and the area lighting up on a
+      strike.
+    - **Acid** is a murky green cloud filling it, matte and lumpy, its billows shaded like smoke,
+      with popping specks and a fizzing edge.
+    - **Radiant** lands in a blinding golden flash and two rings of light rushing out, then blazes
+      with rays round a pulsing heart, motes rising and a halo spilling past the edge.
+- Each spreads out from where the shape starts, then fades. It is one WebGL2 fragment shader, the
+  renderer's first, painting a canvas off screen as big as the shape on screen, at most 1024
+  pixels, which the map's 2D canvas draws like a picture. Fire, acid and radiant are soft and drawn
+  at half that, a quarter of the cost; frost's cracks and the bolts are kept at least a pixel
+  wide, so a big area stays smooth. Bolts have round ends, and every effect fades out before the
+  edge of its picture, so none is cut off in a straight line. Its noise is seeded by the cast's
+  time, so every screen plays the same one; a 20 ft area costs 2 to 5 ms a frame at 4K. Reduced
+  motion, or no WebGL2, shows a glow over the shape alone, fading in and out.
+- Anyone who may measure may cast, the GM and the players at the table. The last cast is one row
+  per session in `casts` (`play.cast`, `play.spell`), played like a ping, at most 20 a minute
+  per person (`cast` in `convex/limits.ts`). The demo plays it on its own screen.
 
 #### Looks
 
@@ -1350,6 +1373,7 @@ rather than the queries.
 - **Condition rounds (30).** Typing rounds when a condition goes on is more work than the table
   tracking "for a minute" itself, and the one condition whose value counts down on its own,
   Pathfinder's Frightened, did not pay for a setting, a toast and the server logic.
+- **Line and cube rulers (35).** Built once and taken out: Line, Circle and Cone are enough.
 
 ---
 

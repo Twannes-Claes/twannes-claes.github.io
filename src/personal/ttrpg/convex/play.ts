@@ -1,7 +1,7 @@
 import { getAuthUserId } from '@convex-dev/auth/server';
 import { ConvexError, v } from 'convex/values';
 
-import type { Decal, Draft, Drawing, Grid, PlayerFight, Point, Scenario, SharedHit, SharedMark, Token } from '../types';
+import type { Decal, Draft, Drawing, Grid, PlayerFight, Point, Scenario, SharedHit, SharedMark, Spell, Token } from '../types';
 import { cleanConditions, isSave } from '../content/conditions';
 import { maxPlayers } from '../content/limits';
 import { colourPattern, defaultAccent } from '../map/colours';
@@ -1550,6 +1550,69 @@ export const sendPing = mutation({
             await ctx.db.insert('pings', ping);
         else if (at - doc.at >= pingGap)
             await ctx.db.replace('pings', doc._id, ping);
+
+        return null;
+    },
+});
+
+/** The last spell effect on the map being played, played like a ping, see Spell in types.ts. */
+export const spell = query({
+    args: { sessionId: v.id('sessions') },
+    handler: async (ctx, { sessionId }): Promise<Spell | null> =>
+    {
+        const session = await memberOf(ctx, sessionId);
+        const doc = session
+            ? await ctx.db
+                .query('casts')
+                .withIndex('by_sessionId', (q) => q.eq('sessionId', sessionId))
+                .unique()
+            : null;
+
+        if (!session || !doc || !session.live || doc.scenarioId !== session.activeScenarioId)
+            return null;
+
+        return { kind: doc.kind, from: doc.from, to: doc.to, element: doc.element, at: doc.at };
+    },
+});
+
+/**
+ * The host or a player at the table plays a spell effect in the shape of the ruler they drew, on
+ * every screen. Anyone who may measure may cast, as it is only a picture.
+ */
+export const cast = mutation({
+    args: {
+        sessionId: v.id('sessions'),
+        kind: v.union(v.literal('ruler'), v.literal('area'), v.literal('cone')),
+        from: v.object({ x: v.number(), y: v.number() }),
+        to: v.object({ x: v.number(), y: v.number() }),
+        element: v.union(v.literal('fire'), v.literal('frost'), v.literal('lightning'), v.literal('acid'), v.literal('radiant')),
+    },
+    handler: async (ctx, { sessionId, ...shape }) =>
+    {
+        const userId = await requireUser(ctx);
+        const session = await sessionOf(ctx, sessionId);
+        const scenarioId = session.activeScenarioId;
+
+        if (session.ownerId !== userId && !(await ownToken(ctx, sessionId, userId)))
+            throw new ConvexError('Join the session to cast.');
+
+        const scenario = scenarioId && session.live ? await scenarioOf(ctx, sessionId, scenarioId) : null;
+
+        if (!scenarioId || !scenario || !onScenario(scenario, shape.from) || ![shape.to.x, shape.to.y].every(Number.isFinite))
+            return null;
+
+        await limit(ctx, userId, 'cast');
+
+        const doc = await ctx.db
+            .query('casts')
+            .withIndex('by_sessionId', (q) => q.eq('sessionId', sessionId))
+            .unique();
+        const row = { sessionId, scenarioId, ...shape, at: Date.now() };
+
+        if (doc)
+            await ctx.db.replace('casts', doc._id, row);
+        else
+            await ctx.db.insert('casts', row);
 
         return null;
     },

@@ -205,6 +205,19 @@ export interface Mark
     rise?: number;
 }
 
+/** What a spell effect looks like, see map/spells.ts. */
+export type SpellElement = 'fire' | 'frost' | 'lightning' | 'acid' | 'radiant';
+
+/**
+ * A spell effect playing in a ruler's shape on every screen for a few seconds, see casts in
+ * convex/play.ts. at is when, by the server's clock, and tells one cast from the next, like Ping.
+ */
+export interface Spell extends Mark
+{
+    element: SpellElement;
+    at: number;
+}
+
 /** Another screen's mark, in its player's ring colour, or the GM's without one. */
 export interface SharedMark extends Mark
 {
@@ -406,6 +419,10 @@ export interface Live
     ping: Ping | null | undefined;
     /** Flashes a spot of the map being played on every screen. */
     sendPing: (at: Point) => Promise<void>;
+    /** The last spell effect on the map being played, undefined while it loads, see Spell. */
+    spell: Spell | null | undefined;
+    /** Plays a spell effect in a ruler's shape on every screen. */
+    cast: (mark: Mark, element: SpellElement) => Promise<void>;
     /** The paths players are drawing on other screens, see Draft. */
     drafts: Draft[];
     /** Shares a player's path as it is drawn, or drops it with null. */

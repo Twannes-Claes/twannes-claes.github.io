@@ -1211,9 +1211,11 @@ assert.deepEqual(
 }
 
 // A cone starts on the nearer grid corner and reaches in whole cells. In Pathfinder 2e it points
-// straight or diagonally; in 5e any way.
+// straight or diagonally; in 5e any way. Let go, it goes from every screen but hands itself over
+// for a spell effect.
 {
     const shared: (Mark | null)[] = [];
+    let left: Mark | undefined;
     const cell = edited.grid.size;
     const cone = createTool(
         'cone',
@@ -1221,7 +1223,11 @@ assert.deepEqual(
         null,
         undefined,
         1,
-        (mark) => void shared.push(mark),
+        (mark, kept) =>
+        {
+            shared.push(mark);
+            left = kept;
+        },
     );
     const at = (x: number, y: number, system: GameSystem): ToolPointer => ({
         world: { x, y },
@@ -1244,6 +1250,10 @@ assert.deepEqual(
     const free = shared.at(-1);
 
     assert.ok(free && free.to.y > cell && Math.abs(distance(free.from, free.to) - cell * 3) < 1e-9);
+
+    cone?.up?.(at(cell * 3.9, cell * 1.6, '5e'));
+    assert.equal(shared.at(-1), null);
+    assert.deepEqual(left, free);
 }
 
 // A line takes a point only once the pointer moved a few screen pixels, and stops at its limit.

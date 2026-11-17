@@ -259,6 +259,19 @@ export default defineSchema({
         at: v.number(),
     }).index('by_sessionId', ['sessionId']),
     /**
+     * The last spell effect of a session, one row each, played in a ruler's shape on every
+     * screen, see cast in convex/play.ts. Its own table, like pings.
+     */
+    casts: defineTable({
+        sessionId: v.id('sessions'),
+        scenarioId: v.string(),
+        kind: v.union(v.literal('ruler'), v.literal('area'), v.literal('cone')),
+        from: v.object({ x: v.number(), y: v.number() }),
+        to: v.object({ x: v.number(), y: v.number() }),
+        element: v.union(v.literal('fire'), v.literal('frost'), v.literal('lightning'), v.literal('acid'), v.literal('radiant')),
+        at: v.number(),
+    }).index('by_sessionId', ['sessionId']),
+    /**
      * The last attack or heal of a session, one row each, for the animation every screen plays,
      * see hit in convex/play.ts. Its own table, like pings.
      */

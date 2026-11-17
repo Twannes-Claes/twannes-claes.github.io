@@ -22,6 +22,8 @@ const rates = {
     chat: { max: 30, window: minute },
     /** A player's pictures in the chat, on top of chat: each one is stored, see chat.uploadUrl. */
     picture: { max: 10, window: 10 * minute },
+    /** Spell effects, each played on every screen for a few seconds, see play.cast. */
+    cast: { max: 20, window: minute },
     /** Paths, rulers and lines, sent every 150 ms while dragging, see view.ts. */
     drag: { max: 600, window: minute },
 };

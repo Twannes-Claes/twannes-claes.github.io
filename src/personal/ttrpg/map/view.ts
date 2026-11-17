@@ -1,4 +1,4 @@
-import type { BloodSettings, Cell, CreatureSize, Decal, Draft, Drawing, FogSettings, GameSystem, Mark, Pen, Point, Prop, PropPicture, Scenario, SharedFog, SharedHit, SharedMark, Token } from '../types';
+import type { BloodSettings, Cell, CreatureSize, Decal, Draft, Drawing, FogSettings, GameSystem, Mark, Pen, Point, Prop, PropPicture, Scenario, SharedFog, SharedHit, SharedMark, Spell, Token } from '../types';
 
 import { buzz } from '../services/haptics.ts';
 
@@ -19,7 +19,7 @@ import {
     type FogLayers,
     type MistLook,
 } from './fog.ts';
-import { accent, ground, highlight, tooFar } from './colours.ts';
+import { accent, ground, highlight, ink, tooFar } from './colours.ts';
 import { distance, lerp, midpoint, onMap } from './geometry.ts';
 import { defaultBlood, stateOf } from './health.ts';
 import { extendPath, lineFeet, pathBlocked, pathFeet } from './path.ts';
@@ -50,6 +50,7 @@ import {
 import { propAt } from './props.ts';
 import { anchorAt, footprint, footprintCenter, footprintKeys, landingAt, partners } from './size.ts';
 import { stuckAt } from './spawn.ts';
+import { drawSpell, spellLife } from './spells.ts';
 import { drawLine, penWidths } from './drawings.ts';
 import { createTool, drawBox, drawMark, drawPropGhost, fingerGap, type MapTool, type ToolId, type ToolPointer } from './tools.ts';
 import { insidePolygon, sightSegments, visibilityPolygon, type Segment } from './visibility.ts';
@@ -140,6 +141,11 @@ export interface MapViewOptions
     onDraft?: (id: string, points: Point[] | null, feet: number) => void;
     /** This screen's ruler or area as it is dragged, to show on every other screen, see Mark. */
     onMark?: (mark: Mark | null) => void;
+    /**
+     * This screen's ruler or area once let go, kept on the map to cast a spell effect in, or null
+     * once it goes: at the next press, with another tool, or by forgetDrawn. Only in play.
+     */
+    onDrawn?: (mark: Mark | null) => void;
     /** This screen's line as it is drawn, by a key it made up, see Drawing. */
     onDrawLine?: (key: string, points: Point[], pen: Pen) => Promise<void> | void;
     /** Lines the eraser went over, see Drawing. */
@@ -195,6 +201,10 @@ export interface MapView
     ping: (at: Point, color?: string) => void;
     /** Plays an attack or a heal on where its targets stood, see drawHit in map/render.ts. */
     hit: (hit: SharedHit) => void;
+    /** Plays a spell effect in its ruler's shape, see drawSpell in map/spells.ts. */
+    cast: (spell: Spell) => void;
+    /** Drops the ruler or area kept for a spell effect, see onDrawn. */
+    forgetDrawn: () => void;
     /**
      * Picking targets for an attack or a heal, with the ones picked so far ringed, or null when
      * not. While picking, a press on a token goes to onTarget rather than moving it.
@@ -359,6 +369,10 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
     let pings: { x: number; y: number; color?: string; start: number }[] = [];
     /** The attacks and heals playing now, like pings. */
     let hits: (HitEffect & { start: number })[] = [];
+    /** The spell effects playing now, like pings. */
+    let spells: (Spell & { start: number })[] = [];
+    /** This screen's ruler or area kept after it was let go, see onDrawn. */
+    let drawn: Mark | null = null;
     /** The tokens picked as targets, or null when not picking, see setTargets. */
     let targets: string[] | null = null;
     /** The decals, with since when each shows, and the cleared ones, with since when they fade. */
@@ -727,8 +741,21 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
      * the latest one once its turn comes. Letting go goes at once. Only in play: an edit tool never
      * makes one, and the fog being on means the session's map is shown.
      */
-    const shareMark = (mark: Mark | null) =>
+    const keepDrawn = (next: Mark | null) =>
     {
+        if (next === drawn)
+            return;
+
+        drawn = next;
+        options.onDrawn?.(next);
+        redraw();
+    };
+
+    const shareMark = (mark: Mark | null, left?: Mark) =>
+    {
+        // A ruler of no length has nothing to cast in.
+        keepDrawn(fogEnabled && left && (left.from.x !== left.to.x || left.from.y !== left.to.y) ? left : null);
+
         if (!options.onMark || (mark && !fogEnabled))
             return;
 
@@ -934,6 +961,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         // The fog or a token still fading in or out.
         pings = pings.filter((ping) => time - ping.start < pingLife);
         hits = hits.filter((hit) => time - hit.start < hitLife);
+        spells = spells.filter((spell) => time - spell.start < spellLife);
         clearedDecals = calm.matches ? [] : clearedDecals.filter((decal) => time - decal.at < decalFade);
 
         // A new pool spreads out fast and settles, like spilt liquid, its colour there well before
@@ -956,7 +984,7 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         ];
         const decalsMoving = blood.ground && (clearedDecals.length > 0 || decals.some((decal) => progress(decal.at, decalSpread) < 1));
         const settling =
-            fading.size > 0 || ringsMoving(time) || mounting.size > 0 || pings.length > 0 || hits.length > 0 || decalsMoving || (layers !== null && time - layers.changedAt < fogSettings.fade);
+            fading.size > 0 || ringsMoving(time) || mounting.size > 0 || pings.length > 0 || hits.length > 0 || spells.length > 0 || decalsMoving || (layers !== null && time - layers.changedAt < fogSettings.fade);
 
         // Only the smoke is moving: skip frames until its own rate comes round.
         if (!urgent && !walking && !settling && time - drawnAt < 1000 / smokeFps)
@@ -1135,6 +1163,9 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         for (const mark of marks)
             drawMark(context, mark, camera.zoom, scenario, mark.color ?? highlight, system);
 
+        if (drawn)
+            drawMark(context, drawn, camera.zoom, scenario, ink, system);
+
         tool?.draw(context, camera.zoom, scenario);
 
         if (propGhost)
@@ -1147,11 +1178,14 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         for (const hit of hits)
             drawHit(context, hit, (time - hit.start) / hitLife, camera.zoom, !calm.matches);
 
+        for (const spell of spells)
+            drawSpell(context, spell, (time - spell.start) / 1000, scenario.grid.size, camera.zoom, system, !calm.matches);
+
         // The smoke and the mist drift, walking tokens move, fog changes, tokens fade and glide, so they ask for
         // the next frame. Reduced motion keeps the smoke still and skips the fades; a walk still
         // plays. Only once: the fog refreshed above may already have asked, and two would draw
         // every frame twice.
-        if ((walking || fading.size > 0 || ringsMoving(time) || mounting.size > 0 || pings.length > 0 || hits.length > 0 || decalsMoving || ((fog || scenario.mists?.length) && !calm.matches)) && frame === 0)
+        if ((walking || fading.size > 0 || ringsMoving(time) || mounting.size > 0 || pings.length > 0 || hits.length > 0 || spells.length > 0 || decalsMoving || ((fog || scenario.mists?.length) && !calm.matches)) && frame === 0)
             frame = requestAnimationFrame(draw);
 
         measure(time, performance.now() - started);
@@ -2094,9 +2128,11 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
         },
         setTool: (id, placing = null, snap = 1, mist = null) =>
         {
-            // A ruler or area still out goes with the tool that drew it.
+            // A ruler or area still out goes with the tool that drew it, and one kept with it.
             if (marked || markTimer)
                 shareMark(null);
+
+            keepDrawn(null);
 
             tool = createTool(id, changeScenario, placing, reveal, snap, shareMark, (ids) => options.onMonstersErase?.(ids), {
                 share: shareLine,
@@ -2151,6 +2187,12 @@ export function createMapView(canvas: HTMLCanvasElement, options: MapViewOptions
 
             redraw();
         },
+        cast: (spell) =>
+        {
+            spells.push({ ...spell, start: performance.now() });
+            redraw();
+        },
+        forgetDrawn: () => keepDrawn(null),
         setTargets: (ids) =>
         {
             targets = ids;
